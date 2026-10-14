@@ -25,6 +25,24 @@ export interface ChangeSet {
 }
 export interface ChangeSetSummary { id: string; number: string; orgId: string; author: string; description: string; status: Status; createdAt: string; finishedAt: string | null; total: number; ok: number; errors: number }
 
+export interface RecordTypeInfo { id: string | null; developerName: string | null; label: string; active: boolean }
+export interface ProfileInfo { id: string; permSetId: string; name: string; fullName: string | null }
+export interface LayoutAnalysis {
+  object: string; recordTypes: RecordTypeInfo[]; profiles: ProfileInfo[];
+  layouts: { id: string; name: string; namespace: string | null; fields: string[] }[];
+  assignments: { profileId: string; recordTypeId: string | null; layoutId: string }[];
+  noObjectRead: string[];
+  gaps: { profileId: string; layoutId: string; fields: string[] }[];
+}
+export interface PageAnalysis {
+  object: string; recordTypes: RecordTypeInfo[]; profiles: ProfileInfo[];
+  apps: { name: string; label: string }[];
+  pages: { id: string; name: string; label: string; components: string[]; fields: string[] }[];
+  orgDefault: string | null;
+  appDefaults: { app: string; page: string }[];
+  assignments: { app: string; profile: string; recordType: string | null; page: string }[];
+}
+
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }
@@ -48,6 +66,8 @@ export const api = {
   removeOrg: (id: string) => call('DELETE', `/api/orgs/${id}`),
   renameOrg: (id: string, alias: string) => call<Org>('PATCH', `/api/orgs/${id}`, { alias }),
   objects: (orgId: string) => call<SObject[]>('GET', `/api/orgs/${orgId}/objects`),
+  layouts: (orgId: string, object: string) => call<LayoutAnalysis>('GET', `/api/orgs/${orgId}/layouts?object=${encodeURIComponent(object)}`),
+  lightningPages: (orgId: string, object: string) => call<PageAnalysis>('GET', `/api/orgs/${orgId}/lightning-pages?object=${encodeURIComponent(object)}`),
   matrix: (orgId: string, objects: string[]) => call<Matrix>('GET', `/api/orgs/${orgId}/matrix?objects=${encodeURIComponent(objects.join(','))}`),
   createChangeSet: (orgId: string, body: { description?: string; changes?: { parentId: string; field: string; access: Access }[] }) =>
     call<ChangeSet>('POST', `/api/orgs/${orgId}/change-sets`, body),
