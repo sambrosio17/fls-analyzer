@@ -30,17 +30,25 @@ const DESCRIBES = {
   ] }
 };
 
-export function demoOrg(): MemoryOrg {
+/** `large` adds hundreds of fields and over a thousand permission sets, to try the matrix at scale (DEMO_LARGE=true). */
+export function demoOrg(large = false): MemoryOrg {
   const permissionSets = [
     profile('0PS0000000000A1', 'System Administrator'), profile('0PS0000000000A2', 'Sales User'), profile('0PS0000000000A3', 'Customer Service'),
     profile('0PS0000000000A5', 'Partner Community User', 'Partner Community'),
     permSet('0PS0000000000B1', 'Finance_Access', 'Finance Access'), permSet('0PS0000000000B2', 'Sales_Ops', 'Sales Ops'),
     permSet('0PS0000000000B3', 'GDPR_Data_Steward', 'GDPR Data Steward'), permSet('0PS0000000000B4', 'CPQ_Admin', 'CPQ Admin', 'SBQQ')
   ];
+  const describes = large ? withExtraFields(DESCRIBES, 400) : DESCRIBES;
+  if (large) {
+    for (let k = 1; k <= 1500; k++) {
+      const id = `0PS9${String(k).padStart(11, '0')}`;
+      permissionSets.push(k % 5 === 0 ? profile(id, `Profilo ${k}`) : permSet(id, `Demo_Set_${k}`, `Permission set demo ${k}`));
+    }
+  }
   const noObject: Record<string, string[]> = { '0PS0000000000B1': ['Contact'], '0PS0000000000B3': ['Opportunity'], '0PS0000000000A5': ['Contact'] };
-  const objectPerms = permissionSets.flatMap(p => Object.keys(DESCRIBES)
+  const objectPerms = permissionSets.flatMap(p => Object.keys(describes)
     .filter(o => !(noObject[p.Id] ?? []).includes(o)).map(o => ({ ParentId: p.Id, SobjectType: o, PermissionsRead: true })));
-  const org = new MemoryOrg({ name: 'Demo (dati di esempio)', isSandbox: true, permissionSets, objectPerms, describes: DESCRIBES });
+  const org = new MemoryOrg({ name: 'Demo (dati di esempio)', isSandbox: true, permissionSets, objectPerms, describes });
   // Inserting encrypted fields fails, to show per-row errors in the result.
   org.rejectFields = new Set(['Account.Billing_IBAN__c', 'Contact.Fiscal_Code__c']);
 
@@ -48,7 +56,7 @@ export function demoOrg(): MemoryOrg {
   let n = 7;
   const rnd = () => (n = (n * 48271) % 2147483647) % 10;
   for (const p of permissionSets) {
-    for (const [obj, d] of Object.entries(DESCRIBES)) {
+    for (const [obj, d] of Object.entries(describes)) {
       if ((noObject[p.Id] ?? []).includes(obj)) continue;
       for (const field of d.fields) {
         if (!field.permissionable || field.type === 'address') continue;
@@ -60,4 +68,9 @@ export function demoOrg(): MemoryOrg {
     }
   }
   return org;
+}
+
+function withExtraFields(base: typeof DESCRIBES, count: number): typeof DESCRIBES {
+  const extra = Array.from({ length: count }, (_, k) => f(`Extra_Field_${k + 1}__c`, `Campo extra ${k + 1}`, k % 3 ? 'string' : 'picklist'));
+  return { ...base, Account: { ...base.Account, fields: [...base.Account.fields, ...extra] } };
 }

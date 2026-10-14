@@ -10,7 +10,7 @@ const db = new Db(config.dbPath);
 const extraApis = new Map<string, SfApi>();
 
 if (config.demoMode) {
-  const demo = demoOrg();
+  const demo = demoOrg(process.env.DEMO_LARGE === 'true');
   extraApis.set(DEMO_ORG_ID, demo);
   db.upsertOrg({
     id: DEMO_ORG_ID, tenant_id: DEFAULT_TENANT, sf_org_id: '00DDEMO', name: demo.data.name, username: 'demo@example.com',

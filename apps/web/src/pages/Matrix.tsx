@@ -1,9 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ACCESS_LONG, ACCESS_SHORT, api, type Access, type BulkAction, type FieldMeta, type Matrix, type Org, type PermSet, type SObject } from '../api.ts';
 
-const key = (parentId: string, field: string) => `${parentId}|${field}`;
-const locked = (f: FieldMeta, p: PermSet) => !f.permissionable || !!p.namespace || p.type === 'Group' || p.type === 'Muting';
+const lockedPs = (p: PermSet) => !!p.namespace || p.type === 'Group' || p.type === 'Muting';
 type Filter = 'all' | 'custom' | 'none' | 'editall' | 'pending';
+type PsKind = 'all' | 'profiles' | 'permsets';
+
+// The grid only renders the cells in view, so every row and column has a fixed size.
+const ROW_H = 48;
+const COL_W = 112;
+const OVERSCAN_ROWS = 8;
+const OVERSCAN_COLS = 3;
+const MAX_CHANGES = 200_000; // same limit as the server
+
+type DisplayRow = { kind: 'obj'; object: string } | { kind: 'field'; i: number };
 
 interface Props { org: Org; onChangeSet: (id: string) => void }
 
@@ -14,11 +23,15 @@ export function MatrixPage({ org, onChangeSet }: Props) {
   const [matrix, setMatrix] = useState<Matrix | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(new Map<string, Access>());
-  const [rows, setRows] = useState(new Set<string>());
-  const [cols, setCols] = useState(new Set<string>());
+  // Pending changes keyed by cell index (column * fieldCount + field). Mutated in place; `rev` triggers renders.
+  const pending = useRef(new Map<number, Access>()).current;
+  const [rev, setRev] = useState(0);
+  const touch = () => setRev(r => r + 1);
+  const [rows, setRows] = useState(new Set<number>());
+  const [cols, setCols] = useState(new Set<number>());
   const [search, setSearch] = useState('');
   const [psSearch, setPsSearch] = useState('');
+  const [psKind, setPsKind] = useState<PsKind>('all');
   const [filter, setFilter] = useState<Filter>('all');
   const [bulkAction, setBulkAction] = useState<BulkAction>('read');
   const [creating, setCreating] = useState(false);
@@ -27,79 +40,175 @@ export function MatrixPage({ org, onChangeSet }: Props) {
 
   const load = async (list: string[]) => {
     setSelected(list);
-    setPending(new Map()); setRows(new Set()); setCols(new Set());
+    discard(); setRows(new Set()); setCols(new Set());
     if (!list.length) { setMatrix(null); return; }
     setLoading(true); setError(null);
     try { setMatrix(await api.matrix(org.id, list)); } catch (e) { setError((e as Error).message); } finally { setLoading(false); }
   };
 
-  const base = useMemo(() => new Map((matrix?.cells ?? []).map(c => [key(c.parentId, c.field), c.access])), [matrix]);
-  const objectRead = useMemo(() => new Set((matrix?.objectRead ?? []).map(o => key(o.parentId, o.sobjectType))), [matrix]);
-  const baseOf = (k: string): Access => base.get(k) ?? 0;
-  const cur = (k: string): Access => pending.get(k) ?? baseOf(k);
+  const allFields = matrix?.fields ?? [];
+  const allPs = matrix?.permissionSets ?? [];
+  const F = allFields.length;
 
-  const columns = useMemo(() => (matrix?.permissionSets ?? []).filter(p => !psSearch || p.label.toLowerCase().includes(psSearch.toLowerCase())), [matrix, psSearch]);
+  const base = useMemo(() => {
+    const out = new Uint8Array(F * allPs.length);
+    if (!matrix) return out;
+    allPs.forEach((p, j) => {
+      const s = matrix.access[p.id];
+      if (s) for (let i = 0; i < F; i++) out[j * F + i] = s.charCodeAt(i) - 48;
+    });
+    return out;
+  }, [matrix]);
+  // Current values (base overlaid with pending), kept in sync by setCell so counts and filters read a typed array.
+  const current = useMemo(() => base.slice(), [base]);
+  const objectRead = useMemo(() => new Set((matrix?.objectRead ?? []).map(o => `${o.parentId}|${o.sobjectType}`)), [matrix]);
+
+  const cur = (idx: number): Access => current[idx] as Access;
+  const discard = () => { pending.clear(); current.set(base); touch(); };
+  const locked = (f: FieldMeta, p: PermSet) => !f.permissionable || lockedPs(p);
+
+  const columns = useMemo(() => {
+    const q = psSearch.toLowerCase();
+    const out: number[] = [];
+    allPs.forEach((p, j) => {
+      if (psKind === 'profiles' && !p.isProfile) return;
+      if (psKind === 'permsets' && p.isProfile) return;
+      if (q && !p.label.toLowerCase().includes(q) && !p.name.toLowerCase().includes(q)) return;
+      out.push(j);
+    });
+    return out;
+  }, [matrix, psSearch, psKind]);
+
   const fields = useMemo(() => {
     const q = search.toLowerCase();
-    return (matrix?.fields ?? []).filter(f => {
-      if (q && !f.label.toLowerCase().includes(q) && !f.name.toLowerCase().includes(q)) return false;
-      if (filter === 'custom') return f.custom;
-      if (filter === 'all') return true;
-      if (!f.permissionable) return false;
-      const vals = columns.map(p => cur(key(p.id, f.name)));
-      if (filter === 'none') return vals.every(v => v === 0);
-      if (filter === 'editall') return vals.length > 0 && vals.every(v => v === 2);
-      return columns.some(p => pending.has(key(p.id, f.name)));
+    const out: number[] = [];
+    allFields.forEach((f, i) => {
+      if (q && !f.label.toLowerCase().includes(q) && !f.name.toLowerCase().includes(q)) return;
+      if (filter === 'custom' && !f.custom) return;
+      if (filter !== 'all' && filter !== 'custom') {
+        if (!f.permissionable) return;
+        if (filter === 'none' && !columns.every(j => cur(j * F + i) === 0)) return;
+        if (filter === 'editall' && !(columns.length > 0 && columns.every(j => cur(j * F + i) === 2))) return;
+        if (filter === 'pending' && !columns.some(j => pending.has(j * F + i))) return;
+      }
+      out.push(i);
     });
-  }, [matrix, search, filter, columns, pending]);
+    return out;
+  }, [matrix, search, filter, columns, filter === 'all' || filter === 'custom' ? 0 : rev]);
 
-  const setCell = (next: Map<string, Access>, f: FieldMeta, p: PermSet, value: Access) => {
-    const k = key(p.id, f.name);
+  const displayRows = useMemo(() => {
+    const out: DisplayRow[] = [];
+    let last = '';
+    for (const i of fields) {
+      const f = allFields[i]!;
+      if (f.object !== last) { last = f.object; out.push({ kind: 'obj', object: f.object }); }
+      out.push({ kind: 'field', i });
+    }
+    return out;
+  }, [fields]);
+
+  // Read / edit counts per column over the visible permissionable fields.
+  const counts = useMemo(() => {
+    const C = allPs.length;
+    const read = new Int32Array(C), edit = new Int32Array(C);
+    const visible = new Uint8Array(F);
+    for (const i of fields) if (allFields[i]!.permissionable) visible[i] = 1;
+    for (const j of columns) {
+      let r = 0, e = 0;
+      const off = j * F;
+      for (let i = 0; i < F; i++) {
+        if (!visible[i]) continue;
+        const v = current[off + i]!;
+        if (v > 0) r++;
+        if (v === 2) e++;
+      }
+      read[j] = r; edit[j] = e;
+    }
+    return { read, edit };
+  }, [current, fields, columns, rev]);
+
+  const setCell = (f: FieldMeta, idx: number, value: Access) => {
     const v: Access = f.calculated && value === 2 ? 1 : value;
-    if (v === baseOf(k)) next.delete(k); else next.set(k, v);
+    if (v === base[idx]) pending.delete(idx); else pending.set(idx, v);
+    current[idx] = v;
   };
 
-  const clickCell = (f: FieldMeta, p: PermSet) => {
-    if (locked(f, p)) return;
+  const clickCell = (i: number, j: number) => {
+    const f = allFields[i]!;
+    if (locked(f, allPs[j]!)) return;
+    const idx = j * F + i;
     const states: Access[] = f.calculated ? [0, 1] : [0, 1, 2];
-    const next = new Map(pending);
-    setCell(next, f, p, states[(states.indexOf(cur(key(p.id, f.name))) + 1) % states.length]!);
-    setPending(next);
+    setCell(f, idx, states[(states.indexOf(cur(idx)) + 1) % states.length]!);
+    touch();
   };
 
   const applyBulk = () => {
-    if (!matrix) return;
-    const next = new Map(pending);
-    for (const f of matrix.fields.filter(x => rows.has(x.name))) {
-      for (const p of matrix.permissionSets.filter(x => cols.has(x.id))) {
-        if (locked(f, p)) continue;
-        const c = cur(key(p.id, f.name));
+    for (const i of rows) {
+      const f = allFields[i]!;
+      for (const j of cols) {
+        if (locked(f, allPs[j]!)) continue;
+        const idx = j * F + i;
+        const c = cur(idx);
         const target: Access = bulkAction === 'read' ? 1 : bulkAction === 'edit' ? 2 : bulkAction === 'none' ? 0 : c === 2 ? 1 : c;
-        setCell(next, f, p, target);
+        setCell(f, idx, target);
       }
     }
-    setPending(next);
+    touch();
   };
 
   const createChangeSet = async () => {
+    if (pending.size > MAX_CHANGES) {
+      setError(`Troppe modifiche per un solo change set (${pending.size.toLocaleString('it-IT')}, massimo ${MAX_CHANGES.toLocaleString('it-IT')}). Dividile in più change set, per esempio filtrando i profili.`);
+      return;
+    }
     setCreating(true); setError(null);
     try {
-      const changes = [...pending].map(([k, access]) => { const [parentId, field] = k.split('|') as [string, string]; return { parentId, field, access }; });
+      const changes = [...pending].map(([idx, access]) => ({ parentId: allPs[Math.floor(idx / F)]!.id, field: allFields[idx % F]!.name, access }));
       const cs = await api.createChangeSet(org.id, { changes, description: `${new Set(changes.map(c => c.field)).size} campi su ${new Set(changes.map(c => c.parentId)).size} profili/permission set` });
       onChangeSet(cs.id);
     } catch (e) { setError((e as Error).message); setCreating(false); }
   };
 
-  const toggle = (set: Set<string>, value: string, update: (s: Set<string>) => void) => {
+  const toggle = (set: Set<number>, value: number, update: (s: Set<number>) => void) => {
     const next = new Set(set);
     if (next.has(value)) next.delete(value); else next.add(value);
     update(next);
   };
 
+  // ---- virtual window
+  const scroller = useRef<HTMLDivElement>(null);
+  const head = useRef<HTMLTableSectionElement>(null);
+  const fcol = useRef<HTMLTableCellElement>(null);
+  const [view, setView] = useState({ top: 0, left: 0, width: 1200, height: 600, headH: 90, fcolW: 280 });
+  const measure = () => {
+    const el = scroller.current;
+    if (!el) return;
+    const next = { top: el.scrollTop, left: el.scrollLeft, width: el.clientWidth, height: el.clientHeight, headH: head.current?.offsetHeight ?? 90, fcolW: fcol.current?.offsetWidth ?? 280 };
+    setView(v => (v.top === next.top && v.left === next.left && v.width === next.width && v.height === next.height && v.headH === next.headH && v.fcolW === next.fcolW) ? v : next);
+  };
+  const frame = useRef(0);
+  const onScroll = () => { cancelAnimationFrame(frame.current); frame.current = requestAnimationFrame(measure); };
+  useLayoutEffect(() => {
+    measure();
+    const el = scroller.current;
+    if (!el) return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [matrix, loading]);
+
+  const firstRow = Math.max(0, Math.floor((view.top - view.headH) / ROW_H) - OVERSCAN_ROWS);
+  const lastRow = Math.min(displayRows.length, Math.ceil((view.top + view.height) / ROW_H) + OVERSCAN_ROWS);
+  const firstCol = Math.max(0, Math.floor(view.left / COL_W) - OVERSCAN_COLS);
+  const lastCol = Math.min(columns.length, Math.ceil((view.left + view.width - view.fcolW) / COL_W) + OVERSCAN_COLS);
+  const visCols = columns.slice(firstCol, lastCol);
+  const leftPad = firstCol * COL_W, rightPad = (columns.length - lastCol) * COL_W;
+  const padCells = (pad: number, k: string) => pad > 0 ? <td className="pad" key={k} style={{ width: pad, minWidth: pad }} /> : null;
+
+  const permissionableVisible = fields.filter(i => allFields[i]!.permissionable);
   const objectMatches = objectQuery.length < 2 ? [] : objects.filter(o =>
     !selected.includes(o.name) && (o.label.toLowerCase().includes(objectQuery.toLowerCase()) || o.name.toLowerCase().includes(objectQuery.toLowerCase()))).slice(0, 8);
 
-  let lastObject = '';
   return (
     <>
       <div className="view-head">
@@ -134,6 +243,9 @@ export function MatrixPage({ org, onChangeSet }: Props) {
           <div className="toolbar">
             <input className="input" id="field-search" type="search" placeholder="Cerca campo" value={search} onChange={e => setSearch(e.target.value)} />
             <input className="input" id="ps-search" type="search" placeholder="Filtra profili e permission set" value={psSearch} onChange={e => setPsSearch(e.target.value)} />
+            <select className="input" id="ps-kind" value={psKind} onChange={e => setPsKind(e.target.value as PsKind)}>
+              <option value="all">Profili e permission set</option><option value="profiles">Solo profili</option><option value="permsets">Solo permission set</option>
+            </select>
             {([['all', 'Tutti'], ['none', 'Non visibili a nessuno'], ['editall', 'Modificabili da tutti'], ['custom', 'Solo custom'], ['pending', 'Con modifiche']] as const).map(([f, l]) => (
               <button key={f} className="chip" aria-pressed={filter === f} onClick={() => setFilter(f)}>{l}</button>
             ))}
@@ -149,65 +261,81 @@ export function MatrixPage({ org, onChangeSet }: Props) {
             <button className="btn sm" disabled={!rows.size && !cols.size} onClick={() => { setRows(new Set()); setCols(new Set()); }}>Deseleziona</button>
             <span className="spacer" />
             <span className={pending.size ? 'warn-text' : 'muted'}><b>{pending.size}</b> modifiche in sospeso</span>
-            <button className="btn sm danger" disabled={!pending.size} onClick={() => setPending(new Map())}>Scarta</button>
+            <button className="btn sm danger" disabled={!pending.size} onClick={discard}>Scarta</button>
             <button className="btn sm primary" disabled={!pending.size || creating} onClick={createChangeSet}>{creating ? 'Preparo l\'anteprima…' : 'Vai all\'anteprima'}</button>
           </div>
 
-          <div className="scroller">
-            <table className="mx">
-              <thead>
+          <p className="muted mx-size">{fields.length} campi × {columns.length} profili/permission set</p>
+
+          <div className="scroller" ref={scroller} onScroll={onScroll}>
+            <table className="mx" style={{ width: view.fcolW + columns.length * COL_W }}>
+              <thead ref={head}>
                 <tr>
-                  <th className="fcol">
+                  <th className="fcol" ref={fcol}>
                     <label className="check"><input type="checkbox" id="all-rows"
-                      checked={fields.length > 0 && fields.every(f => !f.permissionable || rows.has(f.name))}
-                      onChange={e => setRows(e.target.checked ? new Set(fields.filter(f => f.permissionable).map(f => f.name)) : new Set())} />Campo</label>
+                      checked={permissionableVisible.length > 0 && permissionableVisible.every(i => rows.has(i))}
+                      onChange={e => setRows(e.target.checked ? new Set(permissionableVisible) : new Set())} />Campo</label>
+                    {columns.length > 0 && (
+                      <label className="check"><input type="checkbox" id="all-cols"
+                        checked={columns.every(j => lockedPs(allPs[j]!) || cols.has(j))}
+                        onChange={e => setCols(e.target.checked ? new Set(columns.filter(j => !lockedPs(allPs[j]!))) : new Set())} />Tutte le colonne</label>
+                    )}
                   </th>
-                  {columns.map(p => {
-                    const visible = fields.filter(f => f.permissionable);
-                    const r = visible.filter(f => cur(key(p.id, f.name)) > 0).length;
-                    const e = visible.filter(f => cur(key(p.id, f.name)) === 2).length;
+                  {padCells(leftPad, 'lp')}
+                  {visCols.map(j => {
+                    const p = allPs[j]!;
                     return (
-                      <th key={p.id}><div className="ps-h">
+                      <th key={p.id} className="pcol"><div className="ps-h">
                         <span className="kind">{p.isProfile ? 'Profilo' : 'Perm. set'}</span>
-                        <span className="nm" title={p.name}>{p.namespace ? '🔒 ' : ''}{p.label}</span>
-                        <span className="ct">L {r} · M {e}</span>
-                        <label><input type="checkbox" disabled={!!p.namespace} checked={cols.has(p.id)} onChange={() => toggle(cols, p.id, setCols)} />seleziona</label>
+                        <span className="nm" title={`${p.label} (${p.name})`}>{p.namespace ? '🔒 ' : ''}{p.label}</span>
+                        <span className="ct">L {counts.read[j]} · M {counts.edit[j]}</span>
+                        <label><input type="checkbox" disabled={lockedPs(p)} checked={cols.has(j)} onChange={() => toggle(cols, j, setCols)} />seleziona</label>
                       </div></th>
                     );
                   })}
+                  {padCells(rightPad, 'rp')}
                 </tr>
               </thead>
               <tbody>
-                {fields.map(f => {
-                  const header = f.object !== lastObject ? (lastObject = f.object) : null;
-                  return [
-                    header && (
-                      <tr className="obj" key={`obj-${f.object}`}><th>{f.object}</th>
-                        {columns.map(p => <td key={p.id}>{objectRead.has(key(p.id, f.object)) ? '' : <span className="warn-text" title="Nessuna lettura sull'oggetto">⚠ oggetto</span>}</td>)}
+                {firstRow > 0 && <tr className="spacer-row" style={{ height: firstRow * ROW_H }}><td colSpan={visCols.length + 3} /></tr>}
+                {displayRows.slice(firstRow, lastRow).map(row => {
+                  if (row.kind === 'obj') {
+                    return (
+                      <tr className="obj" key={`obj-${row.object}`}><th>{row.object}</th>
+                        {padCells(leftPad, 'lp')}
+                        {visCols.map(j => <td key={j}>{objectRead.has(`${allPs[j]!.id}|${row.object}`) ? '' : <span className="warn-text" title="Nessuna lettura sull'oggetto">⚠ oggetto</span>}</td>)}
+                        {padCells(rightPad, 'rp')}
                       </tr>
-                    ),
-                    <tr key={f.name} className={rows.has(f.name) ? 'sel' : ''}>
+                    );
+                  }
+                  const i = row.i, f = allFields[i]!;
+                  return (
+                    <tr key={f.name} className={rows.has(i) ? 'sel' : ''}>
                       <th><div className="fh">
-                        <input type="checkbox" id={`r-${f.name}`} disabled={!f.permissionable} checked={rows.has(f.name)} onChange={() => toggle(rows, f.name, setRows)} />
-                        <label htmlFor={`r-${f.name}`}>{f.label}</label>
-                        <span className="api">{f.name}</span>
+                        <input type="checkbox" id={`r-${f.name}`} disabled={!f.permissionable} checked={rows.has(i)} onChange={() => toggle(rows, i, setRows)} />
+                        <label htmlFor={`r-${f.name}`} title={f.label}>{f.label}</label>
+                        <span className="api" title={f.name}>{f.name}</span>
                         <span className="tags"><span className="tag">{f.type}</span>{!f.permissionable && <span className="tag">Senza FLS</span>}{f.calculated && <span className="tag">Solo lettura</span>}{f.encrypted && <span className="tag sens">Crittografato</span>}</span>
                       </div></th>
-                      {columns.map(p => {
-                        const k = key(p.id, f.name);
-                        if (!f.permissionable) return <td key={p.id} className="c locked"><button disabled title="Campo senza FLS: sempre visibile">sempre</button></td>;
-                        const v = cur(k), b = baseOf(k), isPending = pending.has(k);
+                      {padCells(leftPad, 'lp')}
+                      {visCols.map(j => {
+                        const p = allPs[j]!;
+                        if (!f.permissionable) return <td key={j} className="c locked"><button disabled title="Campo senza FLS: sempre visibile">sempre</button></td>;
+                        const idx = j * F + i;
+                        const v = cur(idx), b = base[idx] as Access, isPending = pending.has(idx);
                         return (
-                          <td key={p.id} className={`c v${v}${isPending ? ' pend' : ''}${locked(f, p) ? ' locked' : ''}${cols.has(p.id) ? ' colsel' : ''}`}>
-                            <button onClick={() => clickCell(f, p)} title={`${p.label} · ${f.name}: ${ACCESS_LONG[v]}${isPending ? ` (prima: ${ACCESS_LONG[b]})` : ''}`}>
+                          <td key={j} className={`c v${v}${isPending ? ' pend' : ''}${locked(f, p) ? ' locked' : ''}${cols.has(j) ? ' colsel' : ''}`}>
+                            <button onClick={() => clickCell(i, j)} title={`${p.label} · ${f.name}: ${ACCESS_LONG[v]}${isPending ? ` (prima: ${ACCESS_LONG[b]})` : ''}`}>
                               <span className="v">{ACCESS_SHORT[v]}</span>{isPending && <span className="was">da {ACCESS_SHORT[b]}</span>}
                             </button>
                           </td>
                         );
                       })}
+                      {padCells(rightPad, 'rp')}
                     </tr>
-                  ];
+                  );
                 })}
+                {lastRow < displayRows.length && <tr className="spacer-row" style={{ height: (displayRows.length - lastRow) * ROW_H }}><td colSpan={visCols.length + 3} /></tr>}
               </tbody>
             </table>
           </div>

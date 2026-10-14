@@ -9,7 +9,7 @@ import type { Config } from './config.ts';
 import { pkcePair, randomToken, safeEqual, TokenCipher } from './crypto.ts';
 import { DEFAULT_TENANT, Db, type OrgRow } from './db.ts';
 import { SalesforceClient, SalesforceError, type SfApi } from './salesforce/client.ts';
-import { listObjects, loadFields, loadOrgInfo, loadPermissionSets, loadSnapshot, loadUserPermissions } from './salesforce/metadata.ts';
+import { accessStrings, listObjects, loadFields, loadOrgInfo, loadPermissionSets, loadSnapshot, loadUserPermissions } from './salesforce/metadata.ts';
 import { authorizeUrl, exchangeCode, loginUrlFor, refreshAccessToken, type OAuthSettings } from './salesforce/oauth.ts';
 import { ChangeSetService, NotFoundError } from './services/changesets.ts';
 
@@ -28,7 +28,7 @@ export interface AppOptions {
 const desiredSchema = z.object({ parentId: z.string(), field: z.string(), access: z.union([z.literal(0), z.literal(1), z.literal(2)]) });
 const createSchema = z.object({
   description: z.string().max(500).optional(),
-  changes: z.array(desiredSchema).max(20000).optional(),
+  changes: z.array(desiredSchema).max(200000).optional(),
   bulk: z.array(z.object({ fields: z.array(z.string()).min(1), parentIds: z.array(z.string()).min(1), action: z.enum(['read', 'edit', 'removeEdit', 'none']) })).max(50).optional()
 });
 
@@ -167,7 +167,7 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOpti
     db.touchOrg(org.id);
     return {
       fields, permissionSets,
-      cells: fieldPerms.filter(r => r.read || r.edit).map(r => ({ parentId: r.parentId, field: r.field, access: r.edit ? 2 : 1 })),
+      access: accessStrings(fields.map(f => f.name), fieldPerms),
       objectRead: objectPerms.filter(o => o.read).map(o => ({ parentId: o.parentId, sobjectType: o.sobjectType }))
     };
   });
@@ -197,7 +197,7 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOpti
       status: cs.status, createdAt: cs.created_at, finishedAt: cs.finished_at, total: cs.total, ok: cs.ok ?? 0, errors: cs.errors ?? 0
     }));
   });
-  app.post('/api/orgs/:id/change-sets', async req => {
+  app.post('/api/orgs/:id/change-sets', { bodyLimit: 32 * 1024 * 1024 }, async req => {
     const cs = await service.create((req.params as { id: string }).id, createSchema.parse(req.body));
     return csDto(cs.id);
   });
