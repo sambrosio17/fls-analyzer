@@ -180,6 +180,6 @@ export class ChangeSetService {
     const cs = this.changeSet(id);
     const ok = this.d.db.listItems(id).filter(r => r.status === 'ok').map(itemFromRow);
     if (!ok.length) throw new Error('Nothing to roll back: no row of this change set was applied.');
-    return this.create(cs.org_id, { description: `Rollback of CS-${String(cs.seq).padStart(4, '0')}`, changes: rollbackDesired(ok) }, id);
+    return this.create(cs.org_id, { description: `Annulla CS-${String(cs.seq).padStart(4, '0')}`, changes: rollbackDesired(ok) }, id);
   }
 }

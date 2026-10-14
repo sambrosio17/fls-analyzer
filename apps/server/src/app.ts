@@ -21,6 +21,8 @@ export interface AppOptions {
   db: Db;
   /** Overrides the Salesforce client (tests). */
   apiFor?: (org: OrgRow) => SfApi;
+  /** Fixed clients by org id, e.g. the demo org. */
+  extraApis?: Map<string, SfApi>;
 }
 
 const desiredSchema = z.object({ parentId: z.string(), field: z.string(), access: z.union([z.literal(0), z.literal(1), z.literal(2)]) });
@@ -34,14 +36,14 @@ export function orgDto(o: OrgRow) {
   return { id: o.id, name: o.name, username: o.username, instanceUrl: o.instance_url, isSandbox: !!o.is_sandbox, lastSyncAt: o.last_sync_at };
 }
 
-export function buildApp({ config, db, apiFor: apiOverride }: AppOptions) {
+export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOptions) {
   const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? (process.env.VITEST ? 'silent' : 'info') } });
   const cipher = new TokenCipher(config.appSecret);
   const tenant = DEFAULT_TENANT;
   const oauth: OAuthSettings = { clientId: config.sfClientId, clientSecret: config.sfClientSecret, redirectUri: `${config.appUrl}/oauth/callback` };
   const secure = config.appUrl.startsWith('https://');
 
-  const apiFor = apiOverride ?? ((org: OrgRow) => new SalesforceClient({
+  const apiFor = apiOverride ?? ((org: OrgRow) => extraApis?.get(org.id) ?? new SalesforceClient({
     instanceUrl: org.instance_url,
     apiVersion: config.sfApiVersion,
     accessToken: org.access_token_enc ? cipher.decrypt(org.access_token_enc) : null,

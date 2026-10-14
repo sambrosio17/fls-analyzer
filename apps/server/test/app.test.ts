@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.ts';
 import type { Config } from '../src/config.ts';
 import { DEFAULT_TENANT, Db } from '../src/db.ts';
-import { FakeOrg } from './fakeOrg.ts';
+import { fakeOrg } from './fakeOrg.ts';
 
 const config: Config = {
   port: 0, appUrl: 'http://localhost:3000', appPassword: 'secret-pass', appSecret: 'x'.repeat(40), appUser: 'owner',
-  sfClientId: 'cid', sfClientSecret: null, sfApiVersion: 'v62.0', dbPath: ':memory:', requireDifferentApprover: false
+  sfClientId: 'cid', sfClientSecret: null, sfApiVersion: 'v62.0', dbPath: ':memory:', requireDifferentApprover: false, demoMode: false
 };
 
 const SALES = '0PS000000000001';
@@ -15,7 +15,7 @@ const CPQ = '0PS000000000003';
 
 async function setup(isSandbox = true) {
   const db = new Db(':memory:');
-  const fake = new FakeOrg(isSandbox);
+  const fake = fakeOrg(isSandbox);
   db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: isSandbox ? 'Acme UAT' : 'Acme', username: 'me@acme.com',
     instance_url: 'https://acme.my.salesforce.com', login_url: 'https://login.salesforce.com', is_sandbox: isSandbox ? 1 : 0, refresh_token_enc: 'x', access_token_enc: null });
   const app = buildApp({ config, db, apiFor: () => fake });
