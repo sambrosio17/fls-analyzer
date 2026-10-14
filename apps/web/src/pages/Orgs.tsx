@@ -7,20 +7,30 @@ interface Props {
   selectedId: string | null;
   onOpen: (id: string) => void;
   onRemoved: (id: string) => void;
+  onRenamed: (org: Org) => void;
 }
 
-export function Orgs({ orgs, error, selectedId, onOpen, onRemoved }: Props) {
+export function Orgs({ orgs, error, selectedId, onOpen, onRemoved, onRenamed }: Props) {
   const [env, setEnv] = useState<'production' | 'sandbox' | 'custom'>('sandbox');
   const [domain, setDomain] = useState('');
+  const [alias, setAlias] = useState('');
+  const [editing, setEditing] = useState<{ id: string; alias: string } | null>(null);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const connect = (e: FormEvent) => {
     e.preventDefault();
-    const q = new URLSearchParams({ env, ...(env === 'custom' ? { domain } : {}) });
+    const q = new URLSearchParams({ env, alias: alias.trim(), ...(env === 'custom' ? { domain } : {}) });
     location.href = `/oauth/start?${q}`;
   };
   const remove = async (o: Org) => {
-    if (!window.confirm(`Scollegare ${o.name}? Il token salvato verrà eliminato.`)) return;
+    if (!window.confirm(`Scollegare ${o.label}? Il token salvato verrà eliminato.`)) return;
     await api.removeOrg(o.id);
     onRemoved(o.id);
+  };
+  const rename = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editing) return;
+    try { onRenamed(await api.renameOrg(editing.id, editing.alias.trim())); setEditing(null); setRenameError(null); }
+    catch (err) { setRenameError((err as Error).message); }
   };
 
   return (
@@ -39,10 +49,20 @@ export function Orgs({ orgs, error, selectedId, onOpen, onRemoved }: Props) {
               <div className="org-card" key={o.id}>
                 <span className="dot ok" />
                 <div>
-                  <h3>{o.name} <span className={`env ${o.isSandbox ? 'sandbox' : 'prod'}`}>{o.isSandbox ? 'Sandbox' : 'Produzione'}</span></h3>
-                  <p><span className="mono">{o.username}</span>{o.lastSyncAt && ` · letta il ${new Date(o.lastSyncAt).toLocaleString('it-IT')}`}</p>
+                  {editing?.id === o.id ? (
+                    <form className="row" onSubmit={rename}>
+                      <input className="input" id={`alias-${o.id}`} aria-label="Alias" autoFocus required maxLength={40} value={editing.alias} onChange={e => setEditing({ id: o.id, alias: e.target.value })} />
+                      <button className="btn sm primary" type="submit">Salva</button>
+                      <button className="btn sm" type="button" onClick={() => { setEditing(null); setRenameError(null); }}>Annulla</button>
+                    </form>
+                  ) : (
+                    <h3>{o.label} <span className={`env ${o.isSandbox ? 'sandbox' : 'prod'}`}>{o.isSandbox ? 'Sandbox' : 'Produzione'}</span></h3>
+                  )}
+                  {editing?.id === o.id && renameError && <p className="err-text">{renameError}</p>}
+                  <p>{o.alias && <>{o.name} · </>}<span className="mono">{o.username}</span>{o.lastSyncAt && ` · letta il ${new Date(o.lastSyncAt).toLocaleString('it-IT')}`}</p>
                 </div>
                 <div className="row">
+                  <button className="btn sm" onClick={() => setEditing({ id: o.id, alias: o.alias ?? '' })}>{o.alias ? 'Rinomina' : 'Aggiungi alias'}</button>
                   <button className="btn sm" onClick={() => remove(o)}>Scollega</button>
                   <button className={`btn sm ${o.id === selectedId ? '' : 'primary'}`} onClick={() => onOpen(o.id)}>Apri</button>
                 </div>
@@ -53,6 +73,10 @@ export function Orgs({ orgs, error, selectedId, onOpen, onRemoved }: Props) {
         <section className="panel">
           <div className="panel-h"><h2>Collega una nuova org</h2></div>
           <form className="panel-b" onSubmit={connect}>
+            <label className="field"><span>Alias</span>
+              <input className="input" id="alias" required maxLength={40} placeholder="es. Acme UAT" value={alias} onChange={e => setAlias(e.target.value)} />
+              <small className="muted">Il nome con cui vedrai questa org nell'app. Utile perché le sandbox hanno lo stesso nome della produzione.</small>
+            </label>
             <div className="field"><span>Ambiente</span>
               <div className="seg">
                 {([['production', 'Produzione'], ['sandbox', 'Sandbox'], ['custom', 'My Domain']] as const).map(([v, l]) => (

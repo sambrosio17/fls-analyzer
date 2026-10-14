@@ -44,13 +44,13 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
   const skippedByReason = cs.skipped.reduce<Record<string, number>>((acc, s) => ({ ...acc, [s.reason]: (acc[s.reason] ?? 0) + 1 }), {});
   const finished = ['done', 'partial', 'failed'].includes(cs.status);
   const prod = cs.requiresApproval;
-  const canRun = reviewed && (!prod || confirmName.trim() === cs.org.name);
+  const canRun = reviewed && (!prod || confirmName.trim() === cs.org.label);
 
   return (
     <>
       <div className="view-head">
         <div>
-          <div className="eyebrow">{cs.number} · {cs.org.name}</div>
+          <div className="eyebrow">{cs.number} · {cs.org.label}</div>
           <h1>{finished ? 'Risultato' : 'Anteprima modifiche'} <span className={`pill ${STATUS_CLASS[cs.status]}`}>{STATUS_LABEL[cs.status]}</span></h1>
           <p>{cs.description}{cs.rollbackOf && ' · annulla un change set precedente'}</p>
         </div>
@@ -137,7 +137,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
               {((cs.status === 'draft' && !prod && items.length > 0) || cs.status === 'approved') && (
                 <>
                   {prod && (
-                    <label className="field"><span>Digita <b>{cs.org.name}</b> per confermare</span>
+                    <label className="field"><span>Digita <b>{cs.org.label}</b> per confermare</span>
                       <input className="input" id="confirm-name" value={confirmName} onChange={e => setConfirmName(e.target.value)} />
                     </label>
                   )}

@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { TransitionError } from '@fls/core';
 import type { Config } from './config.ts';
 import { pkcePair, randomToken, safeEqual, TokenCipher } from './crypto.ts';
-import { DEFAULT_TENANT, Db, type OrgRow } from './db.ts';
+import { DEFAULT_TENANT, Db, orgLabel, type OrgRow } from './db.ts';
 import { SalesforceClient, SalesforceError, type SfApi } from './salesforce/client.ts';
 import { accessStrings, listObjects, loadFields, loadOrgInfo, loadPermissionSets, loadSnapshot, loadUserPermissions } from './salesforce/metadata.ts';
 import { authorizeUrl, exchangeCode, loginUrlFor, refreshAccessToken, type OAuthSettings } from './salesforce/oauth.ts';
@@ -32,8 +32,10 @@ const createSchema = z.object({
   bulk: z.array(z.object({ fields: z.array(z.string()).min(1), parentIds: z.array(z.string()).min(1), action: z.enum(['read', 'edit', 'removeEdit', 'none']) })).max(50).optional()
 });
 
+const aliasSchema = z.string().trim().min(1).max(40);
+
 export function orgDto(o: OrgRow) {
-  return { id: o.id, name: o.name, username: o.username, instanceUrl: o.instance_url, isSandbox: !!o.is_sandbox, lastSyncAt: o.last_sync_at };
+  return { id: o.id, label: orgLabel(o), alias: o.alias, name: o.name, username: o.username, instanceUrl: o.instance_url, isSandbox: !!o.is_sandbox, lastSyncAt: o.last_sync_at };
 }
 
 export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOptions) {
@@ -101,11 +103,11 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOpti
 
   // ---- Salesforce OAuth (web server flow + PKCE)
   app.get('/oauth/start', async (req, reply) => {
-    const q = z.object({ env: z.enum(['production', 'sandbox', 'custom']), domain: z.string().optional() }).parse(req.query);
+    const q = z.object({ env: z.enum(['production', 'sandbox', 'custom']), domain: z.string().optional(), alias: aliasSchema.optional() }).parse(req.query);
     const loginUrl = loginUrlFor(q.env, q.domain);
     const state = randomToken();
     const { verifier, challenge } = pkcePair();
-    reply.setCookie(OAUTH, JSON.stringify({ state, verifier, loginUrl }), { signed: true, httpOnly: true, sameSite: 'lax', secure, path: '/oauth', maxAge: 600 });
+    reply.setCookie(OAUTH, JSON.stringify({ state, verifier, loginUrl, alias: q.alias ?? null }), { signed: true, httpOnly: true, sameSite: 'lax', secure, path: '/oauth', maxAge: 600 });
     return reply.redirect(authorizeUrl(loginUrl, oauth, state, challenge));
   });
 
@@ -116,7 +118,7 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOpti
     const raw = req.cookies[OAUTH];
     const unsigned = raw ? req.unsignCookie(raw) : null;
     if (!unsigned?.valid || !unsigned.value) return fail('Login session expired, try again.');
-    const saved = JSON.parse(unsigned.value) as { state: string; verifier: string; loginUrl: string };
+    const saved = JSON.parse(unsigned.value) as { state: string; verifier: string; loginUrl: string; alias?: string | null };
     reply.clearCookie(OAUTH, { path: '/oauth' });
     if (!q.code || q.state !== saved.state) return fail('Invalid OAuth state.');
 
@@ -130,7 +132,7 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOpti
     const org = db.upsertOrg({
       id: randomToken(12), tenant_id: tenant, sf_org_id: info.orgId, name: info.name, username: identity.username,
       instance_url: token.instance_url, login_url: saved.loginUrl, is_sandbox: info.isSandbox ? 1 : 0,
-      refresh_token_enc: cipher.encrypt(token.refresh_token), access_token_enc: cipher.encrypt(token.access_token)
+      refresh_token_enc: cipher.encrypt(token.refresh_token), access_token_enc: cipher.encrypt(token.access_token), alias: saved.alias ?? null
     });
     db.audit({ tenant, orgId: org.id, actor: config.appUser, action: 'org.connected', detail: `${info.name} (${identity.username})` });
     return reply.redirect(`/?org=${org.id}`);
@@ -144,6 +146,13 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOpti
   };
 
   app.get('/api/orgs', async () => db.listOrgs(tenant).map(orgDto));
+  app.patch('/api/orgs/:id', async req => {
+    const org = orgOr404((req.params as { id: string }).id);
+    const { alias } = z.object({ alias: aliasSchema }).parse(req.body);
+    db.setAlias(tenant, org.id, alias);
+    db.audit({ tenant, orgId: org.id, actor: config.appUser, action: 'org.renamed', detail: alias });
+    return orgDto(orgOr404(org.id));
+  });
   app.delete('/api/orgs/:id', async req => {
     const { id } = req.params as { id: string };
     db.deleteOrg(tenant, orgOr404(id).id);
@@ -213,10 +222,10 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOpti
     const cs = db.getChangeSet(tenant, id);
     if (!cs) throw new NotFoundError('Change set not found.');
     const org = orgOr404(cs.org_id);
-    // Production needs the org name typed back as an extra guard.
+    // Production needs the org name (alias if set) typed back as an extra guard.
     if (!org.is_sandbox) {
       const { confirmName } = z.object({ confirmName: z.string() }).parse(req.body ?? {});
-      if (confirmName.trim() !== org.name) throw Object.assign(new Error('The org name does not match.'), { statusCode: 400 });
+      if (confirmName.trim() !== orgLabel(org)) throw Object.assign(new Error('The org name does not match.'), { statusCode: 400 });
     }
     service.start(id);
     return csDto(id);

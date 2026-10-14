@@ -48,10 +48,12 @@ export function App() {
             ))}
           </nav>
           <span className="spacer" />
-          {org && (
-            <button className="org-chip" onClick={() => setView('orgs')}>
-              <span className="dot ok" />{org.name}<span className={`env ${org.isSandbox ? 'sandbox' : 'prod'}`}>{org.isSandbox ? 'Sandbox' : 'Produzione'}</span>
+          {org ? (
+            <button className="org-chip" onClick={() => setView('orgs')} title={`${org.name} · ${org.username}`}>
+              <span className="dot ok" /><b>{org.label}</b><span className={`env ${org.isSandbox ? 'sandbox' : 'prod'}`}>{org.isSandbox ? 'Sandbox' : 'Produzione'}</span>
             </button>
+          ) : (
+            <button className="org-chip muted" onClick={() => setView('orgs')}>Nessuna org aperta</button>
           )}
           <button className="btn sm" onClick={() => api.logout().then(() => setSession(false))}>Esci</button>
         </div>
@@ -60,7 +62,8 @@ export function App() {
         {view === 'orgs' && (
           <Orgs orgs={orgs} error={oauthError} selectedId={orgId}
             onOpen={id => { setOrgId(id); setView('matrix'); }}
-            onRemoved={id => { setOrgs(orgs.filter(o => o.id !== id)); if (id === orgId) setOrgId(null); }} />
+            onRemoved={id => { setOrgs(orgs.filter(o => o.id !== id)); if (id === orgId) setOrgId(null); }}
+            onRenamed={updated => setOrgs(orgs.map(o => o.id === updated.id ? updated : o))} />
         )}
         {view === 'matrix' && org && <MatrixPage key={org.id} org={org} onChangeSet={openChangeSet} />}
         {view === 'changeset' && changeSetId && <ChangeSetPage key={changeSetId} id={changeSetId} onOpen={openChangeSet} onBack={() => setView(org ? 'matrix' : 'history')} />}
