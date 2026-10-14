@@ -63,9 +63,17 @@ describe('API', () => {
   it('returns the matrix without compound fields and group permission sets', async () => {
     current = await setup();
     const { body } = await current.call('GET', '/api/orgs/org1/matrix?objects=Account');
-    expect(body.fields.map((f: { name: string }) => f.name)).toEqual(['Account.Name', 'Account.Industry', 'Account.Tax_Code__c', 'Account.Score__c']);
+    expect(body.fields.map((f: { name: string }) => f.name)).toEqual(['Account.Name', 'Account.Industry', 'Account.Tax_Code__c', 'Account.Score__c', 'Account.Secret_Code__c']);
+    // Hidden from the connected user, so missing from describe: found through EntityParticle.
+    expect(body.fields.filter((f: { hiddenFromUser?: boolean }) => f.hiddenFromUser).map((f: { name: string }) => f.name)).toEqual(['Account.Secret_Code__c']);
     expect(body.permissionSets.map((p: { label: string }) => p.label)).toEqual(['Sales User', 'CPQ Admin', 'Finance Access']);
-    expect(body.access).toEqual({ [SALES]: '0100' });
+    expect(body.access).toEqual({ [SALES]: '01000' });
+  });
+
+  it('plans changes on fields hidden from the connected user', async () => {
+    current = await setup();
+    const { body } = await current.call('POST', '/api/orgs/org1/change-sets', { changes: [{ parentId: SALES, field: 'Account.Secret_Code__c', access: 2 }] });
+    expect(body.items.map((i: { field: string; op: string }) => [i.field, i.op])).toEqual([['Account.Secret_Code__c', 'insert']]);
   });
 
   it('plans, runs and verifies a bulk change on a sandbox, then rolls it back', async () => {
