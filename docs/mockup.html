@@ -1,0 +1,1036 @@
+<title>FLS Analyzer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky app bar + flow stepper, then one working view at a time (connect, matrix, preview, run, history, design) */
+:root {
+  --bg: #F3F5F7; --surface: #FFFFFF; --surface-2: #F8FAFB; --ink: #15202A; --muted: #5A6774; --line: #DAE0E6;
+  --accent: #0D6987; --accent-ink: #FFFFFF; --accent-soft: #DDEFF5; --accent-line: #9FCBDB;
+  --pending: #B86E00; --pending-soft: #FFF2DC; --danger: #B8322B; --danger-soft: #FBE6E4;
+  --ok: #1D7F47; --ok-soft: #E0F3E8; --hatch: #E9EDF1;
+  --font-ui: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-code: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E141A; --surface: #161F27; --surface-2: #1B252E; --ink: #E2E8EE; --muted: #93A0AC; --line: #2A3641;
+  --accent: #4DB0D0; --accent-ink: #06202A; --accent-soft: #12323F; --accent-line: #2D6478;
+  --pending: #F0A845; --pending-soft: #3A2B12; --danger: #F06C63; --danger-soft: #3B1A18;
+  --ok: #4CC17E; --ok-soft: #133224; --hatch: #202B35; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #0E141A; --surface: #161F27; --surface-2: #1B252E; --ink: #E2E8EE; --muted: #93A0AC; --line: #2A3641;
+  --accent: #4DB0D0; --accent-ink: #06202A; --accent-soft: #12323F; --accent-line: #2D6478;
+  --pending: #F0A845; --pending-soft: #3A2B12; --danger: #F06C63; --danger-soft: #3B1A18;
+  --ok: #4CC17E; --ok-soft: #133224; --hatch: #202B35; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+button, input, select { font: inherit; color: inherit; }
+code, .mono { font-family: var(--font-code); font-size: 12px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 1400px; margin: 0 auto; }
+
+/* App bar */
+.appbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+.appbar .wrap { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-block: 10px; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: -0.01em; font-size: 16px; }
+.brand-mark { width: 26px; height: 26px; border-radius: 6px; background: var(--accent); display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 5px; }
+.brand-mark i { background: var(--accent-ink); border-radius: 1px; opacity: .9; }
+.brand-mark i:nth-child(2) { opacity: .35; } .brand-mark i:nth-child(3) { opacity: .6; }
+.tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+.tab { border: 0; background: none; padding: 7px 12px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 500; display: inline-flex; gap: 6px; align-items: center; }
+.tab:hover { background: var(--surface-2); color: var(--ink); }
+.tab[aria-current="page"] { color: var(--ink); background: var(--accent-soft); }
+.tab[disabled] { opacity: .45; cursor: not-allowed; }
+.count { background: var(--pending); color: var(--surface); border-radius: 10px; font-size: 11px; padding: 0 7px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.spacer { flex: 1; }
+.org-chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px 4px 8px; background: var(--surface-2); cursor: pointer; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.dot.ok { background: var(--ok); }
+.env { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; padding: 1px 6px; border-radius: 4px; }
+.env.sandbox { background: var(--accent-soft); color: var(--accent); }
+.env.prod { background: var(--danger-soft); color: var(--danger); }
+.mock-note { font-size: 12px; color: var(--muted); }
+
+/* Stepper */
+.stepper { border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.stepper ol { list-style: none; margin: 0; padding-block: 8px; display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; padding-inline: 0; }
+.stepper li { display: flex; align-items: center; gap: 6px; color: var(--muted); padding-right: 10px; }
+.stepper li .n { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font-weight: 600; font-size: 11px; background: var(--surface); }
+.stepper li.done .n { background: var(--ok); color: var(--surface); border-color: var(--ok); }
+.stepper li.now { color: var(--ink); font-weight: 600; }
+.stepper li.now .n { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.stepper li + li::before { content: ""; width: 18px; height: 1px; background: var(--line); }
+
+main { padding-block: 20px 60px; }
+.view-head { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.view-head h1 { font-size: 22px; letter-spacing: -0.015em; }
+.view-head p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+.eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--danger); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; filter: none; }
+.btn.sm { padding: 4px 10px; font-size: 13px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.panel-h { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.panel-h h2 { font-size: 15px; }
+.panel-b { padding: 16px; }
+
+/* Connect */
+.connect { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.org-list { display: grid; gap: 10px; }
+.org-card { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.org-card h3 { font-size: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.org-card p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.field { display: grid; gap: 4px; margin-bottom: 14px; }
+.field label, .legend-t { font-size: 12px; font-weight: 600; color: var(--muted); }
+.input { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 7px 10px; width: 100%; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; flex-wrap: wrap; }
+.seg label { flex: 1; text-align: center; padding: 7px 10px; cursor: pointer; border-right: 1px solid var(--line); font-size: 13px; min-width: 90px; }
+.seg label:last-child { border-right: 0; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.req-list { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+
+/* Matrix */
+.analyze { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; align-items: start; }
+.side { display: grid; gap: 12px; }
+.side .panel-b { padding: 12px; }
+.check { display: flex; gap: 8px; align-items: center; padding: 3px 0; font-size: 13px; cursor: pointer; }
+.check small { color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+.kind { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.toolbar .input { max-width: 260px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 11px; font-size: 13px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.stats { display: flex; gap: 20px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.stats b { color: var(--ink); font-variant-numeric: tabular-nums; font-size: 15px; margin-right: 4px; }
+.stats .warn b { color: var(--pending); }
+.selbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 12px; border: 1px solid var(--accent-line); background: var(--accent-soft); border-radius: 8px; margin-bottom: 10px; font-size: 13px; }
+.scroller { overflow: auto; max-height: 68vh; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table.mx { border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.mx th, .mx td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+.mx thead th { position: sticky; top: 0; background: var(--surface-2); z-index: 2; vertical-align: bottom; padding: 8px 6px; font-weight: 600; text-align: left; min-width: 96px; max-width: 120px; }
+.mx thead th.fcol { left: 0; z-index: 3; min-width: 280px; max-width: none; }
+.mx tbody th { position: sticky; left: 0; background: var(--surface); z-index: 1; text-align: left; font-weight: 500; padding: 6px 10px; min-width: 280px; }
+.mx tr.obj th { background: var(--surface-2); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 6px 10px; }
+.mx tr.obj td { background: var(--surface-2); }
+.ps-h { display: grid; gap: 4px; font-size: 12px; line-height: 1.25; }
+.ps-h .nm { overflow-wrap: anywhere; }
+.ps-h .ct { font-weight: 400; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.ps-h label { display: flex; gap: 4px; align-items: center; font-weight: 400; color: var(--muted); font-size: 11px; cursor: pointer; }
+.fh { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: center; }
+.fh .api { grid-column: 2; color: var(--muted); font-family: var(--font-code); font-size: 11px; }
+.fh .tags { grid-column: 2; display: flex; gap: 4px; flex-wrap: wrap; }
+.tag { font-size: 10px; border-radius: 3px; padding: 0 5px; background: var(--hatch); color: var(--muted); font-weight: 500; }
+.tag.sens { background: var(--danger-soft); color: var(--danger); }
+tr.sel th, tr.sel td.c { background-color: var(--accent-soft); }
+td.c { padding: 0; height: 44px; text-align: center; }
+td.c button { width: 100%; height: 100%; min-height: 44px; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; align-content: center; gap: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.v0 .v { color: var(--muted); font-weight: 400; }
+.v1 .v { color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: 4px; padding: 1px 8px; }
+.v2 .v { color: var(--accent-ink); background: var(--accent); border-radius: 4px; padding: 2px 8px; }
+td.c.pend button { background: var(--pending-soft); box-shadow: inset 0 0 0 2px var(--pending); }
+td.c .was { font-size: 10px; color: var(--pending); font-weight: 500; }
+td.c.locked button { cursor: not-allowed; background: repeating-linear-gradient(135deg, transparent 0 5px, var(--hatch) 5px 7px); color: var(--muted); font-weight: 400; font-size: 11px; }
+td.c.colsel button { box-shadow: inset 0 0 0 1px var(--accent-line); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
+.legend span.sw { display: inline-flex; align-items: center; gap: 6px; }
+.legend .box { display: inline-grid; place-items: center; min-width: 30px; height: 20px; font-size: 11px; font-weight: 600; border-radius: 4px; }
+.legend .b1 { color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-line); }
+.legend .b2 { color: var(--accent-ink); background: var(--accent); }
+.legend .bp { background: var(--pending-soft); box-shadow: inset 0 0 0 2px var(--pending); width: 30px; }
+.legend .bl { background: repeating-linear-gradient(135deg, transparent 0 5px, var(--hatch) 5px 7px); border: 1px solid var(--line); width: 30px; }
+
+/* Modal */
+.overlay { position: fixed; inset: 0; background: rgba(8, 14, 20, .45); z-index: 50; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.modal { background: var(--surface); border-radius: 10px; width: min(860px, 100%); max-height: 100%; display: flex; flex-direction: column; border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.modal.narrow { width: min(460px, 100%); }
+.modal-h { padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+.modal-h h2 { font-size: 17px; }
+.modal-h p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.modal-b { padding: 16px 20px; overflow: auto; }
+.modal-f { padding: 12px 20px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+.x { border: 0; background: none; font-size: 20px; cursor: pointer; color: var(--muted); line-height: 1; }
+.bulk-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; }
+.pick { border: 1px solid var(--line); border-radius: 8px; }
+.pick-h { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2); font-size: 13px; font-weight: 600; }
+.pick-h .row button { border: 0; background: none; color: var(--accent); cursor: pointer; font-size: 12px; padding: 0; }
+.pick-b { max-height: 240px; overflow: auto; padding: 6px 12px; }
+.pick-b .grp { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 8px 0 2px; font-weight: 600; }
+.actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+.act { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; display: grid; gap: 2px; }
+.act b { font-size: 13px; }
+.act span { font-size: 12px; color: var(--muted); }
+.act input { position: absolute; opacity: 0; pointer-events: none; }
+.act:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.impact { margin-top: 14px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); font-size: 13px; }
+.impact b { font-variant-numeric: tabular-nums; }
+
+/* Consent mock */
+.consent .logo { width: 44px; height: 44px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; color: var(--accent); font-weight: 700; margin-bottom: 8px; }
+.scope { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.scope code { color: var(--muted); }
+.loading-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.loading-list li { display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
+.loading-list li.done { color: var(--ink); }
+.loading-list .st { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); flex: none; }
+.loading-list li.run .st { border-color: var(--accent); border-top-color: transparent; animation: spin .8s linear infinite; }
+.loading-list li.done .st { background: var(--ok); border-color: var(--ok); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Preview */
+.kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.kpi .k { font-size: 12px; color: var(--muted); }
+.kpi .n { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.kpi.warn .n { color: var(--pending); }
+.kpi.bad .n { color: var(--danger); }
+.kpi.good .n { color: var(--ok); }
+.prev-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.tbl-wrap { overflow: auto; max-height: 56vh; }
+table.dt { border-collapse: collapse; width: 100%; font-size: 13px; }
+.dt th { position: sticky; top: 0; background: var(--surface-2); text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.dt td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.dt td.num { font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; border-radius: 4px; padding: 1px 7px; white-space: nowrap; }
+.op-insert { background: var(--ok-soft); color: var(--ok); }
+.op-update { background: var(--accent-soft); color: var(--accent); }
+.op-delete { background: var(--danger-soft); color: var(--danger); }
+.st-ok { background: var(--ok-soft); color: var(--ok); }
+.st-err { background: var(--danger-soft); color: var(--danger); }
+.st-part { background: var(--pending-soft); color: var(--pending); }
+.acc { font-family: var(--font-code); font-size: 12px; }
+.warn-line { color: var(--pending); font-size: 12px; }
+.warn-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.warn-list li { font-size: 13px; padding-left: 12px; border-left: 3px solid var(--pending); }
+.warn-list li.info { border-left-color: var(--accent); }
+.warn-list li b { display: block; }
+details.payload summary { cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 0; }
+pre.code { background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 12px; overflow: auto; font-family: var(--font-code); font-size: 12px; max-height: 300px; margin: 8px 0 0; }
+.confirm { display: grid; gap: 12px; }
+.callplan { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 12px; }
+.callplan li { display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-code); }
+.banner { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 13px; border: 1px solid; }
+.banner.info { background: var(--accent-soft); border-color: var(--accent-line); }
+.banner.prod { background: var(--danger-soft); border-color: var(--danger); color: var(--ink); }
+
+/* Run */
+.progress { height: 10px; border-radius: 6px; background: var(--hatch); overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
+.log { font-family: var(--font-code); font-size: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: grid; gap: 4px; margin-top: 14px; max-height: 220px; overflow: auto; }
+.log .ok { color: var(--ok); } .log .err { color: var(--danger); }
+
+/* Design doc */
+.doc { max-width: 860px; }
+.doc h1 { font-size: 26px; margin-bottom: 8px; }
+.doc h2 { font-size: 19px; margin: 32px 0 10px; padding-top: 16px; border-top: 1px solid var(--line); }
+.doc h3 { font-size: 15px; margin: 22px 0 8px; }
+.doc p, .doc li { max-width: 72ch; }
+.doc pre { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; overflow: auto; font-size: 12px; line-height: 1.5; }
+.doc code { font-family: var(--font-code); font-size: 12px; background: var(--hatch); padding: 1px 4px; border-radius: 3px; }
+.doc pre code { background: none; padding: 0; }
+.doc table { border-collapse: collapse; font-size: 13px; display: block; overflow-x: auto; margin: 10px 0; }
+.doc th, .doc td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+.doc th { background: var(--surface-2); }
+.doc-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+
+.toast { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 13px; z-index: 60; max-width: calc(100% - 32px); box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+.muted { color: var(--muted); }
+.empty { padding: 40px 20px; text-align: center; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .connect, .analyze, .prev-grid, .bulk-grid { grid-template-columns: minmax(0, 1fr); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mx thead th.fcol, .mx tbody th { min-width: 190px; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<header class="appbar">
+  <div class="wrap">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>FLS Analyzer</div>
+    <nav class="tabs" id="tabs" aria-label="Sezioni"></nav>
+    <span class="spacer"></span>
+    <span class="mock-note">Mockup · dati di esempio</span>
+    <button class="org-chip" id="orgchip" data-action="go" data-view="connect"></button>
+  </div>
+</header>
+<div class="stepper"><div class="wrap"><ol id="stepper"></ol></div></div>
+<main class="wrap" id="main"></main>
+<div id="modal-root"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script type="text/plain" id="design-md"># FLS Analyzer: documento di progetto
+
+Versione 0.2, 14 ottobre 2026. Stato: decisioni principali prese (vedi sezione 12).
+
+## 1. Obiettivo
+
+Una web app che si collega a una o più org Salesforce e permette di:
+
+1. **Analizzare** la Field Level Security (FLS) come matrice *campi × profili/permission set*, con filtri e ricerca.
+2. **Modificare in blocco** lettura/modifica su più campi e più profili/permission set in un'unica operazione.
+3. **Vedere un'anteprima** delle modifiche (diff prima/dopo, avvisi, chiamate API previste) prima di applicarle.
+4. **Applicare, verificare e annullare**: esecuzione a lotti, esito per singolo record, rollback dallo snapshot.
+5. **Tenere traccia** di chi ha cambiato cosa, quando e su quale org.
+
+Fuori ambito per l'MVP: permessi di oggetto (solo segnalati), record type, layout, sharing.
+
+## 2. Concetti Salesforce su cui si basa
+
+- Ogni **profilo** ha un permission set "nascosto" (`PermissionSet.IsOwnedByProfile = true`, `ProfileId` valorizzato). Quindi profili e permission set si gestiscono con lo **stesso oggetto** e la stessa API.
+- La FLS è salvata nell'oggetto **`FieldPermissions`**: un record per coppia *(permission set, campo)* con `PermissionsRead` e `PermissionsEdit`. **Nessun record = nessun accesso.**
+- Regole da rispettare:
+  - `PermissionsEdit = true` richiede `PermissionsRead = true`.
+  - Campi calcolati (formula, roll-up, auto number) accettano solo lettura.
+  - Campi non "permissionable" (obbligatori a livello di sistema, es. `Account.Name`, `Opportunity.StageName`) non hanno FLS: sono sempre visibili e la UI li mostra bloccati.
+  - Permission set di pacchetti gestiti (`NamespacePrefix` valorizzato) non sono modificabili.
+  - I permission set group (`Type = 'Group'`) non si modificano direttamente: si ricalcolano dai permission set che contengono.
+  - La FLS è efficace solo se c'è almeno la lettura sull'oggetto (`ObjectPermissions`): l'app lo segnala.
+
+## 3. Architettura
+
+```
+Browser (SPA React)  ──HTTPS──▶  Backend BFF (Node.js)  ──REST/OAuth──▶  Salesforce org(s)
+                                   │   ├─ Postgres (connessioni, snapshot, change set, audit)
+                                   │   └─ Redis + coda job (esecuzioni lunghe)
+```
+
+**Scelta consigliata: web app esterna con backend (BFF).**
+
+| Opzione | Pro | Contro |
+|---|---|---|
+| **Web app esterna + BFF** (consigliata) | Multi-org, confronto tra org, nessuna installazione nell'org, token mai esposti al browser | Va ospitata e messa in sicurezza |
+| App nativa (LWC + Apex) | Niente OAuth né hosting | Un'installazione per org, limiti governor di Apex, niente confronto tra org |
+| SPA pura senza backend | Semplicissima | Token nel browser, CORS da configurare in ogni org, niente audit centralizzato |
+
+**Stack proposto**
+- Frontend (confermato): React + TypeScript + Vite, TanStack Table con virtualizzazione (matrici da migliaia di righe × centinaia di colonne).
+- Backend: Node.js (Fastify o NestJS) con `jsforce` per le chiamate Salesforce.
+- Persistenza: Postgres; Redis + BullMQ per i job di esecuzione e la cache dei metadati.
+- Deploy: container (es. Cloud Run, ECS, Azure Container Apps).
+
+## 4. Autenticazione
+
+- **OAuth 2.0 Web Server Flow con PKCE** tramite una *External Client App* (o Connected App) Salesforce.
+- Host di login: `login.salesforce.com` (produzione), `test.salesforce.com` (sandbox) oppure My Domain.
+- Scope: `api`, `refresh_token`, `id`.
+- Il refresh token è salvato **cifrato** lato server (KMS / envelope encryption); il browser riceve solo un cookie di sessione `HttpOnly`.
+- L'app agisce **con i permessi dell'utente** collegato. All'avvio verifica che abbia `Manage Profiles and Permission Sets`, `View Setup and Configuration` e `API Enabled` (query su `UserPermissionAccess`); se mancano mostra un messaggio chiaro e apre l'app in sola lettura.
+
+## 5. Lettura dei dati (analisi)
+
+Caricamento **per oggetto, su richiesta**, con cache per org e data di ultima sincronizzazione.
+
+1. **Oggetti**: `GET /services/data/vXX.X/sobjects` (describeGlobal).
+2. **Campi** di un oggetto: `GET /sobjects/{Object}/describe` e si tengono `name`, `label`, `type`, `permissionable`, `calculated`, `autoNumber`, `encrypted`, `custom`.
+3. **Profili e permission set**:
+   ```sql
+   SELECT Id, Name, Label, Type, IsOwnedByProfile, Profile.Name, NamespacePrefix, License.Name
+   FROM PermissionSet
+   WHERE Type IN ('Regular', 'Profile')
+   ```
+4. **FLS esistente** (paginata con `queryMore`):
+   ```sql
+   SELECT Id, ParentId, SobjectType, Field, PermissionsRead, PermissionsEdit
+   FROM FieldPermissions
+   WHERE SobjectType IN ('Account', 'Opportunity') AND ParentId IN (:permissionSetIds)
+   ```
+5. **Accesso agli oggetti** (per gli avvisi):
+   ```sql
+   SELECT ParentId, SobjectType, PermissionsRead, PermissionsEdit
+   FROM ObjectPermissions WHERE SobjectType IN (...)
+   ```
+
+La matrice si costruisce in memoria: chiave `ParentId|Object.Field` → `{ id, read, edit }`. Le celle senza record valgono "nessun accesso".
+
+**Analisi offerte nella UI**
+- Filtri: campi senza accesso per nessuno, campi modificabili da tutti, solo campi custom, ricerca per label o API name.
+- Contatori per colonna (quanti campi vede/modifica ogni profilo) e per riga.
+- Confronto tra due permission set o tra due org (v2).
+- "Chi vede questo campo?": utenti effettivi tramite `PermissionSetAssignment` (v2).
+
+## 6. Scrittura (modifica massiva)
+
+### 6.1 Dal "desiderato" al piano
+
+L'utente sceglie *campi × permission set × azione* (Lettura, Lettura e modifica, Nessun accesso, Togli solo la modifica). Il backend confronta lo stato desiderato con lo snapshot e produce un **change set**:
+
+| Prima | Dopo | Operazione |
+|---|---|---|
+| nessun record | Lettura / Lettura e modifica | **insert** `FieldPermissions` |
+| record esistente | valore diverso, almeno lettura | **update** `PermissionsRead/Edit` |
+| record esistente | Nessun accesso | **delete** del record |
+| uguale | uguale | nessuna operazione |
+
+Durante la generazione si applicano le regole della sezione 2: modifica ridotta a lettura sui campi calcolati, permission set gestiti esclusi, campi non permissionable esclusi, avviso se manca la lettura sull'oggetto.
+
+### 6.2 Esecuzione
+
+- **sObject Collections API**, fino a 200 record per chiamata, con `allOrNone: false` per avere l'esito record per record:
+  - `POST /composite/sobjects` per gli insert
+  - `PATCH /composite/sobjects` per gli update
+  - `DELETE /composite/sobjects?ids=...&allOrNone=false` per le eliminazioni
+- Volumi molto grandi (decine di migliaia di righe): Bulk API 2.0 come alternativa.
+- **Controllo di concorrenza**: subito prima di scrivere si rileggono i `FieldPermissions` coinvolti; se qualcuno li ha cambiati dopo l'anteprima, quelle righe vanno in "conflitto" e non si toccano.
+- Esecuzione in un job in coda, con avanzamento in tempo reale (SSE o WebSocket).
+- Dopo la scrittura: nuova lettura delle righe coinvolte e confronto con il desiderato (verifica).
+
+Esempio di payload per l'insert:
+
+```json
+{
+  "allOrNone": false,
+  "records": [
+    {
+      "attributes": { "type": "FieldPermissions" },
+      "ParentId": "0PS5g000001AbCdGAK",
+      "SobjectType": "Account",
+      "Field": "Account.Tax_Code__c",
+      "PermissionsRead": true,
+      "PermissionsEdit": false
+    }
+  ]
+}
+```
+
+### 6.3 Rollback
+
+Ogni change set salva lo snapshot "prima". Annullare significa generare il change set inverso (con nuova anteprima) e rieseguirlo con lo stesso motore.
+
+### 6.4 Perché non la Metadata API
+
+La Metadata API (deploy di `Profile`/`PermissionSet`) funziona ma è lenta, richiede di gestire file XML completi e un deploy di profilo può sovrascrivere altre impostazioni. La usiamo solo per l'**export** in formato metadata (v2), utile a chi versiona i permessi in Git o con SFDX.
+
+## 7. Modello dati dell'app
+
+```
+OrgConnection   id, sf_org_id, instance_url, username, is_sandbox, refresh_token_enc, created_by, last_sync_at
+MetadataCache   org_id, object_api_name, describe_json, fetched_at
+ChangeSet       id, tenant_id, org_id, author, status (draft|pending_approval|approved|rejected|running|done|partial|failed|rolled_back),
+                created_at, approved_by, approved_at, executed_at, rollback_of
+ChangeItem      id, change_set_id, permission_set_id, permission_set_label, sobject, field,
+                before_read, before_edit, before_record_id,
+                after_read, after_edit, operation (insert|update|delete),
+                warning, status (pending|ok|error|conflict|skipped), error_code, error_message
+AuditEvent      id, org_id, user, action, change_set_id, ip, at
+```
+
+## 8. Sicurezza e governance
+
+- Token cifrati, mai inviati al browser; sessioni brevi; protezione CSRF.
+- **Le org di produzione chiedono una conferma esplicita** (digitare il nome dell'org); opzione per obbligare a provare prima in sandbox.
+- Ruoli interni all'app: *Viewer* (solo analisi), *Editor* (prepara change set), *Approver* (esegue in produzione), opzionale.
+- Audit completo nell'app, in aggiunta al Setup Audit Trail di Salesforce.
+- Limite di sicurezza configurabile sul numero di modifiche per change set.
+
+## 9. Limiti e casi particolari
+
+- Limiti API giornalieri dell'org: l'app mostra le chiamate previste in anteprima e le chiamate residue (`/limits`).
+- Licenze: alcune licenze (es. community, platform) non ammettono certi campi o oggetti; l'errore emerge solo in esecuzione ed è riportato per riga.
+- Campi composti (indirizzi, nome): la FLS si gestisce sui singoli componenti.
+- Dopo modifiche ai permission set inclusi in un group, Salesforce ricalcola il group in modo asincrono.
+- Profili standard: la FLS è modificabile, ma conviene segnalare l'impatto (es. "Read Only" assegnato a molti utenti).
+
+## 10. Flussi end-to-end (vedi mockup)
+
+1. **Connetti org**: scelta ambiente → login Salesforce → consenso → verifica permessi → lettura metadati.
+2. **Analizza**: scelta oggetti e profili/permission set → matrice con filtri e contatori.
+3. **Modifica**: click sulle singole celle oppure "Modifica massiva" su righe e colonne selezionate.
+4. **Anteprima**: diff prima/dopo, avvisi, chiamate API previste, conferma.
+5. **Esecuzione e risultato**: avanzamento per lotto, esito per riga, errori, rollback.
+6. **Storico**: elenco dei change set con autore, esito e possibilità di annullare.
+
+## 11. Roadmap
+
+- **MVP**: connessione OAuth a più org, matrice per oggetto, modifica a celle e massiva, anteprima con regole, esecuzione con Collections API, rollback, storico, export CSV.
+- **v2**: confronto tra permission set e tra org, "chi vede questo campo", import da CSV, export metadata/package.xml, approvazione a due step, template di modifiche riutilizzabili.
+- **v3**: permessi di oggetto e permission set group (inclusi i muting permission set), report pianificati di anomalie (es. campi sensibili visibili a troppi profili).
+
+## 12. Decisioni prese
+
+1. **Si parte con un MVP personale, poi si passa a un prodotto per più clienti** (14/10/2026).
+   - MVP: un solo utente (tu), gira in locale o su un piccolo host; login all'app semplice, più org Salesforce collegabili. Postgres (o SQLite in locale) e niente Redis: i job girano nel processo.
+   - Pronto per il multi-cliente da subito: ogni tabella ha `tenant_id`, i token sono cifrati con chiave per tenant, la logica Salesforce sta in un modulo separato dalla UI.
+   - Fase multi-cliente: login con SSO, ruoli (Viewer/Editor/Approver), coda job con Redis, External Client App distribuibile (packaging) e hosting gestito.
+
+2. **Approvazione a due step in produzione già nell'MVP** (14/10/2026).
+   - Su un'org di produzione il change set passa per tre stati: *bozza* → *in attesa di approvazione* → *approvato ed eseguito* (oppure *rifiutato*).
+   - L'approvazione rifà l'anteprima sullo stato attuale dell'org: se qualcosa è cambiato nel frattempo, le righe in conflitto sono evidenziate prima di approvare.
+   - Nell'MVP personale chi approva può essere lo stesso utente (un secondo passaggio deliberato, registrato nell'audit); nella fase multi-cliente si può imporre che l'approvatore sia una persona diversa.
+   - Le sandbox restano a conferma singola, configurabile per org.
+3. **Stack: React + TypeScript (Vite) e Node.js** (14/10/2026).
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script>
+(() => {
+/* ---------- Sample metadata ---------- */
+const OBJECTS = {
+  Account: [
+    { api: 'Name', label: 'Nome account', type: 'Testo', locked: true },
+    { api: 'AnnualRevenue', label: 'Fatturato annuo', type: 'Valuta' },
+    { api: 'Industry', label: 'Settore', type: 'Picklist' },
+    { api: 'Rating', label: 'Rating', type: 'Picklist' },
+    { api: 'CustomerPriority__c', label: 'Priorità cliente', type: 'Picklist', custom: true },
+    { api: 'SLAExpirationDate__c', label: 'Scadenza SLA', type: 'Data', custom: true },
+    { api: 'Credit_Score__c', label: 'Credit score', type: 'Formula', custom: true, calc: true },
+    { api: 'Partner_Tier__c', label: 'Livello partner', type: 'Picklist', custom: true },
+    { api: 'Tax_Code__c', label: 'Partita IVA', type: 'Testo', custom: true, sens: true },
+    { api: 'Billing_IBAN__c', label: 'IBAN fatturazione', type: 'Testo', custom: true, sens: true, enc: true },
+    { api: 'Open_Opps_Count__c', label: 'Opportunità aperte', type: 'Roll-up', custom: true, calc: true }
+  ],
+  Opportunity: [
+    { api: 'StageName', label: 'Fase', type: 'Picklist', locked: true },
+    { api: 'Amount', label: 'Importo', type: 'Valuta' },
+    { api: 'Probability', label: 'Probabilità (%)', type: 'Percentuale' },
+    { api: 'NextStep', label: 'Prossimo passo', type: 'Testo' },
+    { api: 'Discount__c', label: 'Sconto', type: 'Percentuale', custom: true },
+    { api: 'Margin__c', label: 'Margine', type: 'Formula', custom: true, calc: true, sens: true },
+    { api: 'Competitor__c', label: 'Concorrente', type: 'Picklist', custom: true },
+    { api: 'Loss_Reason__c', label: 'Motivo perdita', type: 'Testo lungo', custom: true }
+  ],
+  Contact: [
+    { api: 'Email', label: 'Email', type: 'Email', sens: true },
+    { api: 'Phone', label: 'Telefono', type: 'Telefono', sens: true },
+    { api: 'Birthdate', label: 'Data di nascita', type: 'Data', sens: true },
+    { api: 'Fiscal_Code__c', label: 'Codice fiscale', type: 'Testo', custom: true, sens: true, enc: true },
+    { api: 'Marketing_Consent__c', label: 'Consenso marketing', type: 'Checkbox', custom: true },
+    { api: 'Contact_Code__c', label: 'Codice contatto', type: 'Auto number', custom: true, calc: true }
+  ],
+  Case: [
+    { api: 'Priority', label: 'Priorità', type: 'Picklist' },
+    { api: 'SLA_Breach__c', label: 'SLA violato', type: 'Formula', custom: true, calc: true },
+    { api: 'Root_Cause__c', label: 'Causa principale', type: 'Picklist', custom: true },
+    { api: 'Internal_Notes__c', label: 'Note interne', type: 'Testo lungo', custom: true }
+  ]
+};
+const PS = [
+  { id: '0PS5g00000A1', name: 'System Administrator', kind: 'Profilo', std: true },
+  { id: '0PS5g00000A2', name: 'Sales User', kind: 'Profilo' },
+  { id: '0PS5g00000A3', name: 'Customer Service', kind: 'Profilo' },
+  { id: '0PS5g00000A4', name: 'Marketing User', kind: 'Profilo', std: true },
+  { id: '0PS5g00000A5', name: 'Partner Community User', kind: 'Profilo', license: 'Partner Community' },
+  { id: '0PS5g00000B1', name: 'Finance_Access', kind: 'Permission set' },
+  { id: '0PS5g00000B2', name: 'Sales_Ops', kind: 'Permission set' },
+  { id: '0PS5g00000B3', name: 'GDPR_Data_Steward', kind: 'Permission set' },
+  { id: '0PS5g00000B4', name: 'SBQQ__CPQ_Admin', kind: 'Permission set', managed: 'SBQQ' }
+];
+const NO_OBJ = { '0PS5g00000A4': ['Case'], '0PS5g00000A5': ['Case'], '0PS5g00000B1': ['Contact', 'Case'], '0PS5g00000B3': ['Opportunity'], '0PS5g00000B4': ['Contact', 'Case'] };
+const ORGS = [
+  { id: 'uat', name: 'acme--uat', user: 'salvatore@acme.com.uat', sandbox: true, sync: 'sincronizzata 2 ore fa' },
+  { id: 'prod', name: 'Acme S.p.A.', user: 'salvatore@acme.com', sandbox: false, sync: 'sincronizzata ieri' }
+];
+const VAL = ['—', 'L', 'L+M'];
+const VAL_LONG = ['Nessun accesso', 'Lettura', 'Lettura e modifica'];
+
+const psById = Object.fromEntries(PS.map(p => [p.id, p]));
+const fieldByKey = {};
+for (const [o, fs] of Object.entries(OBJECTS)) for (const f of fs) fieldByKey[o + '.' + f.api] = { ...f, obj: o, key: o + '.' + f.api };
+const hasObj = (ps, obj) => !(NO_OBJ[ps] || []).includes(obj);
+const hash = s => { let x = 2166136261; for (const c of s) { x ^= c.charCodeAt(0); x = Math.imul(x, 16777619); } return x >>> 0; };
+
+const base = new Map();
+for (const p of PS) for (const f of Object.values(fieldByKey)) {
+  if (f.locked) continue;
+  let v;
+  if (p.std && p.name === 'System Administrator') v = 2;
+  else if (!hasObj(p.id, f.obj)) v = 0;
+  else if (p.managed) v = f.obj === 'Opportunity' ? 2 : 1;
+  else { const r = hash(p.id + f.key) % 10; v = r < 3 ? 0 : r < 7 ? 1 : 2; }
+  if (f.calc) v = Math.min(v, 1);
+  base.set(p.id + '|' + f.key, v);
+}
+
+/* ---------- State ---------- */
+const S = {
+  org: null, view: 'connect', objects: new Set(['Account', 'Opportunity']), ps: new Set(PS.map(p => p.id)),
+  filter: 'all', search: '', pending: new Map(), notes: new Map(), selRows: new Set(), selCols: new Set(),
+  modal: null, bulk: null, confirmChecked: false, confirmName: '', run: null, awaiting: null, rollbackOf: null, opFilter: 'all',
+  history: [
+    { id: 'CS-0041', at: '10/10/2026 16:22', org: 'acme--uat', author: 'Salvatore', n: 36, ok: 36, err: 0, desc: 'Lettura su campi GDPR a GDPR_Data_Steward' },
+    { id: 'CS-0040', at: '02/10/2026 11:05', org: 'Acme S.p.A.', author: 'Giulia R.', n: 12, ok: 11, err: 1, desc: 'Tolta modifica sconto a Sales User' }
+  ], seq: 42
+};
+const key = (ps, fk) => ps + '|' + fk;
+const cur = k => S.pending.has(k) ? S.pending.get(k) : base.get(k);
+const pendingItems = () => [...S.pending].filter(([k, v]) => v !== base.get(k));
+
+/* ---------- Helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let toastT;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+function go(view) { S.view = view; S.modal = null; render(); window.scrollTo(0, 0); }
+
+function visibleFields() {
+  const q = S.search.trim().toLowerCase();
+  const psIds = PS.filter(p => S.ps.has(p.id)).map(p => p.id);
+  return Object.values(fieldByKey).filter(f => {
+    if (!S.objects.has(f.obj)) return false;
+    if (q && !(f.label.toLowerCase().includes(q) || f.key.toLowerCase().includes(q))) return false;
+    if (S.filter === 'custom') return !!f.custom;
+    if (S.filter === 'sens') return !!f.sens;
+    if (f.locked) return S.filter === 'all';
+    const vals = psIds.map(p => cur(key(p, f.key)));
+    if (S.filter === 'none') return vals.every(v => v === 0);
+    if (S.filter === 'editall') return vals.length && vals.every(v => v === 2);
+    if (S.filter === 'pending') return psIds.some(p => S.pending.has(key(p, f.key)) && S.pending.get(key(p, f.key)) !== base.get(key(p, f.key)));
+    return true;
+  });
+}
+
+/* ---------- Header + stepper ---------- */
+function renderChrome() {
+  const n = pendingItems().length;
+  const tabs = [['matrix', 'Matrice FLS'], ['preview', 'Anteprima'], ['history', 'Storico'], ['design', 'Progetto']];
+  $('#tabs').innerHTML = tabs.map(([v, l]) => {
+    const dis = !S.org && (v === 'matrix' || v === 'preview');
+    const cur = S.view === v || (v === 'preview' && S.view === 'run');
+    return `<button class="tab" data-action="go" data-view="${v}" ${cur ? 'aria-current="page"' : ''} ${dis ? 'disabled' : ''}>${l}${v === 'preview' && n ? ` <span class="count">${n}</span>` : ''}</button>`;
+  }).join('');
+  $('#orgchip').innerHTML = S.org
+    ? `<span class="dot ok"></span><span>${esc(S.org.name)}</span><span class="env ${S.org.sandbox ? 'sandbox' : 'prod'}">${S.org.sandbox ? 'Sandbox' : 'Produzione'}</span>`
+    : `<span class="dot"></span><span>Nessuna org collegata</span>`;
+  const steps = ['Connetti org', 'Analizza', 'Modifica', 'Anteprima', 'Applica e verifica'];
+  let at = { connect: 0, matrix: n ? 2 : 1, preview: 3, run: 4, history: -1, design: -1 }[S.view];
+  if (S.modal === 'bulk') at = 2;
+  if (S.view === 'run' && S.run && S.run.done) at = 5;
+  $('#stepper').innerHTML = steps.map((s, i) => `<li class="${i < at ? 'done' : i === at ? 'now' : ''}"><span class="n">${i < at ? '✓' : i + 1}</span>${s}</li>`).join('');
+}
+
+/* ---------- Views ---------- */
+function vConnect() {
+  return `
+  <div class="view-head"><div><div class="eyebrow">Passo 1</div><h1>Collega un'org Salesforce</h1>
+  <p>L'app usa OAuth: non vede mai la tua password e agisce con i permessi del tuo utente. Le org già collegate restano disponibili.</p></div></div>
+  <div class="connect">
+    <section class="panel"><div class="panel-h"><h2>Org collegate</h2><span class="muted">${ORGS.length}</span></div>
+      <div class="panel-b org-list">
+      ${ORGS.map(o => `<div class="org-card"><span class="dot ok"></span>
+        <div><h3>${esc(o.name)} <span class="env ${o.sandbox ? 'sandbox' : 'prod'}">${o.sandbox ? 'Sandbox' : 'Produzione'}</span></h3>
+        <p><span class="mono">${esc(o.user)}</span> · ${o.sync}</p></div>
+        <button class="btn ${o.sandbox ? 'primary' : ''} sm" data-action="open-org" data-org="${o.id}">${S.org && S.org.id === o.id ? 'Aggiorna' : 'Apri'}</button></div>`).join('')}
+      </div></section>
+    <section class="panel"><div class="panel-h"><h2>Collega una nuova org</h2></div>
+      <form class="panel-b" id="connect-form">
+        <div class="field"><span class="legend-t">Ambiente</span>
+          <div class="seg">
+            <label><input type="radio" name="env" id="env-prod" value="prod">Produzione</label>
+            <label><input type="radio" name="env" id="env-sb" value="sb" checked>Sandbox</label>
+            <label><input type="radio" name="env" id="env-md" value="md">My Domain</label>
+          </div></div>
+        <div class="field"><label for="mydomain">My Domain (facoltativo)</label>
+          <input class="input mono" id="mydomain" placeholder="acme--uat.sandbox.my.salesforce.com"></div>
+        <div class="field"><span class="legend-t">Permessi richiesti al tuo utente</span>
+          <ul class="req-list"><li>API Enabled</li><li>View Setup and Configuration</li><li>Manage Profiles and Permission Sets (solo per modificare)</li></ul></div>
+        <button class="btn primary" type="submit">Accedi con Salesforce</button>
+      </form></section>
+  </div>`;
+}
+
+function vMatrix() {
+  const fields = visibleFields();
+  const cols = PS.filter(p => S.ps.has(p.id));
+  const editable = fields.filter(f => !f.locked);
+  let total = 0, edits = 0, zeros = 0;
+  for (const f of editable) for (const p of cols) { const v = cur(key(p.id, f.key)); total++; if (v === 2) edits++; if (v === 0) zeros++; }
+  const n = pendingItems().length;
+  const filters = [['all', 'Tutti'], ['none', 'Non visibili a nessuno'], ['editall', 'Modificabili da tutti'], ['sens', 'Dati sensibili'], ['custom', 'Solo custom'], ['pending', 'Con modifiche']];
+  const objCount = o => OBJECTS[o].length;
+  let body = '', lastObj = null;
+  for (const f of fields) {
+    if (f.obj !== lastObj) { lastObj = f.obj; body += `<tr class="obj"><th>${f.obj}</th>${cols.map(p => `<td>${hasObj(p.id, f.obj) ? '' : '<span class="warn-line" title="Nessuna lettura sull\'oggetto">⚠ oggetto</span>'}</td>`).join('')}</tr>`; }
+    const sel = S.selRows.has(f.key);
+    body += `<tr class="${sel ? 'sel' : ''}"><th><div class="fh">
+      <input type="checkbox" id="r-${f.key}" data-action="row" data-key="${f.key}" ${sel ? 'checked' : ''} ${f.locked ? 'disabled' : ''} aria-label="Seleziona ${esc(f.label)}">
+      <label for="r-${f.key}">${esc(f.label)}</label><span class="api">${f.key}</span>
+      <span class="tags"><span class="tag">${f.type}</span>${f.locked ? '<span class="tag">Senza FLS</span>' : ''}${f.calc ? '<span class="tag">Solo lettura</span>' : ''}${f.enc ? '<span class="tag sens">Crittografato</span>' : f.sens ? '<span class="tag sens">Sensibile</span>' : ''}</span></div></th>`;
+    for (const p of cols) {
+      const k = key(p.id, f.key);
+      const colsel = S.selCols.has(p.id) ? ' colsel' : '';
+      if (f.locked) { body += `<td class="c locked${colsel}"><button data-action="cell" data-ps="${p.id}" data-key="${f.key}" title="Campo senza FLS: sempre visibile">sempre</button></td>`; continue; }
+      const v = cur(k), b = base.get(k), pend = S.pending.has(k) && v !== b;
+      const lock = p.managed ? ' locked' : '';
+      body += `<td class="c v${v}${pend ? ' pend' : ''}${lock}${colsel}"><button data-action="cell" data-ps="${p.id}" data-key="${f.key}" title="${esc(p.name)} · ${f.key}: ${VAL_LONG[v]}${pend ? ' (prima: ' + VAL_LONG[b] + ')' : ''}"><span class="v">${VAL[v]}</span>${pend ? `<span class="was">da ${VAL[b]}</span>` : ''}</button></td>`;
+    }
+    body += '</tr>';
+  }
+  const head = cols.map(p => {
+    let r = 0, e = 0; for (const f of editable) { const v = cur(key(p.id, f.key)); if (v > 0) r++; if (v === 2) e++; }
+    return `<th><div class="ps-h"><span class="kind">${p.kind === 'Profilo' ? 'Profilo' : 'Perm. set'}</span><span class="nm">${p.managed ? '🔒 ' : ''}${esc(p.name)}</span>
+      <span class="ct">L ${r} · M ${e}</span>
+      <label><input type="checkbox" data-action="col" data-ps="${p.id}" ${S.selCols.has(p.id) ? 'checked' : ''} ${p.managed ? 'disabled' : ''}>seleziona</label></div></th>`;
+  }).join('');
+  const allSel = editable.length && editable.every(f => S.selRows.has(f.key));
+  return `
+  <div class="view-head"><div><div class="eyebrow">Passo 2 e 3 · ${esc(S.org.name)}</div><h1>Matrice Field Level Security</h1>
+    <p>Clicca una cella per cambiarla (nessuno → lettura → lettura e modifica), oppure seleziona righe e colonne e usa la modifica massiva.</p></div>
+    <span class="spacer"></span>
+    <div class="row"><button class="btn" data-action="export-csv">Esporta CSV</button>
+    <button class="btn primary" data-action="open-bulk">Modifica massiva</button></div></div>
+  <div class="analyze">
+    <aside class="side">
+      <section class="panel"><div class="panel-h"><h2>Oggetti</h2></div><div class="panel-b">
+        ${Object.keys(OBJECTS).map(o => `<label class="check"><input type="checkbox" data-action="obj" data-obj="${o}" ${S.objects.has(o) ? 'checked' : ''}>${o}<small>${objCount(o)}</small></label>`).join('')}
+      </div></section>
+      <section class="panel"><div class="panel-h"><h2>Profili e permission set</h2></div><div class="panel-b">
+        ${PS.map(p => `<label class="check"><input type="checkbox" data-action="ps" data-ps="${p.id}" ${S.ps.has(p.id) ? 'checked' : ''}><span>${p.managed ? '🔒 ' : ''}${esc(p.name)}</span><small>${p.kind === 'Profilo' ? 'P' : 'PS'}</small></label>`).join('')}
+        <p class="muted" style="font-size:12px;margin:8px 0 0">🔒 = pacchetto gestito, non modificabile.</p>
+      </div></section>
+    </aside>
+    <section style="min-width:0">
+      <div class="toolbar">
+        <input class="input" id="search" type="search" placeholder="Cerca campo o API name" value="${esc(S.search)}" aria-label="Cerca campo">
+        ${filters.map(([f, l]) => `<button class="chip" data-action="filter" data-f="${f}" aria-pressed="${S.filter === f}">${l}</button>`).join('')}
+      </div>
+      <div class="stats">
+        <span><b>${fields.length}</b>campi</span><span><b>${cols.length}</b>profili e permission set</span>
+        <span><b>${total ? Math.round(zeros / total * 100) : 0}%</b>celle senza accesso</span>
+        <span><b>${total ? Math.round(edits / total * 100) : 0}%</b>celle con modifica</span>
+        <span class="${n ? 'warn' : ''}"><b>${n}</b>modifiche in sospeso</span>
+      </div>
+      ${(S.selRows.size || S.selCols.size) ? `<div class="selbar"><b>${S.selRows.size}</b> campi · <b>${S.selCols.size}</b> profili/permission set selezionati
+        <span class="spacer"></span><button class="btn sm" data-action="clear-sel">Deseleziona</button><button class="btn sm primary" data-action="open-bulk">Modifica selezione</button></div>` : ''}
+      ${fields.length ? `<div class="scroller"><table class="mx"><thead><tr><th class="fcol"><label class="check"><input type="checkbox" data-action="all-rows" ${allSel ? 'checked' : ''}>Campo</label></th>${head}</tr></thead><tbody>${body}</tbody></table></div>`
+        : `<div class="panel empty">Nessun campo corrisponde ai filtri.</div>`}
+      <div class="legend"><span class="sw"><span class="box">—</span>Nessun accesso</span><span class="sw"><span class="box b1">L</span>Lettura</span><span class="sw"><span class="box b2">L+M</span>Lettura e modifica</span>
+        <span class="sw"><span class="box bp"></span>Modifica in sospeso</span><span class="sw"><span class="box bl"></span>Non modificabile</span><span class="sw">⚠ oggetto = manca la lettura sull'oggetto</span></div>
+      ${n ? `<div class="row" style="margin-top:14px"><button class="btn danger" data-action="discard">Scarta modifiche</button><button class="btn primary" data-action="go" data-view="preview">Vai all'anteprima (${n})</button></div>` : ''}
+    </section>
+  </div>`;
+}
+
+function buildPlan() {
+  return pendingItems().map(([k, after]) => {
+    const [psId, fk] = k.split('|'); const p = psById[psId], f = fieldByKey[fk], before = base.get(k);
+    const op = before === 0 ? 'insert' : after === 0 ? 'delete' : 'update';
+    const warns = [];
+    if (S.notes.has(k)) warns.push(S.notes.get(k));
+    if (after > 0 && !hasObj(psId, f.obj)) warns.push(`Manca la lettura su ${f.obj}: il campo resterà invisibile finché non concedi l'accesso all'oggetto.`);
+    if (after > 0 && p.license && f.enc) warns.push(`Licenza ${p.license}: i campi crittografati potrebbero essere rifiutati.`);
+    return { k, p, f, before, after, op, warns };
+  }).sort((a, b) => a.p.name.localeCompare(b.p.name) || a.f.key.localeCompare(b.f.key));
+}
+function callPlan(plan) {
+  const out = [];
+  for (const [op, verb, path] of [['insert', 'POST', '/composite/sobjects'], ['update', 'PATCH', '/composite/sobjects'], ['delete', 'DELETE', '/composite/sobjects?ids=…']]) {
+    const items = plan.filter(i => i.op === op);
+    for (let i = 0; i < items.length; i += 200) out.push({ op, verb, path, items: items.slice(i, i + 200) });
+  }
+  return out;
+}
+
+function vPreview() {
+  const plan = buildPlan();
+  if (!plan.length) return `<div class="view-head"><div><div class="eyebrow">Passo 4</div><h1>Anteprima modifiche</h1></div></div>
+    <div class="panel empty">Non ci sono modifiche in sospeso.<br><br><button class="btn primary" data-action="go" data-view="matrix">Torna alla matrice</button></div>`;
+  const c = { insert: 0, update: 0, delete: 0 }; plan.forEach(i => c[i.op]++);
+  const warnN = plan.filter(i => i.warns.length).length;
+  const calls = callPlan(plan);
+  const shown = S.opFilter === 'warn' ? plan.filter(i => i.warns.length) : S.opFilter === 'all' ? plan : plan.filter(i => i.op === S.opFilter);
+  const objWarn = plan.filter(i => i.warns.some(w => w.startsWith('Manca'))).length;
+  const capN = plan.filter(i => S.notes.has(i.k)).length;
+  const licN = plan.filter(i => i.warns.some(w => w.startsWith('Licenza'))).length;
+  const sample = plan.filter(i => i.op === 'insert').slice(0, 2).map(i => ({ attributes: { type: 'FieldPermissions' }, ParentId: i.p.id + 'GAK', SobjectType: i.f.obj, Field: i.f.key, PermissionsRead: i.after > 0, PermissionsEdit: i.after === 2 }));
+  const prod = !S.org.sandbox;
+  const canRun = S.confirmChecked && (!prod || S.confirmName.trim() === S.org.name);
+  return `
+  <div class="view-head"><div><div class="eyebrow">Passo 4 · ${esc(S.org.name)}</div><h1>Anteprima modifiche</h1>
+    <p>Controlla cosa cambierà prima di scrivere sull'org. Nessuna modifica è ancora stata applicata.</p></div></div>
+  ${S.rollbackOf ? `<div class="banner info">Questo change set annulla <b>${S.rollbackOf}</b>: riporta i campi ai valori di prima.</div>` : ''}
+  <div class="kpis">
+    <div class="kpi"><div class="k">Modifiche totali</div><div class="n">${plan.length}</div></div>
+    <div class="kpi good"><div class="k">Nuovi accessi (insert)</div><div class="n">${c.insert}</div></div>
+    <div class="kpi"><div class="k">Accessi cambiati (update)</div><div class="n">${c.update}</div></div>
+    <div class="kpi bad"><div class="k">Accessi rimossi (delete)</div><div class="n">${c.delete}</div></div>
+    <div class="kpi warn"><div class="k">Con avvisi</div><div class="n">${warnN}</div></div>
+  </div>
+  <div class="prev-grid">
+    <section class="panel" style="min-width:0">
+      <div class="panel-h"><h2>Dettaglio per campo</h2><div class="row">
+        ${[['all', 'Tutte'], ['insert', 'Insert'], ['update', 'Update'], ['delete', 'Delete'], ['warn', 'Con avvisi']].map(([f, l]) => `<button class="chip" data-action="opfilter" data-f="${f}" aria-pressed="${S.opFilter === f}">${l}</button>`).join('')}
+      </div></div>
+      <div class="tbl-wrap"><table class="dt"><thead><tr><th>Profilo / permission set</th><th>Campo</th><th>Prima</th><th>Dopo</th><th>Operazione</th><th></th></tr></thead><tbody>
+      ${shown.map(i => `<tr><td>${esc(i.p.name)}<div class="muted" style="font-size:11px">${i.p.kind}</div></td>
+        <td>${esc(i.f.label)}<div class="acc muted">${i.f.key}</div>${i.warns.map(w => `<div class="warn-line">⚠ ${esc(w)}</div>`).join('')}</td>
+        <td class="acc">${VAL[i.before]}</td><td class="acc"><b>${VAL[i.after]}</b></td>
+        <td><span class="pill op-${i.op}">${i.op}</span></td>
+        <td><button class="btn sm" data-action="revert" data-k="${i.k}" title="Togli dalla lista">Togli</button></td></tr>`).join('')}
+      </tbody></table></div>
+      <div class="panel-b"><details class="payload"><summary>Richiesta API di esempio (insert)</summary>
+        <pre class="code">${esc('POST /services/data/v62.0/composite/sobjects\n' + JSON.stringify({ allOrNone: false, records: sample }, null, 2))}</pre></details></div>
+    </section>
+    <aside style="display:grid;gap:16px">
+      <section class="panel"><div class="panel-h"><h2>Avvisi</h2></div><div class="panel-b">
+        ${(objWarn || capN || licN) ? `<ul class="warn-list">
+          ${capN ? `<li><b>${capN} campi calcolati</b>Hai chiesto lettura e modifica: applichiamo solo la lettura, perché formula e roll-up non sono modificabili.</li>` : ''}
+          ${objWarn ? `<li><b>${objWarn} senza accesso all'oggetto</b>Il permesso sul campo viene salvato ma non ha effetto finché il profilo non legge l'oggetto.</li>` : ''}
+          ${licN ? `<li><b>${licN} a rischio licenza</b>La licenza Partner Community non ammette alcuni campi. Lo scopriremo in esecuzione, riga per riga.</li>` : ''}
+        </ul>` : '<p class="muted" style="margin:0">Nessun avviso.</p>'}
+        <ul class="warn-list" style="margin-top:10px"><li class="info"><b>Esclusi automaticamente</b>Campi senza FLS e permission set di pacchetti gestiti.</li></ul>
+      </div></section>
+      <section class="panel"><div class="panel-h"><h2>Chiamate previste</h2><span class="muted">${calls.length}</span></div><div class="panel-b">
+        <ul class="callplan">${calls.map(cl => `<li><span>${cl.verb} ${cl.path}</span><span>${cl.items.length} rec.</span></li>`).join('')}</ul>
+        <p class="muted" style="font-size:12px;margin:10px 0 0">Max 200 record per chiamata, <code>allOrNone: false</code>. Prima di scrivere rileggiamo i record per intercettare modifiche concorrenti.</p>
+      </div></section>
+      <section class="panel"><div class="panel-h"><h2>${prod ? 'Approvazione' : 'Conferma'}</h2>${prod ? '<span class="env prod">2 step</span>' : ''}</div><div class="panel-b confirm">
+        ${S.awaiting ? `
+          <div class="banner info" style="margin:0"><b>${S.awaiting.id}</b> è in attesa di approvazione.<br><span class="muted">Inviato da Salvatore alle ${S.awaiting.at}.</span></div>
+          <ul class="callplan"><li><span>Anteprima ricalcolata sull'org</span><span style="color:var(--ok)">nessun conflitto</span></li></ul>
+          <p class="muted" style="margin:0;font-size:13px">Chi approva rivede lo stesso diff. Nell'MVP puoi approvare tu stesso: resta un passaggio separato, registrato nello storico.</p>
+          <div class="row"><button class="btn danger" data-action="reject">Rifiuta</button><button class="btn primary" data-action="run">Approva ed esegui</button></div>`
+        : `${prod ? `<div class="banner prod" style="margin:0">Org di <b>produzione</b>: il change set va prima approvato. Digita il nome dell'org per inviarlo.</div>
+          <input class="input" id="confirm-name" placeholder="${esc(S.org.name)}" value="${esc(S.confirmName)}" aria-label="Nome org">` : `<p class="muted" style="margin:0;font-size:13px">Org sandbox: basta una conferma. In produzione serve l'approvazione a due step.</p>`}
+        <label class="check"><input type="checkbox" id="confirm-check" ${S.confirmChecked ? 'checked' : ''}>Ho rivisto le ${plan.length} modifiche</label>
+        <label class="check"><input type="checkbox" checked disabled>Salva lo snapshot per poter annullare</label>
+        <div class="row"><button class="btn" data-action="go" data-view="matrix">Torna alla matrice</button>
+        <button class="btn primary" data-action="${prod ? 'submit-approval' : 'run'}" ${canRun ? '' : 'disabled'} id="run-btn">${prod ? 'Invia per approvazione' : `Applica ${plan.length} modifiche`}</button></div>`}
+      </div></section>
+    </aside>
+  </div>`;
+}
+
+function vRun() {
+  const R = S.run;
+  const pct = Math.round(R.step / R.calls.length * 100);
+  const ok = R.results.filter(r => r.ok).length, err = R.results.filter(r => !r.ok);
+  return `
+  <div class="view-head"><div><div class="eyebrow">Passo 5 · ${esc(S.org.name)} · ${R.id}</div><h1>${R.done ? (err.length ? 'Completato con errori' : 'Modifiche applicate') : 'Applicazione in corso'}</h1>
+    <p>${R.done ? `Abbiamo riletto i record dall'org e confrontato il risultato con quanto richiesto.` : `Puoi lasciare la pagina: il job continua sul server e lo ritrovi nello storico.`}</p></div></div>
+  <div class="kpis">
+    <div class="kpi"><div class="k">Modifiche</div><div class="n">${R.plan.length}</div></div>
+    <div class="kpi good"><div class="k">Riuscite</div><div class="n">${ok}</div></div>
+    <div class="kpi bad"><div class="k">Errori</div><div class="n">${err.length}</div></div>
+    <div class="kpi"><div class="k">Chiamate API</div><div class="n">${R.step}/${R.calls.length}</div></div>
+    <div class="kpi"><div class="k">Stato</div><div class="n" style="font-size:16px;padding-top:5px">${R.done ? (err.length ? '<span class="pill st-part">Parziale</span>' : '<span class="pill st-ok">Completato</span>') : 'In corso…'}</div></div>
+  </div>
+  <section class="panel"><div class="panel-b">
+    <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+    <div class="log">${R.log.map(l => `<div class="${l.c || ''}">${esc(l.t)}</div>`).join('') || '<div>In attesa…</div>'}</div>
+  </div></section>
+  ${R.done ? `
+  ${err.length ? `<section class="panel" style="margin-top:16px"><div class="panel-h"><h2>Errori (${err.length})</h2><span class="muted">Le altre modifiche sono state salvate</span></div>
+    <div class="tbl-wrap"><table class="dt"><thead><tr><th>Profilo / permission set</th><th>Campo</th><th>Errore Salesforce</th></tr></thead><tbody>
+    ${err.map(r => `<tr><td>${esc(r.i.p.name)}</td><td class="acc">${r.i.f.key}</td><td><span class="acc" style="color:var(--danger)">${r.code}</span><div>${esc(r.msg)}</div></td></tr>`).join('')}
+    </tbody></table></div></section>` : ''}
+  <div class="row" style="margin-top:16px">
+    <button class="btn primary" data-action="go" data-view="matrix">Torna alla matrice</button>
+    <button class="btn" data-action="rollback" data-id="${R.id}">Annulla queste modifiche</button>
+    <button class="btn" data-action="export-report">Esporta report CSV</button>
+  </div>` : ''}`;
+}
+
+function vHistory() {
+  return `
+  <div class="view-head"><div><h1>Storico modifiche</h1><p>Ogni change set salva chi l'ha eseguito, quando, su quale org e lo stato di prima. Da qui puoi annullarlo.</p></div></div>
+  <section class="panel"><div class="tbl-wrap" style="max-height:none"><table class="dt"><thead><tr><th>Change set</th><th>Data</th><th>Org</th><th>Autore</th><th>Descrizione</th><th>Modifiche</th><th>Esito</th><th></th></tr></thead><tbody>
+  ${S.history.map(h => `<tr><td class="acc">${h.id}</td><td class="num">${h.at}</td><td>${esc(h.org)}</td><td>${esc(h.author)}</td><td>${esc(h.desc)}</td><td class="num">${h.n}</td>
+    <td>${h.err ? `<span class="pill st-part">${h.ok} ok · ${h.err} errori</span>` : `<span class="pill st-ok">${h.ok} ok</span>`}</td>
+    <td>${h.items ? `<button class="btn sm" data-action="rollback" data-id="${h.id}">Annulla</button>` : `<button class="btn sm" data-action="toast" data-msg="Nel prodotto apre il dettaglio del change set con il diff completo.">Dettaglio</button>`}</td></tr>`).join('')}
+  </tbody></table></div></section>`;
+}
+
+function vDesign() {
+  const md = $('#design-md').textContent;
+  const html = window.marked ? window.marked.parse(md) : `<pre>${esc(md)}</pre>`;
+  return `<div class="doc-actions"><button class="btn" data-action="go" data-view="${S.org ? 'matrix' : 'connect'}">Apri il mockup</button></div><article class="doc">${html}</article>`;
+}
+
+/* ---------- Modals ---------- */
+function mConsent() {
+  return `<div class="overlay"><div class="modal narrow consent" role="dialog" aria-modal="true" aria-labelledby="ct">
+    <div class="modal-h"><div><div class="eyebrow">Pagina di consenso di Salesforce (simulata)</div><h2 id="ct">Consentire l'accesso a FLS Analyzer?</h2></div></div>
+    <div class="modal-b"><div class="logo">FA</div>
+      <p style="margin-top:0">FLS Analyzer chiede di:</p>
+      <div class="scope"><span>Gestire i dati tramite API</span><code>api</code></div>
+      <div class="scope"><span>Eseguire richieste in qualsiasi momento</span><code>refresh_token</code></div>
+      <div class="scope"><span>Accedere alle informazioni di identità</span><code>id</code></div>
+      <p class="muted" style="font-size:12px">Il token viene salvato cifrato sul server dell'app e non arriva mai al browser.</p></div>
+    <div class="modal-f"><button class="btn" data-action="close">Nega</button><button class="btn primary" data-action="consent">Consenti</button></div>
+  </div></div>`;
+}
+function mLoading() {
+  const steps = ['Verifica permessi del tuo utente', 'Lettura oggetti (describeGlobal)', `Lettura di ${PS.length} profili e permission set`, 'Lettura di 1.284 record FieldPermissions', 'Lettura ObjectPermissions'];
+  return `<div class="overlay"><div class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="lt">
+    <div class="modal-h"><div><div class="eyebrow">${esc(S.pendingOrg.name)}</div><h2 id="lt">Lettura dei metadati</h2></div></div>
+    <div class="modal-b"><ul class="loading-list">${steps.map((s, i) => `<li class="${i < S.loadStep ? 'done' : i === S.loadStep ? 'run' : ''}"><span class="st"></span>${s}</li>`).join('')}</ul></div>
+  </div></div>`;
+}
+function mBulk() {
+  const B = S.bulk;
+  const flds = Object.values(fieldByKey).filter(f => S.objects.has(f.obj) && !f.locked);
+  const cols = PS.filter(p => !p.managed);
+  const r = bulkCompute(false);
+  let grp = '', fl = '';
+  for (const f of flds) { if (f.obj !== grp) { grp = f.obj; fl += `<div class="grp">${grp}</div>`; } fl += `<label class="check"><input type="checkbox" data-action="b-f" data-key="${f.key}" ${B.fields.has(f.key) ? 'checked' : ''}>${esc(f.label)}${f.calc ? ' <span class="tag">Solo lettura</span>' : ''}</label>`; }
+  const acts = [['read', 'Lettura', 'Vede il campo, non lo modifica'], ['edit', 'Lettura e modifica', 'Vede e modifica'], ['noedit', 'Togli la modifica', 'Chi modificava ora legge'], ['none', 'Nessun accesso', 'Il campo sparisce']];
+  return `<div class="overlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="bt">
+    <div class="modal-h"><div><div class="eyebrow">Passo 3</div><h2 id="bt">Modifica massiva</h2><p>Scegli i campi, i profili o permission set e cosa applicare. Le modifiche vanno in sospeso: niente viene scritto finché non confermi l'anteprima.</p></div><button class="x" data-action="close" aria-label="Chiudi">×</button></div>
+    <div class="modal-b">
+      <div class="bulk-grid">
+        <div class="pick"><div class="pick-h"><span>Campi · ${B.fields.size}</span><span class="row"><button data-action="b-all-f">Tutti</button><button data-action="b-none-f">Nessuno</button></span></div><div class="pick-b">${fl}</div></div>
+        <div class="pick"><div class="pick-h"><span>Profili e permission set · ${B.ps.size}</span><span class="row"><button data-action="b-all-p">Tutti</button><button data-action="b-none-p">Nessuno</button></span></div><div class="pick-b">
+          ${cols.map(p => `<label class="check"><input type="checkbox" data-action="b-p" data-ps="${p.id}" ${B.ps.has(p.id) ? 'checked' : ''}>${esc(p.name)}<small>${p.kind === 'Profilo' ? 'P' : 'PS'}</small></label>`).join('')}</div></div>
+      </div>
+      <div class="actions" role="radiogroup" aria-label="Azione">
+        ${acts.map(([v, l, d]) => `<label class="act"><input type="radio" name="bact" id="bact-${v}" value="${v}" data-action="b-act" ${B.action === v ? 'checked' : ''}><b>${l}</b><span>${d}</span></label>`).join('')}
+      </div>
+      <div class="impact">Questa azione cambia <b>${r.changed}</b> ${r.changed === 1 ? 'cella' : 'celle'} su ${r.pairs}.${r.capped ? ` <b>${r.capped}</b> campi calcolati riceveranno solo la lettura.` : ''}${r.same ? ` ${r.same} hanno già il valore richiesto.` : ''}</div>
+    </div>
+    <div class="modal-f"><button class="btn" data-action="close">Annulla</button><button class="btn primary" data-action="b-apply" ${r.changed ? '' : 'disabled'}>Aggiungi ${r.changed} ${r.changed === 1 ? 'modifica' : 'modifiche'}</button></div>
+  </div></div>`;
+}
+function bulkCompute(apply) {
+  const B = S.bulk; let pairs = 0, changed = 0, capped = 0, same = 0;
+  for (const fk of B.fields) for (const ps of B.ps) {
+    const f = fieldByKey[fk]; const k = key(ps, fk); pairs++;
+    const c = cur(k); let t;
+    if (B.action === 'read') t = 1; else if (B.action === 'edit') t = 2; else if (B.action === 'none') t = 0; else t = c === 2 ? 1 : c;
+    let cap = false; if (f.calc && t === 2) { t = 1; cap = true; }
+    if (t === c) { same++; continue; }
+    changed++; if (cap) capped++;
+    if (apply) {
+      if (t === base.get(k)) { S.pending.delete(k); S.notes.delete(k); }
+      else { S.pending.set(k, t); if (cap) S.notes.set(k, 'Campo calcolato: applicata solo la lettura.'); else S.notes.delete(k); }
+    }
+  }
+  return { pairs, changed, capped, same };
+}
+
+/* ---------- Render ---------- */
+function render() {
+  renderChrome();
+  const v = { connect: vConnect, matrix: vMatrix, preview: vPreview, run: vRun, history: vHistory, design: vDesign }[S.view];
+  const focusId = document.activeElement && document.activeElement.id;
+  const caret = focusId === 'search' || focusId === 'confirm-name' ? document.activeElement.selectionStart : null;
+  const sc = document.querySelector('.scroller'); const scroll = sc ? [sc.scrollLeft, sc.scrollTop] : null;
+  $('#main').innerHTML = v();
+  const sc2 = document.querySelector('.scroller'); if (sc2 && scroll) { sc2.scrollLeft = scroll[0]; sc2.scrollTop = scroll[1]; }
+  $('#modal-root').innerHTML = S.modal === 'consent' ? mConsent() : S.modal === 'loading' ? mLoading() : S.modal === 'bulk' ? mBulk() : '';
+  if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); if (caret != null && el.setSelectionRange) el.setSelectionRange(caret, caret); } }
+}
+
+/* ---------- Flows ---------- */
+function startLoading(org) {
+  S.pendingOrg = org; S.loadStep = 0; S.modal = 'loading'; render();
+  const tick = () => { S.loadStep++; if (S.loadStep >= 5) { S.org = org; S.pendingOrg = null; S.modal = null; S.view = 'matrix'; render(); toast(`Collegato a ${org.name}`); } else { render(); setTimeout(tick, 450); } };
+  setTimeout(tick, 450);
+}
+function startRun() {
+  const plan = buildPlan(); const calls = callPlan(plan);
+  const id = S.awaiting ? S.awaiting.id : 'CS-' + String(S.seq++).padStart(4, '0');
+  const approved = !!S.awaiting; S.awaiting = null;
+  S.run = { id, plan, calls, step: 0, results: [], log: [...(approved ? [{ t: `Approvato da Salvatore: avvio esecuzione`, c: 'ok' }] : []), { t: `Rilettura di ${plan.length} record per controllo concorrenza… nessun conflitto` }], done: false };
+  S.view = 'run'; render();
+  const next = () => {
+    const R = S.run; if (R.step >= calls.length) return finish();
+    const cl = calls[R.step];
+    let okN = 0, errN = 0;
+    for (const i of cl.items) {
+      const fail = i.after > 0 && i.p.license && i.f.enc;
+      if (fail) { errN++; R.results.push({ i, ok: false, code: 'FIELD_INTEGRITY_EXCEPTION', msg: `Il campo ${i.f.key} non è disponibile per la licenza ${i.p.license}.` }); }
+      else { okN++; R.results.push({ i, ok: true }); }
+    }
+    R.step++;
+    R.log.push({ t: `${cl.verb} ${cl.path} · ${cl.items.length} record → ${okN} ok${errN ? `, ${errN} errori` : ''}`, c: errN ? 'err' : 'ok' });
+    render(); setTimeout(next, 750);
+  };
+  const finish = () => {
+    const R = S.run;
+    for (const r of R.results) if (r.ok) base.set(r.i.k, r.i.after);
+    S.pending.clear(); S.notes.clear(); S.selRows.clear(); S.selCols.clear(); S.confirmChecked = false; S.confirmName = '';
+    const ok = R.results.filter(r => r.ok); const err = R.results.length - ok.length;
+    R.log.push({ t: `Verifica: riletti ${ok.length} record, tutti coerenti con quanto richiesto.`, c: 'ok' });
+    R.done = true;
+    const d = new Date(); const pad = n => String(n).padStart(2, '0');
+    S.history.unshift({ id: R.id, at: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`, org: S.org.name, author: 'Salvatore',
+      n: R.plan.length, ok: ok.length, err, desc: S.rollbackOf ? `Annulla ${S.rollbackOf}` : `${new Set(R.plan.map(i => i.f.key)).size} campi su ${new Set(R.plan.map(i => i.p.id)).size} profili/permission set`,
+      items: ok.map(r => ({ k: r.i.k, before: r.i.before })) });
+    S.rollbackOf = null; render();
+  };
+  setTimeout(next, 700);
+}
+function rollback(id) {
+  const h = S.history.find(x => x.id === id); if (!h || !h.items) return;
+  S.pending.clear(); S.notes.clear();
+  for (const it of h.items) if (base.get(it.k) !== it.before) S.pending.set(it.k, it.before);
+  S.rollbackOf = id; S.opFilter = 'all'; go('preview');
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-action]'); if (!t) return;
+  const a = t.dataset.action;
+  if (t.tagName === 'INPUT' && t.type !== 'checkbox' && t.type !== 'radio') return;
+  switch (a) {
+    case 'go': if (!t.disabled) go(t.dataset.view); break;
+    case 'open-org': startLoading(ORGS.find(o => o.id === t.dataset.org)); break;
+    case 'consent': S.modal = null; startLoading({ id: 'new', name: 'acme--dev', user: 'salvatore@acme.com.dev', sandbox: true, sync: 'appena sincronizzata' }); break;
+    case 'close': S.modal = null; render(); break;
+    case 'obj': t.checked ? S.objects.add(t.dataset.obj) : S.objects.delete(t.dataset.obj); render(); break;
+    case 'ps': t.checked ? S.ps.add(t.dataset.ps) : S.ps.delete(t.dataset.ps); render(); break;
+    case 'filter': S.filter = t.dataset.f; render(); break;
+    case 'opfilter': S.opFilter = t.dataset.f; render(); break;
+    case 'row': t.checked ? S.selRows.add(t.dataset.key) : S.selRows.delete(t.dataset.key); render(); break;
+    case 'col': t.checked ? S.selCols.add(t.dataset.ps) : S.selCols.delete(t.dataset.ps); render(); break;
+    case 'all-rows': { const fs = visibleFields().filter(f => !f.locked); if (t.checked) fs.forEach(f => S.selRows.add(f.key)); else fs.forEach(f => S.selRows.delete(f.key)); render(); break; }
+    case 'clear-sel': S.selRows.clear(); S.selCols.clear(); render(); break;
+    case 'cell': {
+      const p = psById[t.dataset.ps], f = fieldByKey[t.dataset.key];
+      if (S.awaiting) { toast(`${S.awaiting.id} è in attesa di approvazione: approvalo o rifiutalo prima di cambiare altro.`); break; }
+      if (f.locked) { toast(`${f.key} non ha FLS: è sempre visibile a chi legge l'oggetto.`); break; }
+      if (p.managed) { toast(`${p.name} appartiene al pacchetto gestito ${p.managed}: non si può modificare.`); break; }
+      const k = key(p.id, f.key), states = f.calc ? [0, 1] : [0, 1, 2];
+      const nv = states[(states.indexOf(cur(k)) + 1) % states.length];
+      if (nv === base.get(k)) S.pending.delete(k); else S.pending.set(k, nv);
+      S.notes.delete(k); render(); break;
+    }
+    case 'open-bulk': {
+      if (S.awaiting) { toast(`${S.awaiting.id} è in attesa di approvazione.`); break; }
+      const fs = S.selRows.size ? new Set(S.selRows) : new Set();
+      const ps = S.selCols.size ? new Set(S.selCols) : new Set();
+      S.bulk = { fields: fs, ps, action: 'read' }; S.modal = 'bulk'; render(); break;
+    }
+    case 'b-f': t.checked ? S.bulk.fields.add(t.dataset.key) : S.bulk.fields.delete(t.dataset.key); render(); break;
+    case 'b-p': t.checked ? S.bulk.ps.add(t.dataset.ps) : S.bulk.ps.delete(t.dataset.ps); render(); break;
+    case 'b-all-f': Object.values(fieldByKey).filter(f => S.objects.has(f.obj) && !f.locked).forEach(f => S.bulk.fields.add(f.key)); render(); break;
+    case 'b-none-f': S.bulk.fields.clear(); render(); break;
+    case 'b-all-p': PS.filter(p => !p.managed).forEach(p => S.bulk.ps.add(p.id)); render(); break;
+    case 'b-none-p': S.bulk.ps.clear(); render(); break;
+    case 'b-act': S.bulk.action = t.value; render(); break;
+    case 'b-apply': { const r = bulkCompute(true); S.modal = null; render(); toast(`${r.changed === 1 ? '1 modifica aggiunta' : r.changed + ' modifiche aggiunte'}. Controllale nell'anteprima.`); break; }
+    case 'discard': S.pending.clear(); S.notes.clear(); S.rollbackOf = null; render(); toast('Modifiche in sospeso scartate.'); break;
+    case 'revert': if (S.awaiting) break; S.pending.delete(t.dataset.k); S.notes.delete(t.dataset.k); render(); break;
+    case 'run': if (!t.disabled) startRun(); break;
+    case 'submit-approval': if (!t.disabled) { const d = new Date(); S.awaiting = { id: 'CS-' + String(S.seq++).padStart(4, '0'), at: String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') }; render(); toast(`${S.awaiting.id} inviato per approvazione.`); } break;
+    case 'reject': toast(`${S.awaiting.id} rifiutato: le modifiche tornano in bozza.`); S.awaiting = null; S.confirmChecked = false; S.confirmName = ''; render(); break;
+    case 'rollback': rollback(t.dataset.id); break;
+    case 'export-csv': toast('Nel prodotto scarica la matrice in CSV (campo × profilo, con L / L+M).'); break;
+    case 'export-report': toast('Nel prodotto scarica il report CSV con esito ed errore per ogni riga.'); break;
+    case 'toast': toast(t.dataset.msg); break;
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'confirm-check') { S.confirmChecked = e.target.checked; render(); }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'search') { S.search = e.target.value; render(); }
+  if (e.target.id === 'confirm-name') { S.confirmName = e.target.value; const b = $('#run-btn'); if (b) b.disabled = !(S.confirmChecked && S.confirmName.trim() === S.org.name); }
+});
+document.addEventListener('submit', e => { if (e.target.id === 'connect-form') { e.preventDefault(); S.modal = 'consent'; render(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && (S.modal === 'bulk' || S.modal === 'consent')) { S.modal = null; render(); } });
+
+if (location.hash === '#progetto') S.view = 'design';
+render();
+})();
+</script>
