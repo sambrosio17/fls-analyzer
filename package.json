@@ -1,0 +1,21 @@
+{
+  "name": "fls-analyzer",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @fls/server & npm run dev --workspace @fls/web",
+    "build": "npm run build --workspace @fls/web",
+    "start": "npm run start --workspace @fls/server",
+    "test": "vitest run",
+    "typecheck": "tsc -p packages/core && tsc -p apps/server && tsc -p apps/web"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.4"
+  }
+}
