@@ -9,7 +9,8 @@ export interface PermSet { id: string; name: string; label: string; isProfile: b
 export interface Matrix {
   fields: FieldMeta[];
   permissionSets: PermSet[];
-  cells: { parentId: string; field: string; access: Access }[];
+  /** Per permission set id, one char per field in `fields` order: '0' none, '1' read, '2' edit. Missing = no access. */
+  access: Record<string, string>;
   objectRead: { parentId: string; sobjectType: string }[];
 }
 export interface ChangeItem {

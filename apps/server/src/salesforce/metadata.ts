@@ -16,6 +16,18 @@ function chunk<T>(list: T[], size: number): T[][] {
   return out;
 }
 
+/** Runs one query per chunk of parent IDs, a few at a time, keeping the chunk order. */
+async function perChunk<T>(parentIds: string[], run: (ids: string[]) => Promise<T[]>, concurrency = 4): Promise<T[]> {
+  const chunks = chunk(parentIds, 200);
+  const results: T[][] = new Array(chunks.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < chunks.length) { const i = next++; results[i] = await run(chunks[i]!); }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, chunks.length) }, worker));
+  return results.flat();
+}
+
 export interface SObjectSummary { name: string; label: string; custom: boolean }
 
 export async function listObjects(api: SfApi): Promise<SObjectSummary[]> {
@@ -74,23 +86,36 @@ export async function loadPermissionSets(api: SfApi): Promise<PermSetMeta[]> {
 }
 
 export async function loadFieldPermissions(api: SfApi, objects: string[], parentIds: string[]): Promise<FieldPermRecord[]> {
-  const out: FieldPermRecord[] = [];
-  for (const ids of chunk(parentIds, 200)) {
+  return perChunk(parentIds, async ids => {
     const rows = await api.query<{ Id: string; ParentId: string; SobjectType: string; Field: string; PermissionsRead: boolean; PermissionsEdit: boolean }>(
       `SELECT Id, ParentId, SobjectType, Field, PermissionsRead, PermissionsEdit FROM FieldPermissions WHERE SobjectType IN ${inList(objects)} AND ParentId IN ${inList(ids)}`);
-    for (const r of rows) out.push({ id: r.Id, parentId: r.ParentId, sobjectType: r.SobjectType, field: r.Field, read: r.PermissionsRead, edit: r.PermissionsEdit });
-  }
-  return out;
+    return rows.map(r => ({ id: r.Id, parentId: r.ParentId, sobjectType: r.SobjectType, field: r.Field, read: r.PermissionsRead, edit: r.PermissionsEdit }));
+  });
 }
 
 export async function loadObjectPermissions(api: SfApi, objects: string[], parentIds: string[]): Promise<ObjectPermRecord[]> {
-  const out: ObjectPermRecord[] = [];
-  for (const ids of chunk(parentIds, 200)) {
+  return perChunk(parentIds, async ids => {
     const rows = await api.query<{ ParentId: string; SobjectType: string; PermissionsRead: boolean }>(
       `SELECT ParentId, SobjectType, PermissionsRead FROM ObjectPermissions WHERE SobjectType IN ${inList(objects)} AND ParentId IN ${inList(ids)}`);
-    for (const r of rows) out.push({ parentId: r.ParentId, sobjectType: r.SobjectType, read: r.PermissionsRead });
+    return rows.map(r => ({ parentId: r.ParentId, sobjectType: r.SobjectType, read: r.PermissionsRead }));
+  });
+}
+
+/**
+ * Compact matrix encoding: for each permission set with any access, one character per field
+ * ('0' none, '1' read, '2' edit) in the order of `fieldNames`. Keeps large matrices small on the wire.
+ */
+export function accessStrings(fieldNames: string[], fieldPerms: FieldPermRecord[]): Record<string, string> {
+  const index = new Map(fieldNames.map((f, i) => [f, i]));
+  const rows = new Map<string, Uint8Array>();
+  for (const r of fieldPerms) {
+    const i = index.get(r.field);
+    if (i === undefined || !(r.read || r.edit)) continue;
+    let row = rows.get(r.parentId);
+    if (!row) rows.set(r.parentId, row = new Uint8Array(fieldNames.length).fill(48));
+    row[i] = r.edit ? 50 : 49;
   }
-  return out;
+  return Object.fromEntries([...rows].map(([id, row]) => [id, Buffer.from(row).toString('latin1')]));
 }
 
 export async function loadSnapshot(api: SfApi, objects: string[], parentIds: string[]): Promise<{ snapshot: FlsSnapshot; fieldPerms: FieldPermRecord[]; objectPerms: ObjectPermRecord[] }> {

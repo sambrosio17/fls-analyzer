@@ -65,7 +65,7 @@ describe('API', () => {
     const { body } = await current.call('GET', '/api/orgs/org1/matrix?objects=Account');
     expect(body.fields.map((f: { name: string }) => f.name)).toEqual(['Account.Name', 'Account.Industry', 'Account.Tax_Code__c', 'Account.Score__c']);
     expect(body.permissionSets.map((p: { label: string }) => p.label)).toEqual(['Sales User', 'CPQ Admin', 'Finance Access']);
-    expect(body.cells).toEqual([{ parentId: SALES, field: 'Account.Industry', access: 1 }]);
+    expect(body.access).toEqual({ [SALES]: '0100' });
   });
 
   it('plans, runs and verifies a bulk change on a sandbox, then rolls it back', async () => {

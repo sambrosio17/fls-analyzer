@@ -8,6 +8,9 @@ const ITEM_LABEL = { pending: 'Da applicare', ok: 'Applicata', error: 'Errore', 
 
 interface Props { id: string; onOpen: (id: string) => void; onBack: () => void }
 
+/** Rows rendered at once in the detail table; big change sets render on demand. */
+const PAGE = 250;
+
 export function ChangeSetPage({ id, onOpen, onBack }: Props) {
   const [cs, setCs] = useState<ChangeSet | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +19,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
   const [confirmName, setConfirmName] = useState('');
   const [opFilter, setOpFilter] = useState<'all' | 'insert' | 'update' | 'delete' | 'warn' | 'failed'>('all');
   const [notice, setNotice] = useState<string | null>(null);
+  const [limit, setLimit] = useState(PAGE);
 
   useEffect(() => { api.changeSet(id).then(setCs).catch(e => setError(e.message)); }, [id]);
   useEffect(() => {
@@ -71,7 +75,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
           <div className="panel-h"><h2>Dettaglio</h2>
             <div className="row">
               {([['all', 'Tutte'], ['insert', 'Insert'], ['update', 'Update'], ['delete', 'Delete'], ['warn', 'Con avvisi'], ...(finished ? [['failed', 'Errori']] : [])] as [typeof opFilter, string][]).map(([f, l]) => (
-                <button key={f} className="chip" aria-pressed={opFilter === f} onClick={() => setOpFilter(f)}>{l}</button>
+                <button key={f} className="chip" aria-pressed={opFilter === f} onClick={() => { setOpFilter(f); setLimit(PAGE); }}>{l}</button>
               ))}
             </div>
           </div>
@@ -79,7 +83,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
             <table className="dt">
               <thead><tr><th>Profilo / permission set</th><th>Campo</th><th>Prima</th><th>Dopo</th><th>Operazione</th><th>Esito</th></tr></thead>
               <tbody>
-                {shown.map(i => (
+                {shown.slice(0, limit).map(i => (
                   <tr key={i.id}>
                     <td>{i.parentLabel}</td>
                     <td><span className="mono">{i.field}</span>
@@ -93,6 +97,9 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
                   </tr>
                 ))}
                 {!shown.length && <tr><td colSpan={6} className="muted">Nessuna riga.</td></tr>}
+                {shown.length > limit && (
+                  <tr><td colSpan={6}><span className="muted">Mostrate {limit} di {shown.length}.</span> <button className="btn sm" onClick={() => setLimit(l => l + PAGE * 4)}>Mostra altre</button></td></tr>
+                )}
               </tbody>
             </table>
           </div>
