@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS orgs (
   access_token_enc TEXT,
   created_at TEXT NOT NULL,
   last_sync_at TEXT,
+  alias TEXT,
   UNIQUE (tenant_id, sf_org_id, username)
 );
 CREATE TABLE IF NOT EXISTS change_sets (
@@ -82,7 +83,12 @@ export interface OrgRow {
   access_token_enc: string | null;
   created_at: string;
   last_sync_at: string | null;
+  /** Name chosen by the user, shown in place of the Salesforce org name (sandboxes share the production name). */
+  alias: string | null;
 }
+
+/** Name shown for an org: the user's alias, else the Salesforce org name. */
+export const orgLabel = (o: Pick<OrgRow, 'alias' | 'name'>) => o.alias ?? o.name;
 
 export interface ChangeSetRow {
   id: string;
@@ -139,20 +145,28 @@ export class Db {
     this.sql = new DatabaseSync(path);
     this.sql.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
     this.sql.exec(SCHEMA);
+    this.migrate();
+  }
+
+  /** Adds columns introduced after the first release to existing databases. */
+  private migrate(): void {
+    const cols = (this.sql.prepare('PRAGMA table_info(orgs)').all() as { name: string }[]).map(c => c.name);
+    if (!cols.includes('alias')) this.sql.exec('ALTER TABLE orgs ADD COLUMN alias TEXT');
   }
 
   // ---- orgs
+  /** Inserts or refreshes an org; a null alias keeps the one already saved. */
   upsertOrg(o: Omit<OrgRow, 'created_at' | 'last_sync_at'>): OrgRow {
     const existing = this.sql.prepare('SELECT id FROM orgs WHERE tenant_id = ? AND sf_org_id = ? AND username = ?')
       .get(o.tenant_id, o.sf_org_id, o.username) as { id: string } | undefined;
     if (existing) {
-      this.sql.prepare(`UPDATE orgs SET name = ?, instance_url = ?, login_url = ?, is_sandbox = ?, refresh_token_enc = ?, access_token_enc = ? WHERE id = ?`)
-        .run(o.name, o.instance_url, o.login_url, o.is_sandbox, o.refresh_token_enc, o.access_token_enc, existing.id);
+      this.sql.prepare(`UPDATE orgs SET name = ?, instance_url = ?, login_url = ?, is_sandbox = ?, refresh_token_enc = ?, access_token_enc = ?, alias = COALESCE(?, alias) WHERE id = ?`)
+        .run(o.name, o.instance_url, o.login_url, o.is_sandbox, o.refresh_token_enc, o.access_token_enc, o.alias, existing.id);
       return this.getOrg(o.tenant_id, existing.id)!;
     }
-    this.sql.prepare(`INSERT INTO orgs (id, tenant_id, sf_org_id, name, username, instance_url, login_url, is_sandbox, refresh_token_enc, access_token_enc, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(o.id, o.tenant_id, o.sf_org_id, o.name, o.username, o.instance_url, o.login_url, o.is_sandbox, o.refresh_token_enc, o.access_token_enc, now());
+    this.sql.prepare(`INSERT INTO orgs (id, tenant_id, sf_org_id, name, username, instance_url, login_url, is_sandbox, refresh_token_enc, access_token_enc, alias, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(o.id, o.tenant_id, o.sf_org_id, o.name, o.username, o.instance_url, o.login_url, o.is_sandbox, o.refresh_token_enc, o.access_token_enc, o.alias, now());
     return this.getOrg(o.tenant_id, o.id)!;
   }
 
@@ -161,7 +175,11 @@ export class Db {
   }
 
   listOrgs(tenant: string): OrgRow[] {
-    return this.sql.prepare('SELECT * FROM orgs WHERE tenant_id = ? ORDER BY name').all(tenant) as unknown as OrgRow[];
+    return this.sql.prepare('SELECT * FROM orgs WHERE tenant_id = ? ORDER BY COALESCE(alias, name) COLLATE NOCASE').all(tenant) as unknown as OrgRow[];
+  }
+
+  setAlias(tenant: string, id: string, alias: string): void {
+    this.sql.prepare('UPDATE orgs SET alias = ? WHERE tenant_id = ? AND id = ?').run(alias, tenant, id);
   }
 
   deleteOrg(tenant: string, id: string): void {

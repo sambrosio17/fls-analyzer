@@ -17,11 +17,11 @@ async function setup(isSandbox = true) {
   const db = new Db(':memory:');
   const fake = fakeOrg(isSandbox);
   db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: isSandbox ? 'Acme UAT' : 'Acme', username: 'me@acme.com',
-    instance_url: 'https://acme.my.salesforce.com', login_url: 'https://login.salesforce.com', is_sandbox: isSandbox ? 1 : 0, refresh_token_enc: 'x', access_token_enc: null });
+    instance_url: 'https://acme.my.salesforce.com', login_url: 'https://login.salesforce.com', is_sandbox: isSandbox ? 1 : 0, refresh_token_enc: 'x', access_token_enc: null, alias: null });
   const app = buildApp({ config, db, apiFor: () => fake });
   const login = await app.inject({ method: 'POST', url: '/api/session', payload: { password: 'secret-pass' } });
   const cookie = login.headers['set-cookie'] as string;
-  const call = async (method: 'GET' | 'POST', url: string, payload?: object) => {
+  const call = async (method: 'GET' | 'POST' | 'PATCH', url: string, payload?: object) => {
     const res = await app.inject({ method, url, payload, headers: { cookie } });
     return { status: res.statusCode, body: res.json() };
   };
@@ -128,7 +128,10 @@ describe('API', () => {
     const approved = await call('POST', `/api/change-sets/${cs.id}/approve`);
     expect(approved.body).toMatchObject({ status: 'approved', approvedBy: 'owner', conflicts: 0 });
     expect((await call('POST', `/api/change-sets/${cs.id}/execute`, { confirmName: 'Wrong' })).status).toBe(400);
-    expect((await call('POST', `/api/change-sets/${cs.id}/execute`, { confirmName: 'Acme' })).status).toBe(200);
+    // Once the org has an alias, that is the name to type.
+    expect((await call('PATCH', '/api/orgs/org1', { alias: '  Acme PROD ' })).body).toMatchObject({ alias: 'Acme PROD', label: 'Acme PROD', name: 'Acme' });
+    expect((await call('POST', `/api/change-sets/${cs.id}/execute`, { confirmName: 'Acme' })).status).toBe(400);
+    expect((await call('POST', `/api/change-sets/${cs.id}/execute`, { confirmName: 'Acme PROD' })).status).toBe(200);
     expect((await waitDone(cs.id)).status).toBe('done');
   });
 });

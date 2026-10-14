@@ -15,7 +15,7 @@ if (config.demoMode) {
   db.upsertOrg({
     id: DEMO_ORG_ID, tenant_id: DEFAULT_TENANT, sf_org_id: '00DDEMO', name: demo.data.name, username: 'demo@example.com',
     instance_url: 'https://demo.invalid', login_url: 'https://demo.invalid', is_sandbox: 1,
-    refresh_token_enc: new TokenCipher(config.appSecret).encrypt('demo'), access_token_enc: null
+    refresh_token_enc: new TokenCipher(config.appSecret).encrypt('demo'), access_token_enc: null, alias: null
   });
 }
 

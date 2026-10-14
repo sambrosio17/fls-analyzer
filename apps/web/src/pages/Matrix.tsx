@@ -212,7 +212,7 @@ export function MatrixPage({ org, onChangeSet }: Props) {
   return (
     <>
       <div className="view-head">
-        <div><div className="eyebrow">{org.name}</div><h1>Matrice Field Level Security</h1>
+        <div><div className="eyebrow">{org.label}</div><h1>Matrice Field Level Security</h1>
           <p>Scegli gli oggetti. Clicca una cella per cambiarla, oppure seleziona righe e colonne e applica un'azione in blocco. Niente viene scritto finché non confermi l'anteprima.</p></div>
       </div>
 

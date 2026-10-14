@@ -4,7 +4,7 @@ import { STATUS_LABEL, api, type ChangeSetSummary, type Org } from '../api.ts';
 export function History({ orgs, onOpen }: { orgs: Org[]; onOpen: (id: string) => void }) {
   const [list, setList] = useState<ChangeSetSummary[] | null>(null);
   useEffect(() => { api.changeSets().then(setList); }, []);
-  const orgName = (id: string) => orgs.find(o => o.id === id)?.name ?? '—';
+  const orgName = (id: string) => orgs.find(o => o.id === id)?.label ?? '—';
 
   return (
     <>

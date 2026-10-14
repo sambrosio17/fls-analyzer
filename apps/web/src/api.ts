@@ -2,7 +2,8 @@ export type Access = 0 | 1 | 2;
 export type BulkAction = 'read' | 'edit' | 'removeEdit' | 'none';
 export type Status = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'running' | 'done' | 'partial' | 'failed';
 
-export interface Org { id: string; name: string; username: string; instanceUrl: string; isSandbox: boolean; lastSyncAt: string | null }
+/** `label` is the alias chosen by the user, or the Salesforce org name when there is none. */
+export interface Org { id: string; label: string; alias: string | null; name: string; username: string; instanceUrl: string; isSandbox: boolean; lastSyncAt: string | null }
 export interface SObject { name: string; label: string; custom: boolean }
 export interface FieldMeta { object: string; name: string; label: string; type: string; permissionable: boolean; calculated: boolean; custom: boolean; encrypted: boolean }
 export interface PermSet { id: string; name: string; label: string; isProfile: boolean; namespace: string | null; license: string | null; type: string | null }
@@ -45,6 +46,7 @@ export const api = {
   logout: () => call('DELETE', '/api/session'),
   orgs: () => call<Org[]>('GET', '/api/orgs'),
   removeOrg: (id: string) => call('DELETE', `/api/orgs/${id}`),
+  renameOrg: (id: string, alias: string) => call<Org>('PATCH', `/api/orgs/${id}`, { alias }),
   objects: (orgId: string) => call<SObject[]>('GET', `/api/orgs/${orgId}/objects`),
   matrix: (orgId: string, objects: string[]) => call<Matrix>('GET', `/api/orgs/${orgId}/matrix?objects=${encodeURIComponent(objects.join(','))}`),
   createChangeSet: (orgId: string, body: { description?: string; changes?: { parentId: string; field: string; access: Access }[] }) =>
