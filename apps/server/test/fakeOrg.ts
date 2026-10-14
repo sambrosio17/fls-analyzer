@@ -25,6 +25,7 @@ export function fakeOrg(isSandbox = true): MemoryOrg {
           f('Industry', 'Industry', 'picklist'),
           f('Tax_Code__c', 'Tax Code', 'string'),
           f('Score__c', 'Score', 'double', { calculated: true }),
+          f('Secret_Code__c', 'Secret Code', 'Text(20)', { hidden: true }),
           f('BillingAddress', 'Billing Address', 'address')
         ]
       }

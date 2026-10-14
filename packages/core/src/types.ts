@@ -17,6 +17,8 @@ export interface FieldMeta {
   calculated: boolean;
   custom: boolean;
   encrypted: boolean;
+  /** Not visible to the connected user (so missing from describe), found through EntityParticle. */
+  hiddenFromUser?: boolean;
 }
 
 export interface PermSetMeta {

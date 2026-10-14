@@ -44,17 +44,39 @@ interface DescribeField {
   autoNumber: boolean; custom: boolean; encrypted?: boolean;
 }
 
-export async function loadFields(api: SfApi, objects: string[]): Promise<FieldMeta[]> {
+interface ParticleRow { QualifiedApiName: string; Label: string; DataType: string; IsPermissionable: boolean; IsCalculated: boolean; IsCompound: boolean }
+
+/**
+ * Fields of the objects. Describe only returns the fields the connected user can see, so fields hidden from them
+ * (even from an admin) are added from EntityParticle, which lists every field. If that query fails, describe alone is used.
+ */
+export async function loadFields(api: SfApi, objects: string[], log?: (msg: string) => void): Promise<FieldMeta[]> {
   const out: FieldMeta[] = [];
   for (const object of objects) {
     if (!API_NAME.test(object)) throw new Error(`Invalid object name: ${object}`);
-    const d = await api.request<{ fields: DescribeField[] }>('GET', `/services/data/${api.apiVersion}/sobjects/${object}/describe`);
+    const [d, particles] = await Promise.all([
+      api.request<{ fields: DescribeField[] }>('GET', `/services/data/${api.apiVersion}/sobjects/${object}/describe`),
+      api.query<ParticleRow>(`SELECT QualifiedApiName, Label, DataType, IsPermissionable, IsCalculated, IsCompound FROM EntityParticle WHERE EntityDefinition.QualifiedApiName = '${object}'`)
+        .catch((e: Error) => { log?.(`EntityParticle query failed for ${object}: ${e.message}`); return [] as ParticleRow[]; })
+    ]);
+    const seen = new Set<string>();
     for (const f of d.fields) {
+      seen.add(f.name);
       if (SKIP_FIELD_TYPES.has(f.type)) continue;
       out.push({
         object, name: `${object}.${f.name}`, label: f.label, type: f.type,
         permissionable: f.permissionable, calculated: f.calculated || f.autoNumber,
         custom: f.custom, encrypted: !!f.encrypted
+      });
+    }
+    for (const p of particles) {
+      // Only permissionable fields can be hidden by FLS; compound fields (addresses) are covered by their components.
+      if (seen.has(p.QualifiedApiName) || !p.IsPermissionable || p.IsCompound) continue;
+      const type = p.DataType ?? '';
+      out.push({
+        object, name: `${object}.${p.QualifiedApiName}`, label: p.Label, type,
+        permissionable: true, calculated: p.IsCalculated || /^(Formula|Roll-Up Summary|Auto Number)/i.test(type),
+        custom: p.QualifiedApiName.endsWith('__c'), encrypted: /encrypted/i.test(type), hiddenFromUser: true
       });
     }
   }

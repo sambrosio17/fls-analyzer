@@ -5,7 +5,7 @@ export type Status = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'r
 /** `label` is the alias chosen by the user, or the Salesforce org name when there is none. */
 export interface Org { id: string; label: string; alias: string | null; name: string; username: string; instanceUrl: string; isSandbox: boolean; lastSyncAt: string | null }
 export interface SObject { name: string; label: string; custom: boolean }
-export interface FieldMeta { object: string; name: string; label: string; type: string; permissionable: boolean; calculated: boolean; custom: boolean; encrypted: boolean }
+export interface FieldMeta { object: string; name: string; label: string; type: string; permissionable: boolean; calculated: boolean; custom: boolean; encrypted: boolean; hiddenFromUser?: boolean }
 export interface PermSet { id: string; name: string; label: string; isProfile: boolean; namespace: string | null; license: string | null; type: string | null }
 export interface Matrix {
   fields: FieldMeta[];

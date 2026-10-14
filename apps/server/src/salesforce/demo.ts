@@ -16,7 +16,7 @@ const DESCRIBES = {
     f('Name', 'Account Name', 'string', { permissionable: false }), f('AnnualRevenue', 'Annual Revenue', 'currency'),
     f('Industry', 'Industry', 'picklist'), f('Rating', 'Rating', 'picklist'), f('CustomerPriority__c', 'Customer Priority', 'picklist'),
     f('SLAExpirationDate__c', 'SLA Expiration Date', 'date'), f('Credit_Score__c', 'Credit Score', 'double', { calculated: true }),
-    f('Tax_Code__c', 'Tax Code', 'string'), f('Billing_IBAN__c', 'Billing IBAN', 'encryptedstring', { encrypted: true }),
+    f('Tax_Code__c', 'Tax Code', 'string'), f('Internal_Rating__c', 'Internal Rating', 'Picklist', { hidden: true }), f('Billing_IBAN__c', 'Billing IBAN', 'encryptedstring', { encrypted: true }),
     f('BillingAddress', 'Billing Address', 'address')
   ] },
   Opportunity: { label: 'Opportunity', fields: [
