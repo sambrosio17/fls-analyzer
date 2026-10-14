@@ -70,10 +70,19 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOpti
     const raw = req.cookies[SESSION];
     return !!raw && req.unsignCookie(raw).valid;
   };
+  const appHost = new URL(config.appUrl).host;
   app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0]!;
-    const open = path === '/api/session' || !(path.startsWith('/api/') || path.startsWith('/oauth/'));
-    if (!open && !authed(req)) return reply.code(401).send({ error: 'Login required' });
+    // Cookies are per host: opening the app on 127.0.0.1 while the OAuth callback returns to
+    // APP_URL (e.g. localhost) would lose the session. Send page loads to the APP_URL host.
+    if (req.method === 'GET' && !path.startsWith('/api/') && req.headers.host && req.headers.host !== appHost) {
+      return reply.redirect(`${config.appUrl}${req.url}`);
+    }
+    if (path === '/api/session' || !(path.startsWith('/api/') || path.startsWith('/oauth/')) || authed(req)) return;
+    if (path.startsWith('/oauth/')) {
+      return reply.redirect(`/?oauthError=${encodeURIComponent("Sessione dell'app non trovata: entra nell'app e ricollega l'org.")}`);
+    }
+    return reply.code(401).send({ error: 'Login required' });
   });
 
   // ---- app session (single user in the MVP)
