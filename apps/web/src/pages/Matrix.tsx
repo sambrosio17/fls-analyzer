@@ -315,7 +315,7 @@ export function MatrixPage({ org, onChangeSet }: Props) {
                         <input type="checkbox" id={`r-${f.name}`} disabled={!f.permissionable} checked={rows.has(i)} onChange={() => toggle(rows, i, setRows)} />
                         <label htmlFor={`r-${f.name}`} title={f.label}>{f.label}</label>
                         <span className="api" title={f.name}>{f.name}</span>
-                        <span className="tags"><span className="tag">{f.type}</span>{!f.permissionable && <span className="tag">Senza FLS</span>}{f.calculated && <span className="tag">Solo lettura</span>}{f.encrypted && <span className="tag sens">Crittografato</span>}</span>
+                        <span className="tags">{f.hiddenFromUser && <span className="tag" title="Il tuo utente non vede questo campo: Salesforce non lo restituisce nel describe">Nascosto a te</span>}<span className="tag">{f.type}</span>{!f.permissionable && <span className="tag">Senza FLS</span>}{f.calculated && <span className="tag">Solo lettura</span>}{f.encrypted && <span className="tag sens">Crittografato</span>}</span>
                       </div></th>
                       {padCells(leftPad, 'lp')}
                       {visCols.map(j => {

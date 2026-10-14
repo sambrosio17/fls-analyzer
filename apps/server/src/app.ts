@@ -182,7 +182,7 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOpti
     const { objects } = z.object({ objects: z.string().min(1) }).parse(req.query);
     const list = [...new Set(objects.split(',').map(s => s.trim()).filter(Boolean))].slice(0, 20);
     const api = apiFor(org);
-    const [fields, permissionSets] = await Promise.all([loadFields(api, list), loadPermissionSets(api)]);
+    const [fields, permissionSets] = await Promise.all([loadFields(api, list, msg => req.log.warn(msg)), loadPermissionSets(api)]);
     const { fieldPerms, objectPerms } = await loadSnapshot(api, list, permissionSets.map(p => p.id));
     db.touchOrg(org.id);
     return {

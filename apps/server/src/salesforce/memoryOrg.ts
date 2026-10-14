@@ -19,7 +19,11 @@ export interface MemPages {
   apps: MetadataRecord[];
   objects: MetadataRecord[];
 }
-export interface MemField { name: string; label: string; type: string; permissionable: boolean; calculated: boolean; autoNumber: boolean; custom: boolean; encrypted?: boolean }
+export interface MemField {
+  name: string; label: string; type: string; permissionable: boolean; calculated: boolean; autoNumber: boolean; custom: boolean; encrypted?: boolean;
+  /** Hidden from the connected user: left out of describe, still listed by EntityParticle. */
+  hidden?: boolean;
+}
 export interface MemFieldPerm { Id: string; ParentId: string; SobjectType: string; Field: string; PermissionsRead: boolean; PermissionsEdit: boolean }
 
 export interface MemoryOrgData {
@@ -68,6 +72,12 @@ export class MemoryOrg implements SfApi {
     if (soql.includes('FROM RecordType')) return (this.data.pages?.recordTypes ?? []).filter(r => r.SobjectType === whereEq(soql, 'SobjectType')) as T[];
     if (soql.includes('FROM Organization')) return [{ Id: '00D000000000001', Name: this.data.name, IsSandbox: this.data.isSandbox }] as T[];
     if (soql.includes('FROM UserPermissionAccess')) return [{ PermissionsApiEnabled: true, PermissionsViewSetup: true, PermissionsManageProfilesPermissionsets: true }] as T[];
+    if (soql.includes('FROM EntityParticle')) {
+      const object = soql.match(/QualifiedApiName = '(\w+)'/)![1]!;
+      return (this.data.describes[object]?.fields ?? []).map(f => ({
+        QualifiedApiName: f.name, Label: f.label, DataType: f.type, IsPermissionable: f.permissionable, IsCalculated: f.calculated, IsCompound: f.type === 'address'
+      })) as T[];
+    }
     const objects = inSet(soql, 'SobjectType');
     const parents = inSet(soql, 'ParentId');
     if (soql.includes('FROM FieldPermissions')) return this.fieldPerms.filter(p => objects.has(p.SobjectType) && parents.has(p.ParentId)).map(p => ({ ...p })) as T[];
@@ -110,7 +120,7 @@ export class MemoryOrg implements SfApi {
 
   async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const describe = path.match(/\/sobjects\/(\w+)\/describe$/);
-    if (method === 'GET' && describe) return { fields: this.data.describes[describe[1]!]?.fields ?? [] } as T;
+    if (method === 'GET' && describe) return { fields: (this.data.describes[describe[1]!]?.fields ?? []).filter(f => !f.hidden) } as T;
     if (method === 'GET' && path.endsWith('/sobjects')) {
       return { sobjects: Object.entries(this.data.describes).map(([name, d]) => ({ name, label: d.label, custom: name.endsWith('__c'), queryable: true, layoutable: true, deprecatedAndHidden: false })) } as T;
     }
