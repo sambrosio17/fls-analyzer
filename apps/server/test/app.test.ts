@@ -46,6 +46,20 @@ describe('API', () => {
     expect(res.statusCode).toBe(401);
   });
 
+  it('sends page loads to the APP_URL host so the session cookie survives the OAuth round trip', async () => {
+    current = await setup();
+    const res = await current.app.inject({ method: 'GET', url: '/oauth/callback?code=x&state=y', headers: { host: '127.0.0.1:3000' } });
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe('http://localhost:3000/oauth/callback?code=x&state=y');
+  });
+
+  it('redirects OAuth routes without an app session to the login page instead of returning JSON', async () => {
+    current = await setup();
+    const res = await current.app.inject({ method: 'GET', url: '/oauth/callback?code=x&state=y', headers: { host: 'localhost:3000' } });
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toMatch(/^\/\?oauthError=/);
+  });
+
   it('returns the matrix without compound fields and group permission sets', async () => {
     current = await setup();
     const { body } = await current.call('GET', '/api/orgs/org1/matrix?objects=Account');
