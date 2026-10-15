@@ -6,6 +6,7 @@ import { MatrixPage } from './pages/Matrix.tsx';
 import { ChangeSetPage } from './pages/ChangeSet.tsx';
 import { History } from './pages/History.tsx';
 import { LayoutsPage } from './pages/Layouts.tsx';
+import { Brand } from './Brand.tsx';
 
 type View = 'orgs' | 'matrix' | 'layouts' | 'changeset' | 'history';
 
@@ -42,7 +43,7 @@ export function App() {
     <>
       <header className="appbar">
         <div className="wrap appbar-row">
-          <div className="brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span>FLS Analyzer</div>
+          <Brand />
           <nav className="tabs">
             {tabs.map(([v, label, enabled]) => (
               <button key={v} className="tab" disabled={!enabled} aria-current={view === v ? 'page' : undefined} onClick={() => setView(v)}>{label}</button>
