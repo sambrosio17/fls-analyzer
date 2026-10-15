@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { effectivePage, unassignedPages, type PageSource } from '@fls/core';
 import { api, type LayoutAnalysis, type Org, type PageAnalysis, type RecordTypeInfo, type SObject } from '../api.ts';
 
 type Tab = 'layouts' | 'pages';
 
-export function LayoutsPage({ org }: { org: Org }) {
+interface Props { org: Org; initialObject?: string | null; initialTab?: Tab; onChange?: (object: string | null, tab: Tab) => void }
+
+export function LayoutsPage({ org, initialObject = null, initialTab = 'layouts', onChange }: Props) {
   const [objects, setObjects] = useState<SObject[]>([]);
-  const [object, setObject] = useState<string | null>(null);
+  const [object, setObject] = useState<string | null>(initialObject);
   const [query, setQuery] = useState('');
-  const [tab, setTab] = useState<Tab>('layouts');
+  const [tab, setTab] = useState<Tab>(initialTab);
+  const radio = useId();
+  useEffect(() => { onChange?.(object, tab); }, [object, tab]);
   const [layouts, setLayouts] = useState<LayoutAnalysis | null>(null);
   const [pages, setPages] = useState<PageAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
@@ -50,8 +54,8 @@ export function LayoutsPage({ org }: { org: Org }) {
           </div>
           <span className="spacer" />
           <div className="seg" role="tablist">
-            <label><input type="radio" name="layout-tab" id="tab-layouts" checked={tab === 'layouts'} onChange={() => setTab('layouts')} />Page layout</label>
-            <label><input type="radio" name="layout-tab" id="tab-pages" checked={tab === 'pages'} onChange={() => setTab('pages')} />Lightning page</label>
+            <label><input type="radio" name={radio} id="tab-layouts" checked={tab === 'layouts'} onChange={() => setTab('layouts')} />Page layout</label>
+            <label><input type="radio" name={radio} id="tab-pages" checked={tab === 'pages'} onChange={() => setTab('pages')} />Lightning page</label>
           </div>
         </div>
       </section>

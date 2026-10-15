@@ -14,9 +14,9 @@ const MAX_CHANGES = 200_000; // same limit as the server
 
 type DisplayRow = { kind: 'obj'; object: string } | { kind: 'field'; i: number };
 
-interface Props { org: Org; onChangeSet: (id: string) => void }
+interface Props { org: Org; onChangeSet: (id: string) => void; initialObjects?: string[]; onObjectsChange?: (objects: string[]) => void; onDirtyChange?: (dirty: boolean) => void }
 
-export function MatrixPage({ org, onChangeSet }: Props) {
+export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsChange, onDirtyChange }: Props) {
   const [objects, setObjects] = useState<SObject[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [objectQuery, setObjectQuery] = useState('');
@@ -35,11 +35,16 @@ export function MatrixPage({ org, onChangeSet }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
   const [bulkAction, setBulkAction] = useState<BulkAction>('read');
   const [creating, setCreating] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
 
   useEffect(() => { api.objects(org.id).then(setObjects).catch(e => setError(e.message)); }, [org.id]);
+  useEffect(() => { onDirtyChange?.(pending.size > 0); }, [rev > 0 && pending.size > 0]);
+  // Reopens the objects a restored tab had.
+  useEffect(() => { if (initialObjects.length) void load(initialObjects); }, []);
 
   const load = async (list: string[]) => {
-    setSelected(list);
+    setSelected(list); setSent(null);
+    onObjectsChange?.(list);
     discard(); setRows(new Set()); setCols(new Set());
     if (!list.length) { setMatrix(null); return; }
     setLoading(true); setError(null);
@@ -165,6 +170,8 @@ export function MatrixPage({ org, onChangeSet }: Props) {
     try {
       const changes = [...pending].map(([idx, access]) => ({ parentId: allPs[Math.floor(idx / F)]!.id, field: allFields[idx % F]!.name, access }));
       const cs = await api.createChangeSet(org.id, { changes, description: `${new Set(changes.map(c => c.field)).size} campi su ${new Set(changes.map(c => c.parentId)).size} profili/permission set` });
+      // The tab stays open next to the change set: the changes now live there, so the grid goes back to the org's values.
+      discard(); setSent(cs.number); setCreating(false);
       onChangeSet(cs.id);
     } catch (e) { setError((e as Error).message); setCreating(false); }
   };
@@ -235,6 +242,7 @@ export function MatrixPage({ org, onChangeSet }: Props) {
       </section>
 
       {error && <div className="banner prod">{error}</div>}
+      {sent && <div className="banner info">Le modifiche sono nel change set {sent}. Dopo averlo applicato, ricarica la matrice per vedere i valori aggiornati. <button className="btn sm" onClick={() => load(selected)}>Ricarica</button></div>}
       {matrix?.warnings?.length ? (
         <div className="banner info">Non sono riuscito a leggere i campi che il tuo utente non vede, quindi potrebbero mancare. Dettaglio: <span className="mono">{matrix.warnings.join(' · ')}</span></div>
       ) : null}
