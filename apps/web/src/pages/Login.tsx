@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { api } from '../api.ts';
+import { Brand } from '../Brand.tsx';
 
 export function Login({ onDone }: { onDone: () => void }) {
   const [password, setPassword] = useState('');
@@ -11,7 +12,7 @@ export function Login({ onDone }: { onDone: () => void }) {
   return (
     <main className="wrap login">
       <form className="panel panel-b" onSubmit={submit}>
-        <div className="brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span>FLS Analyzer</div>
+        <Brand />
         <label className="field"><span>Password</span>
           <input className="input" type="password" id="password" autoFocus value={password} onChange={e => setPassword(e.target.value)} />
         </label>
