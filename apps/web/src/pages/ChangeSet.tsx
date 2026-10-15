@@ -55,7 +55,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
           <p>{cs.description}{cs.rollbackOf && ' · annulla un change set precedente'}</p>
         </div>
         <span className="spacer" />
-        <button className="btn" onClick={onBack}>Indietro</button>
+        <button className="btn" onClick={onBack}>Chiudi</button>
       </div>
       {error && <div className="banner prod">{error}</div>}
       {notice && <div className="banner info">{notice}</div>}
