@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { effectivePage, unassignedPages, type PageSource } from '@fls/core';
-import { api, type LayoutAnalysis, type Org, type PageAnalysis, type SObject } from '../api.ts';
+import { api, type LayoutAnalysis, type Org, type PageAnalysis, type RecordTypeInfo, type SObject } from '../api.ts';
 
 type Tab = 'layouts' | 'pages';
 
@@ -64,13 +64,30 @@ export function LayoutsPage({ org }: { org: Org }) {
   );
 }
 
-function ProfileFilter({ value, onChange, onlyIssues, setOnlyIssues, issuesLabel }: {
-  value: string; onChange: (v: string) => void; onlyIssues: boolean; setOnlyIssues: (v: boolean) => void; issuesLabel: string;
+interface FilterState { profile: string; recordType: string; target: string; onlyIssues: boolean }
+const NO_FILTER: FilterState = { profile: '', recordType: '', target: '', onlyIssues: false };
+const rtKey = (rt: RecordTypeInfo) => rt.id ?? 'master';
+
+/** Filters shared by both views: profile name, record type (one column), layout or page (rows that use it), issues only. */
+function Filters({ value, onChange, recordTypes, targets, targetLabel, issuesLabel }: {
+  value: FilterState; onChange: (v: FilterState) => void; recordTypes: RecordTypeInfo[];
+  targets: { id: string; label: string }[]; targetLabel: string; issuesLabel: string;
 }) {
+  const set = (patch: Partial<FilterState>) => onChange({ ...value, ...patch });
+  const active = value.profile || value.recordType || value.target || value.onlyIssues;
   return (
     <div className="toolbar">
-      <input className="input" type="search" id="profile-search" placeholder="Filtra profili" value={value} onChange={e => onChange(e.target.value)} />
-      <label className="check"><input type="checkbox" id="only-issues" checked={onlyIssues} onChange={e => setOnlyIssues(e.target.checked)} />{issuesLabel}</label>
+      <input className="input" type="search" id="profile-search" placeholder="Filtra profili" value={value.profile} onChange={e => set({ profile: e.target.value })} />
+      <select className="input" id="rt-filter" aria-label="Record type" value={value.recordType} onChange={e => set({ recordType: e.target.value })}>
+        <option value="">Tutti i record type</option>
+        {recordTypes.map(rt => <option key={rtKey(rt)} value={rtKey(rt)}>{rt.label}</option>)}
+      </select>
+      <select className="input" id="target-filter" aria-label={targetLabel} value={value.target} onChange={e => set({ target: e.target.value })}>
+        <option value="">{targetLabel}: tutti</option>
+        {targets.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+      </select>
+      <label className="check"><input type="checkbox" id="only-issues" checked={value.onlyIssues} onChange={e => set({ onlyIssues: e.target.checked })} />{issuesLabel}</label>
+      {active && <button className="btn sm" onClick={() => onChange(NO_FILTER)}>Azzera filtri</button>}
     </div>
   );
 }
@@ -78,8 +95,7 @@ function ProfileFilter({ value, onChange, onlyIssues, setOnlyIssues, issuesLabel
 const dot = (i: number) => ({ background: `hsl(${(i * 67) % 360} 55% 55%)` });
 
 function LayoutView({ data }: { data: LayoutAnalysis }) {
-  const [search, setSearch] = useState('');
-  const [onlyIssues, setOnlyIssues] = useState(false);
+  const [filter, setFilter] = useState(NO_FILTER);
   const layoutIndex = useMemo(() => new Map(data.layouts.map((l, i) => [l.id, i])), [data]);
   const assignment = useMemo(() => new Map(data.assignments.map(a => [`${a.profileId}|${a.recordTypeId ?? ''}`, a.layoutId])), [data]);
   const gaps = useMemo(() => new Map(data.gaps.map(g => [`${g.profileId}|${g.layoutId}`, g.fields])), [data]);
@@ -87,8 +103,12 @@ function LayoutView({ data }: { data: LayoutAnalysis }) {
   const assignedCount = (layoutId: string) => new Set(data.assignments.filter(a => a.layoutId === layoutId).map(a => a.profileId)).size;
   const unassigned = data.layouts.filter(l => assignedCount(l.id) === 0);
   const withGaps = new Set(data.gaps.map(g => g.profileId));
-  const rts = data.recordTypes;
-  const profiles = data.profiles.filter(p => (!search || p.name.toLowerCase().includes(search.toLowerCase())) && (!onlyIssues || withGaps.has(p.id)));
+  const rts = data.recordTypes.filter(rt => !filter.recordType || rtKey(rt) === filter.recordType);
+  const layoutOf = (profileId: string, rt: RecordTypeInfo) => assignment.get(`${profileId}|${rt.id ?? ''}`);
+  const profiles = data.profiles.filter(p =>
+    (!filter.profile || p.name.toLowerCase().includes(filter.profile.toLowerCase()))
+    && (!filter.onlyIssues || rts.some(rt => { const l = layoutOf(p.id, rt); return !!l && gaps.has(`${p.id}|${l}`); }))
+    && (!filter.target || rts.some(rt => layoutOf(p.id, rt) === filter.target)));
 
   return (
     <>
@@ -103,7 +123,8 @@ function LayoutView({ data }: { data: LayoutAnalysis }) {
       <section className="panel" style={{ marginBottom: 16 }}>
         <div className="panel-h"><h2>Assegnazioni per profilo e record type</h2></div>
         <div className="panel-b">
-          <ProfileFilter value={search} onChange={setSearch} onlyIssues={onlyIssues} setOnlyIssues={setOnlyIssues} issuesLabel="Solo profili con campi non leggibili" />
+          <Filters value={filter} onChange={setFilter} recordTypes={data.recordTypes} targetLabel="Layout" issuesLabel="Solo con campi non leggibili"
+            targets={data.layouts.map(l => ({ id: l.id, label: l.name }))} />
           <div className="tbl-wrap">
             <table className="dt assign">
               <thead><tr><th>Profilo</th>{rts.map(rt => <th key={rt.id ?? 'master'}>{rt.label}{!rt.active && <span className="muted"> (inattivo)</span>}</th>)}</tr></thead>
@@ -112,11 +133,11 @@ function LayoutView({ data }: { data: LayoutAnalysis }) {
                   <tr key={p.id} className={noRead.has(p.id) ? 'dim' : ''}>
                     <td>{p.name}{noRead.has(p.id) && <div className="muted small">Nessun accesso all'oggetto</div>}</td>
                     {rts.map(rt => {
-                      const layoutId = assignment.get(`${p.id}|${rt.id ?? ''}`);
+                      const layoutId = layoutOf(p.id, rt);
                       const layout = layoutId ? data.layouts[layoutIndex.get(layoutId)!] : undefined;
                       const missing = layoutId ? gaps.get(`${p.id}|${layoutId}`) : undefined;
                       return (
-                        <td key={rt.id ?? 'master'}>
+                        <td key={rt.id ?? 'master'} className={filter.target && layoutId !== filter.target ? 'off' : ''}>
                           {layout ? <span className="lay"><i style={dot(layoutIndex.get(layout.id)!)} />{layout.name}</span> : <span className="muted">—</span>}
                           {missing && <div className="warn-text small" title={missing.join('\n')}>⚠ {missing.length} {missing.length === 1 ? 'campo non leggibile' : 'campi non leggibili'}</div>}
                         </td>
@@ -139,8 +160,8 @@ function LayoutView({ data }: { data: LayoutAnalysis }) {
             <thead><tr><th>Layout</th><th>Campi</th><th>Profili assegnati</th><th>Stato</th></tr></thead>
             <tbody>
               {data.layouts.map((l, i) => (
-                <tr key={l.id}>
-                  <td><span className="lay"><i style={dot(i)} />{l.name}</span>{l.namespace && <span className="muted"> · {l.namespace}</span>}</td>
+                <tr key={l.id} className={filter.target === l.id ? 'sel' : ''}>
+                  <td><button className="linklike" title="Mostra i profili che usano questo layout" onClick={() => setFilter({ ...filter, target: filter.target === l.id ? '' : l.id })}><span className="lay"><i style={dot(i)} />{l.name}</span></button>{l.namespace && <span className="muted"> · {l.namespace}</span>}</td>
                   <td title={l.fields.map(f => f.split('.').slice(1).join('.')).join('\n')}>{l.fields.length}</td>
                   <td>{assignedCount(l.id)}</td>
                   <td>{assignedCount(l.id) ? <span className="pill st-ok">In uso</span> : <span className="pill st-part">Non assegnato</span>}</td>
@@ -159,17 +180,17 @@ const SOURCE_CLASS: Record<PageSource, string> = { 'app-profile': 'st-info', app
 
 function PageView({ data }: { data: PageAnalysis }) {
   const [app, setApp] = useState(data.apps.find(a => a.name === 'standard__LightningSales')?.name ?? data.apps[0]?.name ?? '');
-  const [search, setSearch] = useState('');
-  const [onlyCustom, setOnlyCustom] = useState(false);
+  const [filter, setFilter] = useState(NO_FILTER);
   const label = useMemo(() => new Map(data.pages.map(p => [p.name, p.label])), [data]);
   const unassigned = new Set(unassignedPages(data, data.pages.map(p => p.name)));
   const appLabel = (name: string) => data.apps.find(a => a.name === name)?.label ?? name;
   const appDefault = data.appDefaults.find(a => a.app === app)?.page ?? null;
-  const rts = data.recordTypes.filter(rt => rt.active);
+  const activeRts = data.recordTypes.filter(rt => rt.active);
+  const rts = activeRts.filter(rt => !filter.recordType || rtKey(rt) === filter.recordType);
   const rows = data.profiles
-    .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(p => !filter.profile || p.name.toLowerCase().includes(filter.profile.toLowerCase()))
     .map(p => ({ p, cells: rts.map(rt => p.fullName ? effectivePage(data, app, p.fullName, rt.developerName) : { page: null, source: 'system' as PageSource }) }))
-    .filter(r => !onlyCustom || r.cells.some(c => c.source === 'app-profile'));
+    .filter(r => (!filter.onlyIssues || r.cells.some(c => c.source === 'app-profile')) && (!filter.target || r.cells.some(c => c.page === filter.target)));
   const usage = (name: string) => [
     ...(data.orgDefault === name ? ["Default dell'org"] : []),
     ...data.appDefaults.filter(a => a.page === name).map(a => `Default di ${appLabel(a.app)}`),
@@ -194,7 +215,8 @@ function PageView({ data }: { data: PageAnalysis }) {
         </div>
         <div className="panel-b">
           <p className="muted small">Default dell'app: <b>{appDefault ? label.get(appDefault) ?? appDefault : 'nessuno'}</b>. Default dell'org: <b>{data.orgDefault ? label.get(data.orgDefault) ?? data.orgDefault : 'pagina di sistema'}</b>.</p>
-          <ProfileFilter value={search} onChange={setSearch} onlyIssues={onlyCustom} setOnlyIssues={setOnlyCustom} issuesLabel="Solo profili con assegnazione specifica" />
+          <Filters value={filter} onChange={setFilter} recordTypes={activeRts} targetLabel="Lightning page" issuesLabel="Solo con assegnazione specifica"
+            targets={data.pages.map(pg => ({ id: pg.name, label: pg.label }))} />
           <div className="tbl-wrap">
             <table className="dt assign">
               <thead><tr><th>Profilo</th>{rts.map(rt => <th key={rt.id ?? 'master'}>{rt.label}</th>)}</tr></thead>
@@ -203,7 +225,7 @@ function PageView({ data }: { data: PageAnalysis }) {
                   <tr key={p.id}>
                     <td>{p.name}</td>
                     {cells.map((c, i) => (
-                      <td key={rts[i]!.id ?? 'master'}>
+                      <td key={rts[i]!.id ?? 'master'} className={filter.target && c.page !== filter.target ? 'off' : ''}>
                         <div>{c.page ? label.get(c.page) ?? c.page : <span className="muted">Pagina di sistema</span>}</div>
                         <span className={`pill ${SOURCE_CLASS[c.source]}`}>{SOURCE_LABEL[c.source]}</span>
                       </td>
@@ -224,8 +246,8 @@ function PageView({ data }: { data: PageAnalysis }) {
             <thead><tr><th>Pagina</th><th>Componenti</th><th>Campi Dynamic Forms</th><th>Dove è assegnata</th></tr></thead>
             <tbody>
               {data.pages.map(p => (
-                <tr key={p.id}>
-                  <td>{p.label}<div className="mono muted small">{p.name}</div></td>
+                <tr key={p.id} className={filter.target === p.name ? 'sel' : ''}>
+                  <td><button className="linklike" title="Mostra i profili che vedono questa pagina" onClick={() => setFilter({ ...filter, target: filter.target === p.name ? '' : p.name })}>{p.label}</button><div className="mono muted small">{p.name}</div></td>
                   <td title={p.components.join('\n')}>{p.components.length}<div className="muted small">{p.components.slice(0, 3).map(c => c.split(':').pop()).join(', ')}{p.components.length > 3 ? '…' : ''}</div></td>
                   <td title={p.fields.map(f => f.split('.').slice(1).join('.')).join('\n')}>{p.fields.length || <span className="muted">—</span>}</td>
                   <td>{unassigned.has(p.name) ? <span className="pill st-part">Non assegnata</span> : usage(p.name).map(u => <div key={u}>{u}</div>)}</td>
