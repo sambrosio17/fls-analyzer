@@ -5,8 +5,9 @@ import { Orgs } from './pages/Orgs.tsx';
 import { MatrixPage } from './pages/Matrix.tsx';
 import { ChangeSetPage } from './pages/ChangeSet.tsx';
 import { History } from './pages/History.tsx';
+import { LayoutsPage } from './pages/Layouts.tsx';
 
-type View = 'orgs' | 'matrix' | 'changeset' | 'history';
+type View = 'orgs' | 'matrix' | 'layouts' | 'changeset' | 'history';
 
 export function App() {
   const [session, setSession] = useState<boolean | null>(null);
@@ -35,7 +36,7 @@ export function App() {
 
   const org = orgs.find(o => o.id === orgId) ?? null;
   const openChangeSet = (id: string) => { setChangeSetId(id); setView('changeset'); };
-  const tabs: [View, string, boolean][] = [['orgs', 'Org', true], ['matrix', 'Matrice FLS', !!org], ['history', 'Storico', true]];
+  const tabs: [View, string, boolean][] = [['orgs', 'Org', true], ['matrix', 'Matrice FLS', !!org], ['layouts', 'Layout e pagine', !!org], ['history', 'Storico', true]];
 
   return (
     <>
@@ -66,6 +67,7 @@ export function App() {
             onRenamed={updated => setOrgs(orgs.map(o => o.id === updated.id ? updated : o))} />
         )}
         {view === 'matrix' && org && <MatrixPage key={org.id} org={org} onChangeSet={openChangeSet} />}
+        {view === 'layouts' && org && <LayoutsPage key={org.id} org={org} />}
         {view === 'changeset' && changeSetId && <ChangeSetPage key={changeSetId} id={changeSetId} onOpen={openChangeSet} onBack={() => setView(org ? 'matrix' : 'history')} />}
         {view === 'history' && <History orgs={orgs} onOpen={openChangeSet} />}
       </main>

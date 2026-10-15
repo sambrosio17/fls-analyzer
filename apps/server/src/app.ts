@@ -9,6 +9,7 @@ import type { Config } from './config.ts';
 import { pkcePair, randomToken, safeEqual, TokenCipher } from './crypto.ts';
 import { DEFAULT_TENANT, Db, orgLabel, type OrgRow } from './db.ts';
 import { SalesforceClient, SalesforceError, type SfApi } from './salesforce/client.ts';
+import { loadLayoutAnalysis, loadPageAnalysis } from './salesforce/pages.ts';
 import { accessStrings, listObjects, loadFields, loadOrgInfo, loadPermissionSets, loadSnapshot, loadUserPermissions } from './salesforce/metadata.ts';
 import { authorizeUrl, exchangeCode, loginUrlFor, refreshAccessToken, type OAuthSettings } from './salesforce/oauth.ts';
 import { ChangeSetService, NotFoundError } from './services/changesets.ts';
@@ -165,6 +166,16 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOpti
   });
   app.get('/api/orgs/:id/objects', async req => listObjects(apiFor(orgOr404((req.params as { id: string }).id))));
   app.get('/api/orgs/:id/permission-sets', async req => loadPermissionSets(apiFor(orgOr404((req.params as { id: string }).id))));
+
+  const objectQuery = z.object({ object: z.string().regex(/^[A-Za-z0-9_]+$/) });
+  app.get('/api/orgs/:id/layouts', async req => {
+    const org = orgOr404((req.params as { id: string }).id);
+    return loadLayoutAnalysis(apiFor(org), objectQuery.parse(req.query).object);
+  });
+  app.get('/api/orgs/:id/lightning-pages', async req => {
+    const org = orgOr404((req.params as { id: string }).id);
+    return loadPageAnalysis(apiFor(org), objectQuery.parse(req.query).object);
+  });
 
   app.get('/api/orgs/:id/matrix', async req => {
     const org = orgOr404((req.params as { id: string }).id);
