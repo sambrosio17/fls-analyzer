@@ -13,6 +13,8 @@ export interface Matrix {
   /** Per permission set id, one char per field in `fields` order: '0' none, '1' read, '2' edit. Missing = no access. */
   access: Record<string, string>;
   objectRead: { parentId: string; sobjectType: string }[];
+  /** Lookups that failed while reading the fields (e.g. fields hidden from the connected user). */
+  warnings?: string[];
 }
 export interface ChangeItem {
   id: number; parentId: string; parentLabel: string; field: string; sobjectType: string; before: Access; after: Access;

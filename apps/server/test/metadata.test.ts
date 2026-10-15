@@ -25,3 +25,20 @@ describe('large demo org', () => {
     expect(Object.values(access).every(s => s.length === fields.length)).toBe(true);
   });
 });
+
+describe('fields hidden from the connected user', () => {
+  it('finds hidden custom fields through the Tooling API when EntityParticle leaves them out', async () => {
+    const fields = await loadFields(demoOrg(), ['Account']);
+    expect(fields.find(f => f.name === 'Account.Internal_Rating__c')).toMatchObject({ label: 'Internal Rating', hiddenFromUser: true, permissionable: true });
+    expect(fields.filter(f => f.hiddenFromUser)).toHaveLength(1);
+  });
+
+  it('falls back to describe and reports why when the lookups fail', async () => {
+    const org = demoOrg();
+    org.tooling = async () => { throw new Error('INSUFFICIENT_ACCESS'); };
+    const log: string[] = [];
+    const fields = await loadFields(org, ['Account'], m => log.push(m));
+    expect(fields.some(f => f.hiddenFromUser)).toBe(false);
+    expect(log).toEqual(['Custom field lookup failed for Account: INSUFFICIENT_ACCESS']);
+  });
+});

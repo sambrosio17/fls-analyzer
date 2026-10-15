@@ -235,6 +235,9 @@ export function MatrixPage({ org, onChangeSet }: Props) {
       </section>
 
       {error && <div className="banner prod">{error}</div>}
+      {matrix?.warnings?.length ? (
+        <div className="banner info">Non sono riuscito a leggere i campi che il tuo utente non vede, quindi potrebbero mancare. Dettaglio: <span className="mono">{matrix.warnings.join(' · ')}</span></div>
+      ) : null}
       {loading && <p className="muted">Lettura di campi, profili e FieldPermissions…</p>}
       {!matrix && !loading && <div className="panel empty">Aggiungi uno o più oggetti per vedere la matrice.</div>}
 

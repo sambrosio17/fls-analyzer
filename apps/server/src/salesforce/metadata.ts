@@ -44,11 +44,46 @@ interface DescribeField {
   autoNumber: boolean; custom: boolean; encrypted?: boolean;
 }
 
+/** Id the Tooling API uses for an object: its name for standard objects, the 01I id for custom ones. */
+export async function tableId(api: SfApi, object: string): Promise<string> {
+  const [row] = await api.query<{ DurableId: string }>(`SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = ${inList([object]).slice(1, -1)}`);
+  if (!row) throw new Error(`Object not found: ${object}`);
+  return row.DurableId;
+}
+
+/**
+ * Custom fields the connected user cannot see. Tooling CustomField lists every custom field whatever the FLS;
+ * label and type come from the Metadata API.
+ */
+async function hiddenCustomFields(api: SfApi, object: string, known: Set<string>): Promise<FieldMeta[]> {
+  const table = await tableId(api, object);
+  const rows = await api.tooling<{ DeveloperName: string; NamespacePrefix: string | null }>(
+    `SELECT DeveloperName, NamespacePrefix FROM CustomField WHERE TableEnumOrId = ${inList([table]).slice(1, -1)}`);
+  const names = rows.map(r => `${r.NamespacePrefix ? `${r.NamespacePrefix}__` : ''}${r.DeveloperName}__c`).filter(n => !known.has(n));
+  if (!names.length) return [];
+  const records = new Map((await api.readMetadata('CustomField', names.map(n => `${object}.${n}`))).map(r => [r.fullName, r]));
+  const out: FieldMeta[] = [];
+  for (const n of names) {
+    const r = records.get(`${object}.${n}`);
+    const type = String(r?.type ?? '');
+    if (type === 'Location') continue;
+    out.push({
+      object, name: `${object}.${n}`, label: String(r?.label ?? n), type: type || 'custom',
+      // Master-detail and required fields have no FLS.
+      permissionable: type !== 'MasterDetail' && r?.required !== 'true',
+      calculated: !!r?.formula || type === 'Summary' || type === 'AutoNumber',
+      custom: true, encrypted: type === 'EncryptedText', hiddenFromUser: true
+    });
+  }
+  return out;
+}
+
 interface ParticleRow { QualifiedApiName: string; Label: string; DataType: string; IsPermissionable: boolean; IsCalculated: boolean; IsCompound: boolean }
 
 /**
  * Fields of the objects. Describe only returns the fields the connected user can see, so fields hidden from them
- * (even from an admin) are added from EntityParticle, which lists every field. If that query fails, describe alone is used.
+ * (even from an admin) are added from EntityParticle and, for custom fields, from the Tooling API. If those lookups
+ * fail, the fields found so far are used and `log` gets the reason.
  */
 export async function loadFields(api: SfApi, objects: string[], log?: (msg: string) => void): Promise<FieldMeta[]> {
   const out: FieldMeta[] = [];
@@ -78,6 +113,12 @@ export async function loadFields(api: SfApi, objects: string[], log?: (msg: stri
         permissionable: true, calculated: p.IsCalculated || /^(Formula|Roll-Up Summary|Auto Number)/i.test(type),
         custom: p.QualifiedApiName.endsWith('__c'), encrypted: /encrypted/i.test(type), hiddenFromUser: true
       });
+      seen.add(p.QualifiedApiName);
+    }
+    try {
+      out.push(...await hiddenCustomFields(api, object, seen));
+    } catch (e) {
+      log?.(`Custom field lookup failed for ${object}: ${(e as Error).message}`);
     }
   }
   return out;
