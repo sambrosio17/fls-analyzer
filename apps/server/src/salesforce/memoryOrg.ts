@@ -74,7 +74,8 @@ export class MemoryOrg implements SfApi {
     if (soql.includes('FROM UserPermissionAccess')) return [{ PermissionsApiEnabled: true, PermissionsViewSetup: true, PermissionsManageProfilesPermissionsets: true }] as T[];
     if (soql.includes('FROM EntityParticle')) {
       const object = soql.match(/QualifiedApiName = '(\w+)'/)![1]!;
-      return (this.data.describes[object]?.fields ?? []).map(f => ({
+      // Like a real org with FLS on EntityParticle: fields hidden from the user are left out.
+      return (this.data.describes[object]?.fields ?? []).filter(f => !f.hidden).map(f => ({
         QualifiedApiName: f.name, Label: f.label, DataType: f.type, IsPermissionable: f.permissionable, IsCalculated: f.calculated, IsCompound: f.type === 'address'
       })) as T[];
     }
@@ -86,6 +87,10 @@ export class MemoryOrg implements SfApi {
   }
 
   async tooling<T>(soql: string): Promise<T[]> {
+    if (soql.includes('FROM CustomField')) {
+      return (this.data.describes[whereEq(soql, 'TableEnumOrId')!]?.fields ?? []).filter(f => f.custom)
+        .map(f => ({ DeveloperName: f.name.replace(/__c$/, ''), NamespacePrefix: null })) as T[];
+    }
     const pages = this.data.pages;
     if (!pages) return [];
     const id = whereEq(soql, 'Id');
@@ -113,6 +118,13 @@ export class MemoryOrg implements SfApi {
   }
 
   async readMetadata(type: string, fullNames: string[]): Promise<MetadataRecord[]> {
+    if (type === 'CustomField') {
+      return fullNames.flatMap(n => {
+        const [object, name] = n.split('.') as [string, string];
+        const f = this.data.describes[object]?.fields.find(x => x.name === name);
+        return f ? [{ fullName: n, label: f.label, type: f.type, ...(f.calculated ? { formula: '1' } : {}) }] : [];
+      });
+    }
     const source = type === 'CustomApplication' ? this.data.pages?.apps : type === 'CustomObject' ? this.data.pages?.objects : undefined;
     if (!source) throw new Error(`Unexpected readMetadata: ${type}`);
     return structuredClone(source.filter(r => fullNames.includes(r.fullName)));

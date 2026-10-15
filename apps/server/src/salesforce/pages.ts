@@ -1,6 +1,6 @@
 import type { PageAssignments } from '@fls/core';
 import type { MetadataRecord, SfApi } from './client.ts';
-import { loadFieldPermissions, loadFields, loadObjectPermissions } from './metadata.ts';
+import { loadFieldPermissions, loadFields, loadObjectPermissions, tableId } from './metadata.ts';
 
 export interface RecordTypeInfo { id: string | null; developerName: string | null; label: string; active: boolean }
 export interface ProfileInfo { id: string; permSetId: string; name: string; fullName: string | null }
@@ -19,12 +19,6 @@ async function pool<T, R>(items: T[], fn: (item: T) => Promise<R>, concurrency =
 
 const list = <T>(v: unknown): T[] => (Array.isArray(v) ? v : v == null || v === '' ? [] : [v]) as T[];
 
-/** Id the Tooling API uses for an object: its name for standard objects, the 01I id for custom ones. */
-export async function tableId(api: SfApi, object: string): Promise<string> {
-  const [row] = await api.query<{ DurableId: string }>(`SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = ${quote(object)}`);
-  if (!row) throw new Error(`Object not found: ${object}`);
-  return row.DurableId;
-}
 
 /** Record types of the object, plus Master (id null), which every object has. */
 export async function loadRecordTypes(api: SfApi, object: string): Promise<RecordTypeInfo[]> {
