@@ -14,7 +14,7 @@ const MAX_CHANGES = 200_000; // same limit as the server
 
 type DisplayRow = { kind: 'obj'; object: string } | { kind: 'field'; i: number };
 
-interface Props { org: Org; onChangeSet: (id: string) => void; initialObjects?: string[]; onObjectsChange?: (objects: string[]) => void; onDirtyChange?: (dirty: boolean) => void }
+interface Props { org: Org; onChangeSet: (id: string, number: string) => void; initialObjects?: string[]; onObjectsChange?: (objects: string[]) => void; onDirtyChange?: (dirty: boolean) => void }
 
 export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsChange, onDirtyChange }: Props) {
   const [objects, setObjects] = useState<SObject[]>([]);
@@ -172,7 +172,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
       const cs = await api.createChangeSet(org.id, { changes, description: `${new Set(changes.map(c => c.field)).size} campi su ${new Set(changes.map(c => c.parentId)).size} profili/permission set` });
       // The tab stays open next to the change set: the changes now live there, so the grid goes back to the org's values.
       discard(); setSent(cs.number); setCreating(false);
-      onChangeSet(cs.id);
+      onChangeSet(cs.id, cs.number);
     } catch (e) { setError((e as Error).message); setCreating(false); }
   };
 

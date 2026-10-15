@@ -191,21 +191,37 @@ tr.dim td { color: var(--muted); }
   .mx thead th.fcol, .mx tbody th { width: 200px; }
 }
 
-/* Work tabs: org › tool › object, one per open piece of work */
-.worktabs { display: flex; align-items: flex-end; gap: 4px; overflow-x: auto; scrollbar-width: thin; padding-top: 2px; }
-.worktab { display: flex; align-items: center; flex: none; max-width: 400px; border: 1px solid var(--bar-line); border-bottom: 0; border-radius: 8px 8px 0 0; background: transparent; color: var(--bar-muted); }
-.worktab:hover { background: var(--bar-hover); color: var(--bar-ink); }
-.worktab.on { background: var(--bg); color: var(--ink); border-color: var(--bg); box-shadow: inset 0 2px 0 var(--mark); }
-.worktab.prod:not(.on) { box-shadow: inset 0 2px 0 var(--danger); }
-.worktab-label { display: flex; gap: 6px; align-items: baseline; min-width: 0; border: 0; background: none; color: inherit; padding: 7px 4px 7px 12px; cursor: pointer; font-size: 13px; white-space: nowrap; }
-.worktab-label span { overflow: hidden; text-overflow: ellipsis; }
-.worktab-label span + span::before { content: "›"; margin-right: 6px; opacity: .5; }
-.wt-org { font-weight: 700; flex: 0 1 auto; max-width: 140px; }
-.wt-tool { flex: none; }
-.wt-obj { font-family: var(--font-code); font-size: 12px; flex: 0 0 auto; max-width: 160px; }
-.worktab.dirty .worktab-label::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--pending); align-self: center; flex: none; }
-.worktab-x { border: 0; background: none; color: inherit; cursor: pointer; padding: 4px 8px; font-size: 15px; line-height: 1; opacity: .6; border-radius: 6px; }
-.worktab-x:hover { opacity: 1; }
-.worktab-add { flex: none; border: 0; background: none; color: var(--bar-muted); cursor: pointer; padding: 6px 10px; font-size: 17px; line-height: 1; border-radius: 6px; margin-bottom: 2px; }
-.worktab-add:hover { background: var(--bar-hover); color: var(--bar-ink); }
-.newtab { display: grid; gap: 14px; max-width: 520px; }
+/* Work tabs on three levels: org (dark bar), tool, object */
+.orgtabs { display: flex; align-items: flex-end; gap: 4px; padding-top: 2px; overflow-x: auto; overflow-y: visible; scrollbar-width: thin; }
+.orgtab { display: flex; align-items: center; flex: none; max-width: 300px; border: 1px solid var(--bar-line); border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--bar-muted); }
+.orgtab:hover { background: var(--bar-hover); color: var(--bar-ink); }
+.orgtab.on { background: var(--surface-2); color: var(--ink); border-color: var(--surface-2); box-shadow: inset 0 2px 0 var(--mark); }
+.orgtab.prod { box-shadow: inset 0 2px 0 var(--danger); }
+.orgtab-label { display: flex; gap: 8px; align-items: center; min-width: 0; border: 0; background: none; color: inherit; padding: 7px 4px 7px 12px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+.orgtab-label b { overflow: hidden; text-overflow: ellipsis; }
+.tab-x { border: 0; background: none; color: inherit; cursor: pointer; padding: 4px 8px; font-size: 15px; line-height: 1; opacity: .6; border-radius: 6px; }
+.tab-x:hover { opacity: 1; }
+.tab-add { flex: none; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 5px 10px; font-size: 17px; line-height: 1; border-radius: 6px; }
+.tab-add:hover { background: var(--surface-2); color: var(--ink); }
+.orgtabs .tab-add { color: var(--bar-muted); margin-bottom: 2px; }
+.orgtabs .tab-add:hover { background: var(--bar-hover); color: var(--bar-ink); }
+.orgtab-add-wrap { position: relative; flex: none; }
+.menu { position: fixed; z-index: 30; margin: 4px 0 0; padding: 4px; list-style: none; min-width: 240px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / .18); }
+.menu button { display: flex; gap: 8px; align-items: center; width: 100%; text-align: left; border: 0; background: none; color: inherit; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.menu button:hover { background: var(--surface-2); }
+.menu li + li:last-child { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
+.menu-note { padding: 8px 10px; font-size: 13px; }
+.dirty > button:first-child::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--pending); flex: none; margin-left: 6px; }
+.subtabs { background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.tooltabs { display: flex; gap: 4px; overflow-x: auto; }
+.tooltab { border: 0; background: none; color: var(--muted); font-weight: 600; padding: 9px 12px; cursor: pointer; white-space: nowrap; box-shadow: inset 0 -2px 0 transparent; display: inline-flex; gap: 6px; align-items: center; }
+.tooltab:hover { color: var(--ink); }
+.tooltab.on { color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.tooltab .count { font-size: 11px; background: var(--line); color: var(--ink); border-radius: 999px; padding: 0 6px; }
+.objtabs { display: flex; align-items: flex-end; gap: 4px; overflow-x: auto; padding-top: 6px; scrollbar-width: thin; }
+.objtab { display: flex; align-items: center; flex: none; max-width: 280px; border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--muted); background: var(--surface-2); margin-bottom: -1px; }
+.objtab:hover { color: var(--ink); }
+.objtab.on { background: var(--bg); color: var(--ink); border-color: var(--line); border-bottom: 1px solid var(--bg); }
+.objtab.empty .objtab-label { font-style: italic; }
+.objtab-label { display: flex; align-items: center; min-width: 0; border: 0; background: none; color: inherit; padding: 6px 2px 6px 12px; cursor: pointer; font-family: var(--font-code); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.objtabs .tab-add { margin-bottom: 2px; }
