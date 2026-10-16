@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { MatrixHelp } from './MatrixHelp.tsx';
+import { AccessLegend } from '../AccessLegend.tsx';
 import { MultiPick, type PickOption } from '../MultiPick.tsx';
 import { bounds, forEachCell, menuPosition, rangeSize, type CellRange } from '../cellRange.ts';
-import { ACCESS_LONG, ACCESS_SHORT, api, type Access, type BulkAction, type FieldMeta, type Matrix, type Org, type PermSet, type SObject } from '../api.ts';
+import { useT } from '../i18n.tsx';
+import { api, type Access, type BulkAction, type FieldMeta, type Matrix, type Org, type PermSet, type SObject } from '../api.ts';
 
 const lockedPs = (p: PermSet) => !!p.namespace || p.type === 'Group' || p.type === 'Muting';
 type Filter = 'all' | 'custom' | 'none' | 'editall' | 'pending';
@@ -20,6 +22,7 @@ type DisplayRow = { kind: 'obj'; object: string } | { kind: 'field'; i: number }
 interface Props { org: Org; onChangeSet: (id: string, number: string) => void; initialObjects?: string[]; onObjectsChange?: (objects: string[]) => void; onDirtyChange?: (dirty: boolean) => void }
 
 export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsChange, onDirtyChange }: Props) {
+  const t = useT();
   const [objects, setObjects] = useState<SObject[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [objectQuery, setObjectQuery] = useState('');
@@ -284,13 +287,13 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
 
   const createChangeSet = async () => {
     if (pending.size > MAX_CHANGES) {
-      setError(`Troppe modifiche per un solo change set (${pending.size.toLocaleString('it-IT')}, massimo ${MAX_CHANGES.toLocaleString('it-IT')}). Dividile in più change set, per esempio filtrando i profili.`);
+      setError(t.matrix.tooMany(pending.size.toLocaleString(t.locale), MAX_CHANGES.toLocaleString(t.locale)));
       return;
     }
     setCreating(true); setError(null);
     try {
       const changes = [...pending].map(([idx, access]) => ({ parentId: allPs[Math.floor(idx / F)]!.id, field: allFields[idx % F]!.name, access }));
-      const cs = await api.createChangeSet(org.id, { changes, description: `${new Set(changes.map(c => c.field)).size} campi su ${new Set(changes.map(c => c.parentId)).size} profili/permission set` });
+      const cs = await api.createChangeSet(org.id, { changes, description: t.matrix.description(new Set(changes.map(c => c.field)).size, new Set(changes.map(c => c.parentId)).size) });
       // The tab stays open next to the change set: the changes now live there, so the grid goes back to the org's values.
       discard(); setSent(cs.number); setCreating(false);
       onChangeSet(cs.id, cs.number);
@@ -336,7 +339,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   const fieldOptions = useMemo<PickOption[]>(() => allFields.map(f => ({ id: f.name, label: f.label, sub: f.name })), [matrix]);
   const psOptions = useMemo<PickOption[]>(() => allPs
     .filter(p => psKind === 'all' || (psKind === 'profiles') === p.isProfile)
-    .map(p => ({ id: p.id, label: p.label, sub: p.isProfile ? 'profilo' : p.name })), [matrix, psKind]);
+    .map(p => ({ id: p.id, label: p.label, sub: p.isProfile ? t.matrix.profileSub : p.name })), [matrix, psKind, t]);
   const rb = range && bounds(range);
   live.current = { cellAt, extendTo, clickCell, setRange, setMenu, headH: view.headH, fcolW: view.fcolW };
   const permissionableVisible = fields.filter(i => allFields[i]!.permissionable);
@@ -346,20 +349,20 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   return (
     <>
       <div className="view-head">
-        <div><div className="eyebrow">{org.label}</div><h1>Matrice Field Level Security</h1>
-          <p>Scegli gli oggetti. Clicca una cella per cambiarla, trascina il mouse su più celle per scegliere l'accesso da un menu, oppure seleziona righe e colonne e applica un'azione in blocco. Niente viene scritto finché non confermi l'anteprima.</p></div>
+        <div><div className="eyebrow">{org.label}</div><h1>{t.matrix.title}</h1>
+          <p>{t.matrix.intro}</p></div>
         <span className="spacer" />
-        <button className="btn" onClick={() => setHelp(true)}>? Guida</button>
+        <button className="btn" onClick={() => setHelp(true)}>{t.matrix.guide}</button>
       </div>
       <MatrixHelp open={help} onClose={() => setHelp(false)} />
 
       <section className="panel panel-b object-picker">
         <div className="row">
           {selected.map(o => (
-            <span className="chip on" key={o}>{o}<button aria-label={`Togli ${o}`} onClick={() => load(selected.filter(x => x !== o))}>×</button></span>
+            <span className="chip on" key={o}>{o}<button aria-label={t.matrix.removeObject(o)} onClick={() => load(selected.filter(x => x !== o))}>×</button></span>
           ))}
           <div className="combo">
-            <input className="input" id="object-search" placeholder="Aggiungi oggetto (es. Account)" value={objectQuery} onChange={e => setObjectQuery(e.target.value)} />
+            <input className="input" id="object-search" placeholder={t.matrix.addObject} value={objectQuery} onChange={e => setObjectQuery(e.target.value)} />
             {objectMatches.length > 0 && (
               <ul className="combo-list">
                 {objectMatches.map(o => (
@@ -372,41 +375,41 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
       </section>
 
       {error && <div className="banner prod">{error}</div>}
-      {sent && <div className="banner info">Le modifiche sono nel change set {sent}. Dopo averlo applicato, ricarica la matrice per vedere i valori aggiornati. <button className="btn sm" onClick={() => load(selected)}>Ricarica</button></div>}
+      {sent && <div className="banner info">{t.matrix.sent(sent)} <button className="btn sm" onClick={() => load(selected)}>{t.matrix.reload}</button></div>}
       {matrix?.warnings?.length ? (
-        <div className="banner info">Non sono riuscito a leggere i campi che il tuo utente non vede, quindi potrebbero mancare. Dettaglio: <span className="mono">{matrix.warnings.join(' · ')}</span></div>
+        <div className="banner info">{t.matrix.hiddenWarning} <span className="mono">{matrix.warnings.join(' · ')}</span></div>
       ) : null}
-      {loading && <p className="muted">Lettura di campi, profili e FieldPermissions…</p>}
-      {!matrix && !loading && <div className="panel empty">Aggiungi uno o più oggetti per vedere la matrice.</div>}
+      {loading && <p className="muted">{t.matrix.loading}</p>}
+      {!matrix && !loading && <div className="panel empty">{t.matrix.empty}</div>}
 
       {matrix && !loading && (
         <>
           <div className="toolbar">
-            <MultiPick id="field-pick" label="Campi" allLabel="tutti" options={fieldOptions} selected={fieldPick} onChange={setFieldPick} />
-            <MultiPick id="ps-pick" label="Profili e permission set" allLabel="tutti" options={psOptions} selected={psPick} onChange={setPsPick} />
+            <MultiPick id="field-pick" label={t.matrix.fields} options={fieldOptions} selected={fieldPick} onChange={setFieldPick} />
+            <MultiPick id="ps-pick" label={t.matrix.profilesAndPs} options={psOptions} selected={psPick} onChange={setPsPick} />
             <select className="input" id="ps-kind" value={psKind} onChange={e => setPsKind(e.target.value as PsKind)}>
-              <option value="all">Profili e permission set</option><option value="profiles">Solo profili</option><option value="permsets">Solo permission set</option>
+              <option value="all">{t.matrix.kind.all}</option><option value="profiles">{t.matrix.kind.profiles}</option><option value="permsets">{t.matrix.kind.permsets}</option>
             </select>
-            {([['all', 'Tutti'], ['none', 'Non visibili a nessuno'], ['editall', 'Modificabili da tutti'], ['custom', 'Solo custom'], ['pending', 'Con modifiche']] as const).map(([f, l]) => (
-              <button key={f} className="chip" aria-pressed={filter === f} onClick={() => setFilter(f)}>{l}</button>
+            {(['all', 'none', 'editall', 'custom', 'pending'] as const).map(f => (
+              <button key={f} className="chip" aria-pressed={filter === f} onClick={() => setFilter(f)}>{t.matrix.quick[f]}</button>
             ))}
           </div>
 
           <div className="selbar">
-            <span><b>{rows.size}</b> campi · <b>{cols.size}</b> profili/permission set selezionati</span>
+            <span>{t.matrix.selected(rows.size, cols.size)}</span>
             <select className="input" id="bulk-action" value={bulkAction} onChange={e => setBulkAction(e.target.value as BulkAction)}>
-              <option value="read">Lettura</option><option value="edit">Lettura e modifica</option>
-              <option value="removeEdit">Togli la modifica</option><option value="none">Nessun accesso</option>
+              <option value="read">{t.matrix.bulk.read}</option><option value="edit">{t.matrix.bulk.edit}</option>
+              <option value="removeEdit">{t.matrix.bulk.removeEdit}</option><option value="none">{t.matrix.bulk.none}</option>
             </select>
-            <button className="btn sm" disabled={!rows.size || !cols.size} onClick={applyBulk}>Applica alla selezione</button>
-            <button className="btn sm" disabled={!rows.size && !cols.size} onClick={() => { setRows(new Set()); setCols(new Set()); }}>Deseleziona</button>
+            <button className="btn sm" disabled={!rows.size || !cols.size} onClick={applyBulk}>{t.matrix.applyToSelection}</button>
+            <button className="btn sm" disabled={!rows.size && !cols.size} onClick={() => { setRows(new Set()); setCols(new Set()); }}>{t.matrix.deselect}</button>
             <span className="spacer" />
-            <span className={pending.size ? 'warn-text' : 'muted'}><b>{pending.size}</b> modifiche in sospeso</span>
-            <button className="btn sm danger" disabled={!pending.size} onClick={discard}>Scarta</button>
-            <button className="btn sm primary" disabled={!pending.size || creating} onClick={createChangeSet}>{creating ? 'Preparo l\'anteprima…' : 'Vai all\'anteprima'}</button>
+            <span className={pending.size ? 'warn-text' : 'muted'}>{t.matrix.pending(pending.size)}</span>
+            <button className="btn sm danger" disabled={!pending.size} onClick={discard}>{t.matrix.discard}</button>
+            <button className="btn sm primary" disabled={!pending.size || creating} onClick={createChangeSet}>{creating ? t.matrix.preparing : t.matrix.toPreview}</button>
           </div>
 
-          <p className="muted mx-size">{fields.length} campi × {columns.length} profili/permission set</p>
+          <p className="muted mx-size">{t.matrix.size(fields.length, columns.length)}</p>
 
           <div className="scroller" ref={scroller} onScroll={onScroll}>
             <table className="mx" style={{ width: view.fcolW + columns.length * COL_W }}>
@@ -415,11 +418,11 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
                   <th className="fcol" ref={fcol}>
                     <label className="check"><input type="checkbox" id="all-rows"
                       checked={permissionableVisible.length > 0 && permissionableVisible.every(i => rows.has(i))}
-                      onChange={e => setRows(e.target.checked ? new Set(permissionableVisible) : new Set())} />Campo</label>
+                      onChange={e => setRows(e.target.checked ? new Set(permissionableVisible) : new Set())} />{t.matrix.field}</label>
                     {columns.length > 0 && (
                       <label className="check"><input type="checkbox" id="all-cols"
                         checked={columns.every(j => lockedPs(allPs[j]!) || cols.has(j))}
-                        onChange={e => setCols(e.target.checked ? new Set(columns.filter(j => !lockedPs(allPs[j]!))) : new Set())} />Tutte le colonne</label>
+                        onChange={e => setCols(e.target.checked ? new Set(columns.filter(j => !lockedPs(allPs[j]!))) : new Set())} />{t.matrix.allColumns}</label>
                     )}
                   </th>
                   {padCells(leftPad, 'lp')}
@@ -427,10 +430,10 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
                     const p = allPs[j]!;
                     return (
                       <th key={p.id} className="pcol"><div className="ps-h">
-                        <span className="kind">{p.isProfile ? 'Profilo' : 'Perm. set'}</span>
+                        <span className="kind">{p.isProfile ? t.matrix.profile : t.matrix.permSet}</span>
                         <span className="nm" title={`${p.label} (${p.name})`}>{p.namespace ? '🔒 ' : ''}{p.label}</span>
-                        <span className="ct">L {counts.read[j]} · M {counts.edit[j]}</span>
-                        <label><input type="checkbox" disabled={lockedPs(p)} checked={cols.has(j)} onChange={() => toggle(cols, j, setCols)} />seleziona</label>
+                        <span className="ct">{t.matrix.counts(counts.read[j]!, counts.edit[j]!)}</span>
+                        <label><input type="checkbox" disabled={lockedPs(p)} checked={cols.has(j)} onChange={() => toggle(cols, j, setCols)} />{t.matrix.select}</label>
                       </div></th>
                     );
                   })}
@@ -444,7 +447,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
                     return (
                       <tr className="obj" key={`obj-${row.object}`}><th>{row.object}</th>
                         {padCells(leftPad, 'lp')}
-                        {visCols.map(j => <td key={j}>{objectRead.has(`${allPs[j]!.id}|${row.object}`) ? '' : <span className="warn-text" title="Nessuna lettura sull'oggetto">⚠ oggetto</span>}</td>)}
+                        {visCols.map(j => <td key={j}>{objectRead.has(`${allPs[j]!.id}|${row.object}`) ? '' : <span className="warn-text" title={t.matrix.noObjectRead}>⚠ {t.matrix.objectWarn}</span>}</td>)}
                         {padCells(rightPad, 'rp')}
                       </tr>
                     );
@@ -456,7 +459,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
                         <input type="checkbox" id={`r-${f.name}`} disabled={!f.permissionable} checked={rows.has(i)} onChange={() => toggle(rows, i, setRows)} />
                         <label htmlFor={`r-${f.name}`} title={f.label}>{f.label}</label>
                         <span className="api" title={f.name}>{f.name}</span>
-                        <span className="tags">{f.hiddenFromUser && <span className="tag" title="Il tuo utente non vede questo campo: Salesforce non lo restituisce nel describe">Nascosto a te</span>}<span className="tag">{f.type}</span>{!f.permissionable && <span className="tag">Senza FLS</span>}{f.calculated && <span className="tag">Solo lettura</span>}{f.encrypted && <span className="tag sens">Crittografato</span>}</span>
+                        <span className="tags">{f.hiddenFromUser && <span className="tag" title={t.matrix.hiddenTagTitle}>{t.matrix.hiddenTag}</span>}<span className="tag">{f.type}</span>{!f.permissionable && <span className="tag">{t.matrix.noFls}</span>}{f.calculated && <span className="tag">{t.matrix.readOnly}</span>}{f.encrypted && <span className="tag sens">{t.matrix.encrypted}</span>}</span>
                       </div></th>
                       {padCells(leftPad, 'lp')}
                       {visCols.map(j => {
@@ -464,7 +467,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
                         if (!f.permissionable) {
                           const pk = !!rb && fieldPos[i]! >= rb.top && fieldPos[i]! <= rb.bottom && colPos[j]! >= rb.left && colPos[j]! <= rb.right;
                           return <td key={j} data-i={i} data-j={j} className={`c locked${pk ? ' rsel' : ''}`} onMouseDown={e => onCellMouseDown(e, i, j)} onContextMenu={e => onCellContextMenu(e, i, j)}>
-                            <button disabled title="Campo senza FLS: sempre visibile">sempre</button></td>;
+                            <button disabled title={t.matrix.alwaysTitle}>{t.matrix.always}</button></td>;
                         }
                         const idx = j * F + i;
                         const v = cur(idx), b = base[idx] as Access, isPending = pending.has(idx);
@@ -474,8 +477,8 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
                           <td key={j} data-i={i} data-j={j} className={`c v${v}${isPending ? ' pend' : ''}${locked(f, p) ? ' locked' : ''}${cols.has(j) ? ' colsel' : ''}${picked ? ' rsel' : ''}`}
                             onMouseDown={e => onCellMouseDown(e, i, j)} onContextMenu={e => onCellContextMenu(e, i, j)}>
                             {/* Mouse clicks are handled on mousedown/up (they may start a drag); this onClick is for the keyboard. */}
-                            <button onClick={e => { if (e.detail === 0) clickCell(i, j); }} title={`${p.label} · ${f.name}: ${ACCESS_LONG[v]}${isPending ? ` (prima: ${ACCESS_LONG[b]})` : ''}`}>
-                              <span className="v">{ACCESS_SHORT[v]}</span>{isPending && <span className="was">da {ACCESS_SHORT[b]}</span>}
+                            <button onClick={e => { if (e.detail === 0) clickCell(i, j); }} title={`${p.label} · ${f.name}: ${t.access.long[v]}${isPending ? t.matrix.before(t.access.long[b]!) : ''}`}>
+                              <span className="v">{t.access.short[v]}</span>{isPending && <span className="was">{t.matrix.was(t.access.short[b]!)}</span>}
                             </button>
                           </td>
                         );
@@ -492,8 +495,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
             <CellMenu x={menu.x} y={menu.y} stats={rangeStats} onPick={applyRange} onClose={() => { setMenu(null); setRange(null); }} />
           )}
           <div className="legend">
-            <span><span className="box">—</span>Nessun accesso</span><span><span className="box b1">L</span>Lettura</span><span><span className="box b2">L+M</span>Lettura e modifica</span>
-            <span><span className="box bp" />Modifica in sospeso</span><span><span className="box bl" />Non modificabile</span>
+            <AccessLegend />
           </div>
         </>
       )}
@@ -508,18 +510,20 @@ function CellMenu({ x, y, stats, onPick, onClose }: {
   x: number; y: number; stats: { cells: number; editable: number; pending: number };
   onPick: (action: BulkAction | 'revert') => void; onClose: () => void;
 }) {
+  const t = useT();
+  const [none0, read, edit] = t.access.short;
   const pos = menuPosition(x, y, MENU_W, MENU_H, window.innerWidth, window.innerHeight);
   const none = stats.editable === 0;
   return (
     <div className="cell-menu" role="menu" style={pos} onContextMenu={e => e.preventDefault()}>
-      <div className="cell-menu-h">{stats.cells === 1 ? '1 cella' : `${stats.cells} celle`}{stats.editable !== stats.cells && ` · ${stats.editable} modificabili`}</div>
-      <button role="menuitem" disabled={none} onClick={() => onPick('none')}><span className="box">—</span>Nessun accesso</button>
-      <button role="menuitem" disabled={none} onClick={() => onPick('read')}><span className="box b1">L</span>Lettura</button>
-      <button role="menuitem" disabled={none} onClick={() => onPick('edit')}><span className="box b2">L+M</span>Lettura e modifica</button>
-      <button role="menuitem" disabled={none} onClick={() => onPick('removeEdit')}><span className="box b1">L</span>Togli solo la modifica</button>
+      <div className="cell-menu-h">{t.cellMenu.cells(stats.cells)}{stats.editable !== stats.cells && t.cellMenu.editable(stats.editable)}</div>
+      <button role="menuitem" disabled={none} onClick={() => onPick('none')}><span className="box">{none0}</span>{t.access.long[0]}</button>
+      <button role="menuitem" disabled={none} onClick={() => onPick('read')}><span className="box b1">{read}</span>{t.access.long[1]}</button>
+      <button role="menuitem" disabled={none} onClick={() => onPick('edit')}><span className="box b2">{edit}</span>{t.access.long[2]}</button>
+      <button role="menuitem" disabled={none} onClick={() => onPick('removeEdit')}><span className="box b1">{read}</span>{t.cellMenu.removeEditOnly}</button>
       <hr />
-      <button role="menuitem" disabled={!stats.pending} onClick={() => onPick('revert')}><span className="box bp" />Ripristina i valori dell'org{stats.pending ? ` (${stats.pending})` : ''}</button>
-      <button role="menuitem" onClick={onClose}><span className="box" />Annulla selezione</button>
+      <button role="menuitem" disabled={!stats.pending} onClick={() => onPick('revert')}><span className="box bp" />{t.cellMenu.revert}{stats.pending ? ` (${stats.pending})` : ''}</button>
+      <button role="menuitem" onClick={onClose}><span className="box" />{t.cellMenu.clear}</button>
     </div>
   );
 }

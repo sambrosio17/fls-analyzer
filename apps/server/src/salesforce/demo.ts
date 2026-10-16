@@ -50,7 +50,7 @@ export function demoOrg(large = false): MemoryOrg {
   const noObject: Record<string, string[]> = { '0PS0000000000B1': ['Contact'], '0PS0000000000B3': ['Opportunity'], '0PS0000000000A5': ['Contact'] };
   const objectPerms = permissionSets.flatMap(p => Object.keys(describes)
     .filter(o => !(noObject[p.Id] ?? []).includes(o)).map(o => ({ ParentId: p.Id, SobjectType: o, PermissionsRead: true })));
-  const org = new MemoryOrg({ name: 'Demo (dati di esempio)', isSandbox: true, permissionSets, objectPerms, describes, pages: demoPages(permissionSets) });
+  const org = new MemoryOrg({ name: 'Demo (sample data)', isSandbox: true, permissionSets, objectPerms, describes, pages: demoPages(permissionSets) });
   // Inserting encrypted fields fails, to show per-row errors in the result.
   org.rejectFields = new Set(['Account.Billing_IBAN__c', 'Contact.Fiscal_Code__c']);
 

@@ -53,6 +53,10 @@ main.wrap { padding-block: 20px 60px; }
 .appbar .org-chip.muted { color: var(--bar-muted); }
 .appbar .btn { background: transparent; border-color: var(--bar-line); color: var(--bar-ink); }
 .appbar .btn:hover:not(:disabled) { border-color: var(--bar-muted); }
+.lang-pick { width: auto; padding: 5px 8px; font-size: 13px; }
+.appbar .lang-pick { background: transparent; border-color: var(--bar-line); color: var(--bar-ink); }
+.appbar .lang-pick option { color: initial; }
+.login-head { align-items: center; margin-bottom: 8px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
 .dot.ok { background: var(--ok); }
 .env { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; padding: 1px 6px; border-radius: 4px; }
@@ -332,7 +336,7 @@ td.c button:disabled { pointer-events: none; }
 @keyframes h-range { 0%, 9% { opacity: 0; width: var(--w0); height: var(--h0); } 12% { opacity: 1; width: var(--w0); height: var(--h0); } 40%, 62% { opacity: 1; width: var(--w); height: var(--h); } 66%, 100% { opacity: 0; width: var(--w); height: var(--h); } }
 .h-fill { opacity: 0; z-index: 1; box-shadow: inset 0 0 0 2px var(--pending); animation: h-fill 7s infinite; }
 @keyframes h-fill { 0%, 63% { opacity: 0; } 66%, 95% { opacity: 1; } 100% { opacity: 0; } }
-.h-menu { z-index: 4; width: 132px; padding: 4px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 20px rgb(0 0 0 / .18); opacity: 0; transform-origin: top left; animation: h-menu 7s infinite; }
+.h-menu { z-index: 4; width: max-content; min-width: 132px; padding: 4px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 20px rgb(0 0 0 / .18); opacity: 0; transform-origin: top left; animation: h-menu 7s infinite; }
 .h-menu i { display: block; font-style: normal; font-size: 10px; line-height: 17px; padding: 0 8px; white-space: nowrap; }
 .h-menu i:first-child { color: var(--muted); }
 .h-menu .h-pick { animation: h-pick 7s infinite; }

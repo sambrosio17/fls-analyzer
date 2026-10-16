@@ -7,7 +7,6 @@ export type Tool = 'matrix' | 'layouts' | 'changeset';
 export type LayoutMode = 'layouts' | 'pages';
 
 export const TOOLS: Tool[] = ['matrix', 'layouts', 'changeset'];
-export const TOOL_LABEL: Record<Tool, string> = { matrix: 'Matrice FLS', layouts: 'Layout e pagine', changeset: 'Change set' };
 
 export interface WorkTab {
   id: string;
@@ -49,9 +48,10 @@ export function visibleTab(ws: Workspace): WorkTab | null {
   return ws.tabs.find(t => t.id === id) ?? null;
 }
 
-export function tabTitle(tab: WorkTab): string {
-  if (tab.tool === 'changeset') return tab.label ?? 'Change set';
-  return tab.objects.length ? tab.objects.join(', ') : 'Nuovo oggetto';
+/** `labels` are the localized fallbacks for a change set tab with no number and an empty object tab. */
+export function tabTitle(tab: WorkTab, labels: { changeSet: string; newObject: string }): string {
+  if (tab.tool === 'changeset') return tab.label ?? labels.changeSet;
+  return tab.objects.length ? tab.objects.join(', ') : labels.newObject;
 }
 
 /** Adds an object tab after the active one of its group and makes it active. */

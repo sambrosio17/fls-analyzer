@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useT } from './i18n.tsx';
 
 export interface PickOption { id: string; label: string; sub?: string }
 
@@ -18,9 +19,10 @@ const SHOWN = 200;
  * Filter that picks values: search, tick the results you want, and only those are shown.
  * Nothing ticked means no filter.
  */
-export function MultiPick({ id, label, allLabel, options, selected, onChange }: {
-  id: string; label: string; allLabel: string; options: PickOption[]; selected: string[]; onChange: (ids: string[]) => void;
+export function MultiPick({ id, label, options, selected, onChange }: {
+  id: string; label: string; options: PickOption[]; selected: string[]; onChange: (ids: string[]) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const box = useRef<HTMLDivElement>(null);
@@ -44,23 +46,23 @@ export function MultiPick({ id, label, allLabel, options, selected, onChange }: 
     if (allMatched) { const drop = new Set(matches.map(o => o.id)); onChange(selected.filter(x => !drop.has(x))); }
     else onChange([...selected, ...matches.filter(o => !chosen.has(o.id)).map(o => o.id)]);
   };
-  const summary = selected.length === 0 ? allLabel
-    : selected.length === 1 ? byId.get(selected[0]!)?.label ?? '1 scelto' : `${selected.length} scelti`;
+  const summary = selected.length === 0 ? t.common.all
+    : selected.length === 1 ? byId.get(selected[0]!)?.label ?? t.pick.chosen(1) : t.pick.chosen(selected.length);
 
   return (
     <div className="pick" ref={box}>
       <button type="button" id={id} className={`input pick-btn${selected.length ? ' on' : ''}`} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
         <span className="pick-label">{label}:</span> <span className="pick-sum">{summary}</span>
-        {selected.length > 0 && <span className="pick-clear" role="button" aria-label={`Togli il filtro ${label}`} onClick={e => { e.stopPropagation(); onChange([]); }}>×</span>}
+        {selected.length > 0 && <span className="pick-clear" role="button" aria-label={t.pick.removeFilter(label)} onClick={e => { e.stopPropagation(); onChange([]); }}>×</span>}
       </button>
       {open && (
         <div className="pick-pop">
-          <input className="input" type="search" autoFocus placeholder={`Cerca ${label.toLowerCase()}`} value={query} onChange={e => setQuery(e.target.value)} aria-controls={listId} />
+          <input className="input" type="search" autoFocus placeholder={t.pick.search(label)} value={query} onChange={e => setQuery(e.target.value)} aria-controls={listId} />
           <div className="pick-actions">
             <button type="button" className="btn sm" disabled={!matches.length} onClick={pickMatches}>
-              {allMatched ? 'Togli' : 'Spunta'} {query ? `i ${matches.length} risultati` : `tutti (${matches.length})`}
+              {t.pick.tickAll(allMatched, matches.length, !!query)}
             </button>
-            {selected.length > 0 && <button type="button" className="btn sm" onClick={() => onChange([])}>Svuota ({selected.length})</button>}
+            {selected.length > 0 && <button type="button" className="btn sm" onClick={() => onChange([])}>{t.pick.clear(selected.length)}</button>}
           </div>
           <ul className="pick-list" id={listId} role="listbox" aria-multiselectable="true">
             {matches.slice(0, SHOWN).map(o => (
@@ -69,8 +71,8 @@ export function MultiPick({ id, label, allLabel, options, selected, onChange }: 
                   <span>{o.label}{o.sub && <small className="muted mono"> {o.sub}</small>}</span></label>
               </li>
             ))}
-            {matches.length === 0 && <li className="muted pick-note">Nessun risultato.</li>}
-            {matches.length > SHOWN && <li className="muted pick-note">Altri {matches.length - SHOWN}: affina la ricerca.</li>}
+            {matches.length === 0 && <li className="muted pick-note">{t.pick.noResults}</li>}
+            {matches.length > SHOWN && <li className="muted pick-note">{t.pick.more(matches.length - SHOWN)}</li>}
           </ul>
         </div>
       )}

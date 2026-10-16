@@ -46,7 +46,8 @@ export interface PageAnalysis {
 }
 
 export class ApiError extends Error {
-  constructor(readonly status: number, message: string) { super(message); }
+  /** `detail` is the raw cause the server reports next to its message, when it has one. */
+  constructor(readonly status: number, message: string, readonly detail?: string) { super(message); }
 }
 
 async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
@@ -56,7 +57,8 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? `HTTP ${res.status}`);
+  const err = data as { error?: string; detail?: string };
+  if (!res.ok) throw new ApiError(res.status, err.error ?? `HTTP ${res.status}`, err.detail);
   return data as T;
 }
 
@@ -82,23 +84,4 @@ export const api = {
   reject: (id: string) => call<ChangeSet>('POST', `/api/change-sets/${id}/reject`),
   execute: (id: string, confirmName?: string) => call<ChangeSet>('POST', `/api/change-sets/${id}/execute`, { confirmName }),
   rollback: (id: string) => call<ChangeSet>('POST', `/api/change-sets/${id}/rollback`)
-};
-
-export const ACCESS_SHORT = ['—', 'L', 'L+M'] as const;
-export const ACCESS_LONG = ['Nessun accesso', 'Lettura', 'Lettura e modifica'] as const;
-export const STATUS_LABEL: Record<Status, string> = {
-  draft: 'Bozza', pending_approval: 'In attesa di approvazione', approved: 'Approvato', rejected: 'Rifiutato',
-  running: 'In esecuzione', done: 'Completato', partial: 'Parziale', failed: 'Fallito'
-};
-export const WARNING_LABEL: Record<string, string> = {
-  CALCULATED_READ_ONLY: 'Campo calcolato: applicata solo la lettura.',
-  NO_OBJECT_ACCESS: "Manca la lettura sull'oggetto: il campo resterà invisibile."
-};
-export const SKIP_LABEL: Record<string, string> = {
-  NOT_PERMISSIONABLE: 'Campi senza FLS',
-  MANAGED_PERMISSION_SET: 'Permission set di pacchetti gestiti',
-  GROUP_PERMISSION_SET: 'Permission set group o muting',
-  UNKNOWN_FIELD: 'Campi non trovati',
-  UNKNOWN_PERMISSION_SET: 'Profili o permission set non trovati',
-  NO_CHANGE: 'Già con il valore richiesto'
 };
