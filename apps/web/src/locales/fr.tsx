@@ -287,6 +287,10 @@ export const fr: Messages = {
         title: 'Rechercher et filtrer',
         body: <>Les filtres <b>Champs</b> et <b>Profils et ensembles d’autorisations</b> s'ouvrent d'un clic : recherchez, puis cochez seulement les résultats utiles. Si vous cherchez « sales » et trouvez trois profils, vous pouvez en garder deux. <b>Cocher les résultats</b> les prend tous, <b>Vider</b> ou le × retire le filtre, et rien de coché veut dire tous. Il y a aussi des filtres rapides : champs invisibles pour tous, modifiables par tous, personnalisés uniquement, ou avec des modifications en attente. Les compteurs en haut des colonnes suivent les filtres.</>
       },
+      export: {
+        title: 'Exporter',
+        body: <><b>Exporter</b> enregistre ce que vous voyez : les champs et profils filtrés, modifications en attente comprises. L'<b>Excel</b> contient deux feuilles, la matrice telle qu'affichée et une ligne par champ et profil ; les deux <b>CSV</b> ont les mêmes formes. Les <b>métadonnées Salesforce</b> sont un zip avec package.xml et un fichier par profil et ensemble d'autorisations, prêt pour <code>sf project deploy</code> ou Git ; les ensembles gérés ou de groupe sont exclus. Pendant la génération, le bouton est bloqué et un panneau en bas à droite montre la progression : vous pouvez continuer à travailler. Les change sets et Présentations et pages ont aussi leur bouton Exporter.</>
+      },
       flow: {
         title: "De l'aperçu à Salesforce",
         body: <>Rien n'est écrit tant que vous ne confirmez pas. <b>Voir l'aperçu</b> crée un change set avec les modifications en attente et l'ouvre dans un onglet. En production, il faut une approbation et vous devez saisir le nom de l'org. Chaque change set peut être annulé depuis l'Historique.</>

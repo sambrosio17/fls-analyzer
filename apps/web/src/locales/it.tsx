@@ -287,6 +287,10 @@ export const it: Messages = {
         title: 'Cercare e filtrare',
         body: <>I filtri <b>Campi</b> e <b>Profili e permission set</b> si aprono con un clic: cerca, poi spunta solo i risultati che ti servono. Se cerchi "sales" e trovi tre profili, puoi tenerne due. <b>Spunta i risultati</b> li prende tutti, <b>Svuota</b> o la × tolgono il filtro, e nessuna spunta vuol dire tutti. Ci sono anche i filtri rapidi: campi non visibili a nessuno, modificabili da tutti, solo custom, o con modifiche in sospeso. I conteggi in testa alle colonne seguono i filtri.</>
       },
+      export: {
+        title: 'Esportare',
+        body: <><b>Esporta</b> salva quello che vedi: i campi e i profili filtrati, comprese le modifiche in sospeso. L'<b>Excel</b> ha due fogli, la matrice come a schermo e una riga per campo e profilo; i due <b>CSV</b> hanno le stesse forme. I <b>Metadata Salesforce</b> sono uno zip con package.xml e un file per profilo e permission set, pronto per <code>sf project deploy</code> o per Git; i permission set gestiti o di gruppo restano fuori. Mentre il file viene generato il pulsante è bloccato e un pannello in basso a destra mostra l'avanzamento, così puoi continuare a lavorare. Anche i change set e Layout e pagine hanno il loro pulsante Esporta.</>
+      },
       flow: {
         title: "Dall'anteprima a Salesforce",
         body: <>Nulla viene scritto finché non confermi. <b>Vai all'anteprima</b> crea un change set con le modifiche in sospeso e lo apre in una scheda. In produzione serve un'approvazione e devi scrivere il nome dell'org. Ogni change set si può annullare dallo Storico.</>
