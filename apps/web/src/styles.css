@@ -225,3 +225,14 @@ tr.dim td { color: var(--muted); }
 .objtab.empty .objtab-label { font-style: italic; }
 .objtab-label { display: flex; align-items: center; min-width: 0; border: 0; background: none; color: inherit; padding: 6px 2px 6px 12px; cursor: pointer; font-family: var(--font-code); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .objtabs .tab-add { margin-bottom: 2px; }
+
+/* Access token refresh */
+.ok-text { color: var(--ok); font-size: 12px; }
+.org-card p.ok-text { color: var(--ok); }
+.org-card p.err-text { color: var(--danger); }
+.org-card .token-msg { grid-column: 2 / -1; margin: 0; font-size: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tab-refresh { border: 0; background: none; color: inherit; cursor: pointer; padding: 4px 6px; font-size: 14px; line-height: 1; opacity: .6; border-radius: 6px; }
+.tab-refresh:hover:not(:disabled) { opacity: 1; }
+.tab-refresh:disabled { cursor: progress; }
+.tab-refresh.ok { color: var(--ok); opacity: 1; }
+.tab-refresh.error { color: var(--danger); opacity: 1; font-weight: 700; }

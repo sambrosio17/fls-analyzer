@@ -3,6 +3,8 @@ import { buildApp } from '../src/app.ts';
 import type { Config } from '../src/config.ts';
 import { DEFAULT_TENANT, Db } from '../src/db.ts';
 import { fakeOrg } from './fakeOrg.ts';
+import { TokenCipher } from '../src/crypto.ts';
+import type { TokenResponse } from '../src/salesforce/oauth.ts';
 
 const config: Config = {
   port: 0, appUrl: 'http://localhost:3000', appPassword: 'secret-pass', appSecret: 'x'.repeat(40), appUser: 'owner',
@@ -141,5 +143,52 @@ describe('API', () => {
     expect((await call('POST', `/api/change-sets/${cs.id}/execute`, { confirmName: 'Acme' })).status).toBe(400);
     expect((await call('POST', `/api/change-sets/${cs.id}/execute`, { confirmName: 'Acme PROD' })).status).toBe(200);
     expect((await waitDone(cs.id)).status).toBe('done');
+  });
+});
+
+describe('access token refresh', () => {
+  async function tokenSetup(refresh: (loginUrl: string, token: string) => Promise<TokenResponse>) {
+    const db = new Db(':memory:');
+    const cipher = new TokenCipher(config.appSecret);
+    db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: 'Acme UAT', username: 'me@acme.com',
+      instance_url: 'https://acme.my.salesforce.com', login_url: 'https://test.salesforce.com', is_sandbox: 1,
+      refresh_token_enc: cipher.encrypt('refresh-1'), access_token_enc: cipher.encrypt('old'), alias: 'UAT' });
+    const app = buildApp({ config, db, apiFor: () => fakeOrg(true), refreshToken: refresh });
+    const login = await app.inject({ method: 'POST', url: '/api/session', payload: { password: 'secret-pass' } });
+    const cookie = login.headers['set-cookie'] as string;
+    return { app, db, cipher, cookie };
+  }
+
+  it('stores the new access token', async () => {
+    const calls: string[] = [];
+    const { app, db, cipher, cookie } = await tokenSetup(async (loginUrl, token) => {
+      calls.push(`${loginUrl} ${token}`);
+      return { access_token: 'new', instance_url: 'https://acme.my.salesforce.com', id: 'x' };
+    });
+    const res = await app.inject({ method: 'POST', url: '/api/orgs/org1/token', headers: { cookie } });
+    expect(res.statusCode).toBe(200);
+    expect(calls).toEqual(['https://test.salesforce.com refresh-1']);
+    expect(cipher.decrypt(db.getOrg(DEFAULT_TENANT, 'org1')!.access_token_enc!)).toBe('new');
+    await app.close();
+  });
+
+  it('asks to log in again when Salesforce refuses the refresh token', async () => {
+    const { app, db, cipher, cookie } = await tokenSetup(async () => { throw new Error('Salesforce OAuth error: invalid_grant expired access/refresh token'); });
+    const res = await app.inject({ method: 'POST', url: '/api/orgs/org1/token', headers: { cookie } });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ reauth: true });
+    expect(res.json().error).toContain('invalid_grant');
+    expect(cipher.decrypt(db.getOrg(DEFAULT_TENANT, 'org1')!.access_token_enc!)).toBe('old');
+    await app.close();
+  });
+
+  it('logs in again to a connected org on its login URL, keeping the alias', async () => {
+    const { app, cookie } = await tokenSetup(async () => { throw new Error('unused'); });
+    const res = await app.inject({ method: 'GET', url: '/oauth/start?org=org1', headers: { cookie, host: 'localhost:3000' } });
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toMatch(/^https:\/\/test\.salesforce\.com\/services\/oauth2\/authorize\?/);
+    const set = String(res.headers['set-cookie']);
+    expect(decodeURIComponent(set)).toContain('"alias":"UAT"');
+    await app.close();
   });
 });

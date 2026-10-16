@@ -67,6 +67,8 @@ export const api = {
   orgs: () => call<Org[]>('GET', '/api/orgs'),
   removeOrg: (id: string) => call('DELETE', `/api/orgs/${id}`),
   renameOrg: (id: string, alias: string) => call<Org>('PATCH', `/api/orgs/${id}`, { alias }),
+  /** Gets a new access token; fails with status 409 when the org must be logged in again. */
+  refreshToken: (id: string) => call<{ refreshedAt: string }>('POST', `/api/orgs/${id}/token`),
   objects: (orgId: string) => call<SObject[]>('GET', `/api/orgs/${orgId}/objects`),
   layouts: (orgId: string, object: string) => call<LayoutAnalysis>('GET', `/api/orgs/${orgId}/layouts?object=${encodeURIComponent(object)}`),
   lightningPages: (orgId: string, object: string) => call<PageAnalysis>('GET', `/api/orgs/${orgId}/lightning-pages?object=${encodeURIComponent(object)}`),

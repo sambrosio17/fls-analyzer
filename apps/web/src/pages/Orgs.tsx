@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { api, type Org } from '../api.ts';
+import { TokenRefresh } from '../TokenButton.tsx';
 
 interface Props {
   orgs: Org[];
@@ -46,7 +47,8 @@ export function Orgs({ orgs, error, selectedId, onOpen, onRemoved, onRenamed }: 
           <div className="panel-b stack">
             {orgs.length === 0 && <p className="muted">Nessuna org collegata. Collegane una con il modulo qui accanto.</p>}
             {orgs.map(o => (
-              <div className="org-card" key={o.id}>
+              <TokenRefresh org={o} key={o.id}>{(tokenButton, tokenMessage) => (
+              <div className="org-card">
                 <span className="dot ok" />
                 <div>
                   {editing?.id === o.id ? (
@@ -62,11 +64,14 @@ export function Orgs({ orgs, error, selectedId, onOpen, onRemoved, onRenamed }: 
                   <p>{o.alias && <>{o.name} · </>}<span className="mono">{o.username}</span>{o.lastSyncAt && ` · letta il ${new Date(o.lastSyncAt).toLocaleString('it-IT')}`}</p>
                 </div>
                 <div className="row">
+                  {tokenButton}
                   <button className="btn sm" onClick={() => setEditing({ id: o.id, alias: o.alias ?? '' })}>{o.alias ? 'Rinomina' : 'Aggiungi alias'}</button>
                   <button className="btn sm" onClick={() => remove(o)}>Scollega</button>
                   <button className={`btn sm ${o.id === selectedId ? '' : 'primary'}`} onClick={() => onOpen(o.id)}>Apri</button>
                 </div>
+                {tokenMessage}
               </div>
+              )}</TokenRefresh>
             ))}
           </div>
         </section>

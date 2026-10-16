@@ -11,7 +11,7 @@ import { DEFAULT_TENANT, Db, orgLabel, type OrgRow } from './db.ts';
 import { SalesforceClient, SalesforceError, type SfApi } from './salesforce/client.ts';
 import { loadLayoutAnalysis, loadPageAnalysis } from './salesforce/pages.ts';
 import { accessStrings, listObjects, loadFields, loadOrgInfo, loadPermissionSets, loadSnapshot, loadUserPermissions } from './salesforce/metadata.ts';
-import { authorizeUrl, exchangeCode, loginUrlFor, refreshAccessToken, type OAuthSettings } from './salesforce/oauth.ts';
+import { authorizeUrl, exchangeCode, loginUrlFor, refreshAccessToken, type OAuthSettings, type TokenResponse } from './salesforce/oauth.ts';
 import { ChangeSetService, NotFoundError } from './services/changesets.ts';
 
 const SESSION = 'fls_session';
@@ -24,6 +24,8 @@ export interface AppOptions {
   apiFor?: (org: OrgRow) => SfApi;
   /** Fixed clients by org id, e.g. the demo org. */
   extraApis?: Map<string, SfApi>;
+  /** Overrides the OAuth refresh-token call (tests). */
+  refreshToken?: (loginUrl: string, refreshToken: string) => Promise<TokenResponse>;
 }
 
 const desiredSchema = z.object({ parentId: z.string(), field: z.string(), access: z.union([z.literal(0), z.literal(1), z.literal(2)]) });
@@ -39,22 +41,25 @@ export function orgDto(o: OrgRow) {
   return { id: o.id, label: orgLabel(o), alias: o.alias, name: o.name, username: o.username, instanceUrl: o.instance_url, isSandbox: !!o.is_sandbox, lastSyncAt: o.last_sync_at };
 }
 
-export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOptions) {
+export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshToken }: AppOptions) {
   const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? (process.env.VITEST ? 'silent' : 'info') } });
   const cipher = new TokenCipher(config.appSecret);
   const tenant = DEFAULT_TENANT;
   const oauth: OAuthSettings = { clientId: config.sfClientId, clientSecret: config.sfClientSecret, redirectUri: `${config.appUrl}/oauth/callback` };
   const secure = config.appUrl.startsWith('https://');
+  const refresh = refreshToken ?? ((loginUrl: string, token: string) => refreshAccessToken(loginUrl, oauth, token));
+  /** Gets a new access token with the stored refresh token and saves it. */
+  const renewToken = async (org: OrgRow) => {
+    const t = await refresh(org.login_url, cipher.decrypt(org.refresh_token_enc));
+    db.setAccessToken(org.id, cipher.encrypt(t.access_token));
+    return t.access_token;
+  };
 
   const apiFor = apiOverride ?? ((org: OrgRow) => extraApis?.get(org.id) ?? new SalesforceClient({
     instanceUrl: org.instance_url,
     apiVersion: config.sfApiVersion,
     accessToken: org.access_token_enc ? cipher.decrypt(org.access_token_enc) : null,
-    refresh: async () => {
-      const t = await refreshAccessToken(org.login_url, oauth, cipher.decrypt(org.refresh_token_enc));
-      db.setAccessToken(org.id, cipher.encrypt(t.access_token));
-      return t.access_token;
-    }
+    refresh: () => renewToken(org)
   }));
   const service = new ChangeSetService({ db, tenant, actor: config.appUser, requireDifferentApprover: config.requireDifferentApprover, apiFor });
 
@@ -104,11 +109,14 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOpti
 
   // ---- Salesforce OAuth (web server flow + PKCE)
   app.get('/oauth/start', async (req, reply) => {
-    const q = z.object({ env: z.enum(['production', 'sandbox', 'custom']), domain: z.string().optional(), alias: aliasSchema.optional() }).parse(req.query);
-    const loginUrl = loginUrlFor(q.env, q.domain);
+    const q = z.object({ env: z.enum(['production', 'sandbox', 'custom']).optional(), domain: z.string().optional(), alias: aliasSchema.optional(), org: z.string().optional() }).parse(req.query);
+    // `org` logs in again to an org already connected, on the same login URL and keeping its alias.
+    const existing = q.org ? orgOr404(q.org) : null;
+    if (!existing && !q.env) throw Object.assign(new Error('Missing env'), { statusCode: 400 });
+    const loginUrl = existing?.login_url ?? loginUrlFor(q.env!, q.domain);
     const state = randomToken();
     const { verifier, challenge } = pkcePair();
-    reply.setCookie(OAUTH, JSON.stringify({ state, verifier, loginUrl, alias: q.alias ?? null }), { signed: true, httpOnly: true, sameSite: 'lax', secure, path: '/oauth', maxAge: 600 });
+    reply.setCookie(OAUTH, JSON.stringify({ state, verifier, loginUrl, alias: q.alias ?? existing?.alias ?? null }), { signed: true, httpOnly: true, sameSite: 'lax', secure, path: '/oauth', maxAge: 600 });
     return reply.redirect(authorizeUrl(loginUrl, oauth, state, challenge));
   });
 
@@ -159,6 +167,17 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis }: AppOpti
     db.deleteOrg(tenant, orgOr404(id).id);
     db.audit({ tenant, orgId: id, actor: config.appUser, action: 'org.removed' });
     return { ok: true };
+  });
+  app.post('/api/orgs/:id/token', async (req, reply) => {
+    const org = orgOr404((req.params as { id: string }).id);
+    if (!extraApis?.has(org.id)) {
+      try { await renewToken(org); } catch (e) {
+        db.audit({ tenant, orgId: org.id, actor: config.appUser, action: 'org.token_refresh_failed', detail: (e as Error).message });
+        return reply.code(409).send({ error: `Salesforce non ha rinnovato il token (${(e as Error).message}). Ricollega l'org con il login.`, reauth: true });
+      }
+    }
+    db.audit({ tenant, orgId: org.id, actor: config.appUser, action: 'org.token_refreshed' });
+    return { refreshedAt: new Date().toISOString() };
   });
   app.get('/api/orgs/:id/status', async req => {
     const api = apiFor(orgOr404((req.params as { id: string }).id));
