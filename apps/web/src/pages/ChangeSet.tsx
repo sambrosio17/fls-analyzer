@@ -6,7 +6,7 @@ const STATUS_CLASS: Record<Status, string> = {
 };
 const ITEM_LABEL = { pending: 'Da applicare', ok: 'Applicata', error: 'Errore', conflict: 'Conflitto' } as const;
 
-interface Props { id: string; onOpen: (id: string) => void; onBack: () => void }
+interface Props { id: string; onOpen: (id: string, number: string) => void; onBack: () => void }
 
 /** Rows rendered at once in the detail table; big change sets render on demand. */
 const PAGE = 250;
@@ -151,7 +151,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
                 <>
                   <p>{cs.status === 'done' ? 'Tutte le modifiche sono state applicate e verificate rileggendo l\'org.' : `${items.length - failed.length} modifiche applicate, ${failed.length} non applicate.`}</p>
                   {items.some(i => i.status === 'ok') && (
-                    <button className="btn" disabled={busy} onClick={() => act(() => api.rollback(cs.id), r => onOpen(r.id))}>Annulla queste modifiche</button>
+                    <button className="btn" disabled={busy} onClick={() => act(() => api.rollback(cs.id), r => onOpen(r.id, r.number))}>Annulla queste modifiche</button>
                   )}
                 </>
               )}

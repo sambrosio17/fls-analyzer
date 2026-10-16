@@ -1,55 +1,89 @@
 import { describe, expect, it } from 'vitest';
-import { closeTab, loadWorkspace, openTab, pruneTabs, tabTitle, updateTab, type Workspace } from '../src/workspace.ts';
-
-const empty: Workspace = { tabs: [], active: null };
+import {
+  EMPTY, closeOrg, closeTab, groupTabs, loadWorkspace, newObjectTab, openChangeSet, openOrg, pruneOrgs, selectTab, selectTool,
+  tabTitle, toolOf, updateTab, visibleTab
+} from '../src/workspace.ts';
 
 describe('workspace tabs', () => {
-  it('opens tabs next to the active one and activates them', () => {
-    let ws = openTab(empty, { orgId: 'a', tool: 'matrix', objects: [] });
-    const first = ws.active!;
-    ws = openTab(ws, { orgId: 'b', tool: 'layouts', objects: [] });
-    ws = { ...ws, active: first };
-    ws = openTab(ws, { orgId: 'c', tool: 'matrix', objects: [] });
-    expect(ws.tabs.map(t => t.orgId)).toEqual(['a', 'c', 'b']);
-    expect(ws.tabs.find(t => t.id === ws.active)!.orgId).toBe('c');
+  it('opens an org on the FLS matrix with an empty object tab', () => {
+    const ws = openOrg(EMPTY, 'a');
+    expect(ws.orgs).toEqual(['a']);
+    expect(toolOf(ws, 'a')).toBe('matrix');
+    expect(tabTitle(visibleTab(ws)!)).toBe('Nuovo oggetto');
+    expect(openOrg(ws, 'a').tabs).toHaveLength(1);
   });
 
-  it('activates the right neighbour, else the left one, when closing the active tab', () => {
-    let ws = empty;
-    for (const o of ['a', 'b', 'c']) ws = openTab(ws, { orgId: o, tool: 'matrix', objects: [] });
-    const [a, b, c] = ws.tabs.map(t => t.id);
-    ws = closeTab({ ...ws, active: b! }, b!);
-    expect(ws.active).toBe(c);
-    ws = closeTab(ws, c!);
-    expect(ws.active).toBe(a);
-    ws = closeTab(ws, a!);
-    expect(ws).toEqual(empty);
+  it('keeps the active tool and object tab of each org', () => {
+    let ws = openOrg(EMPTY, 'a');
+    ws = updateTab(ws, visibleTab(ws)!.id, { objects: ['Account'] });
+    ws = newObjectTab(ws, 'a', 'matrix');
+    ws = updateTab(ws, visibleTab(ws)!.id, { objects: ['Contact'] });
+    ws = selectTool(ws, 'a', 'layouts');
+    expect(groupTabs(ws, 'a', 'layouts')).toHaveLength(1);
+    ws = openOrg(ws, 'b');
+    expect(visibleTab(ws)!.orgId).toBe('b');
+    ws = openOrg(ws, 'a');
+    expect(visibleTab(ws)!.tool).toBe('layouts');
+    ws = selectTool(ws, 'a', 'matrix');
+    expect(visibleTab(ws)!.objects).toEqual(['Contact']);
+    ws = selectTab(ws, groupTabs(ws, 'a', 'matrix')[0]!.id);
+    expect(visibleTab(ws)!.objects).toEqual(['Account']);
   });
 
-  it('keeps the active tab when closing another one', () => {
-    let ws = openTab(empty, { orgId: 'a', tool: 'matrix', objects: [] });
-    ws = openTab(ws, { orgId: 'b', tool: 'matrix', objects: [] });
-    expect(closeTab(ws, ws.tabs[0]!.id).active).toBe(ws.active);
+  it('activates the neighbour in the same group when closing the active object tab', () => {
+    let ws = openOrg(EMPTY, 'a');
+    ws = newObjectTab(ws, 'a', 'matrix');
+    ws = newObjectTab(ws, 'a', 'matrix');
+    const [x, y, z] = groupTabs(ws, 'a', 'matrix').map(t => t.id);
+    ws = closeTab(selectTab(ws, y!), y!);
+    expect(visibleTab(ws)!.id).toBe(z);
+    ws = closeTab(ws, z!);
+    expect(visibleTab(ws)!.id).toBe(x);
+    ws = closeTab(ws, x!);
+    expect(visibleTab(ws)).toBeNull();
+    expect(ws.orgs).toEqual(['a']);
   });
 
-  it('drops tabs of disconnected orgs but keeps new tabs without an org', () => {
-    let ws = openTab(empty, { orgId: 'a', tool: 'matrix', objects: [] });
-    ws = openTab(ws, { orgId: null, tool: null, objects: [] });
-    ws = openTab(ws, { orgId: 'b', tool: 'layouts', objects: [] });
-    expect(pruneTabs(ws, ['a']).tabs.map(t => t.orgId)).toEqual(['a', null]);
+  it('opens each change set once, under the change set tool of its org', () => {
+    let ws = openOrg(EMPTY, 'a');
+    ws = openChangeSet(ws, 'b', 'cs1', 'CS-0001');
+    expect(ws.orgs).toEqual(['a', 'b']);
+    expect(visibleTab(ws)).toMatchObject({ orgId: 'b', tool: 'changeset', label: 'CS-0001' });
+    ws = selectTool(ws, 'b', 'matrix');
+    ws = openChangeSet(ws, 'b', 'cs1');
+    expect(groupTabs(ws, 'b', 'changeset')).toHaveLength(1);
+    expect(visibleTab(ws)!.changeSetId).toBe('cs1');
   });
 
-  it('titles a tab as org, tool and objects', () => {
-    let ws = openTab(empty, { orgId: 'a', tool: null, objects: [] });
-    const id = ws.active!;
-    expect(tabTitle(ws.tabs[0]!, 'Acme UAT')).toEqual(['Acme UAT']);
-    ws = updateTab(ws, id, { tool: 'matrix', objects: ['Account', 'Contact'] });
-    expect(tabTitle(ws.tabs[0]!, 'Acme UAT')).toEqual(['Acme UAT', 'Matrice FLS', 'Account, Contact']);
+  it('closes an org with its tabs and drops disconnected orgs', () => {
+    let ws = openOrg(openOrg(openOrg(EMPTY, 'a'), 'b'), 'c');
+    ws = closeOrg(openOrg(ws, 'b'), 'b');
+    expect(ws.orgs).toEqual(['a', 'c']);
+    expect(ws.activeOrg).toBe('c');
+    expect(ws.tabs.every(t => t.orgId !== 'b')).toBe(true);
+    ws = pruneOrgs(ws, ['a']);
+    expect(ws.orgs).toEqual(['a']);
+    expect(ws.activeOrg).toBe('a');
+  });
+
+  it('regroups tabs saved by the single-row version', () => {
+    const old = { active: 't2', tabs: [
+      { id: 't1', orgId: 'a', tool: 'matrix', objects: ['Account'] },
+      { id: 't2', orgId: 'a', tool: 'matrix', objects: ['Contact'] },
+      { id: 't3', orgId: 'b', tool: 'layouts', objects: ['Case'], layoutMode: 'pages' },
+      { id: 't4', orgId: null, tool: null, objects: [] },
+      { id: 't5', orgId: 'a', tool: 'changeset', objects: [], changeSetId: 'cs1' }
+    ] };
+    const ws = loadWorkspace({ getItem: () => JSON.stringify(old) });
+    expect(ws.orgs).toEqual(['a', 'b']);
+    expect(groupTabs(ws, 'a', 'matrix').map(t => t.objects)).toEqual([['Account'], ['Contact']]);
+    expect(groupTabs(ws, 'b', 'layouts')[0]).toMatchObject({ objects: ['Case'], layoutMode: 'pages' });
+    expect(groupTabs(ws, 'a', 'changeset')[0]!.changeSetId).toBe('cs1');
   });
 
   it('survives missing or corrupt storage', () => {
-    expect(loadWorkspace(null)).toEqual(empty);
-    expect(loadWorkspace({ getItem: () => '{nope' })).toEqual(empty);
-    expect(loadWorkspace({ getItem: () => { throw new Error('blocked'); } })).toEqual(empty);
+    expect(loadWorkspace(null)).toEqual(EMPTY);
+    expect(loadWorkspace({ getItem: () => '{nope' })).toEqual(EMPTY);
+    expect(loadWorkspace({ getItem: () => { throw new Error('blocked'); } })).toEqual(EMPTY);
   });
 });

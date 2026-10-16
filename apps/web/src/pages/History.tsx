@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { STATUS_LABEL, api, type ChangeSetSummary, type Org } from '../api.ts';
 
-export function History({ orgs, onOpen }: { orgs: Org[]; onOpen: (id: string, orgId: string) => void }) {
+export function History({ orgs, onOpen }: { orgs: Org[]; onOpen: (id: string, orgId: string, number: string) => void }) {
   const [list, setList] = useState<ChangeSetSummary[] | null>(null);
   useEffect(() => { api.changeSets().then(setList); }, []);
   const orgName = (id: string) => orgs.find(o => o.id === id)?.label ?? '—';
@@ -22,7 +22,7 @@ export function History({ orgs, onOpen }: { orgs: Org[]; onOpen: (id: string, or
                   <td>{cs.description}</td>
                   <td>{cs.total}{cs.errors > 0 && <span className="err-text"> · {cs.errors} non applicate</span>}</td>
                   <td>{STATUS_LABEL[cs.status]}</td>
-                  <td><button className="btn sm" onClick={() => onOpen(cs.id, cs.orgId)}>Apri</button></td>
+                  <td><button className="btn sm" onClick={() => onOpen(cs.id, cs.orgId, cs.number)}>Apri</button></td>
                 </tr>
               ))}
               {list?.length === 0 && <tr><td colSpan={7} className="muted">Nessun change set ancora.</td></tr>}
