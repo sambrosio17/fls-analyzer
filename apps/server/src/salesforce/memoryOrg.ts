@@ -1,4 +1,4 @@
-import type { SaveResult } from '@fls/core';
+import { profileKey, type SaveResult } from '@fls/core';
 import type { MetadataRecord, MetadataSaveResult, SfApi } from './client.ts';
 
 export interface MemPermSet {
@@ -56,6 +56,8 @@ export class MemoryOrg implements SfApi {
   fieldPerms: MemFieldPerm[] = [];
   /** SetupEntityAccess rows for Apex classes. */
   entityAccess: MemEntityAccess[] = [];
+  /** Profile names (as written) whose app overrides Salesforce refuses with an invalid reference. */
+  rejectAppProfiles = new Set<string>();
   /** Fields whose insert fails, to simulate license errors. */
   rejectFields = new Set<string>();
   private seq = 0;
@@ -184,8 +186,9 @@ export class MemoryOrg implements SfApi {
         const overrides = ([] as { content?: string; profile?: string }[]).concat((r.profileActionOverrides ?? []) as never);
         const unknownPage = overrides.find(o => !pages.flexiPages.some(p => p.DeveloperName === o.content));
         if (unknownPage) return fail(r.fullName, 'FIELD_INTEGRITY_EXCEPTION', `Lightning page ${unknownPage.content} not found`);
-        const unknownProfile = overrides.find(o => !Object.values(pages.profileFullNames).includes(o.profile ?? ''));
+        const unknownProfile = overrides.find(o => !Object.values(pages.profileFullNames).some(n => profileKey(n) === profileKey(o.profile ?? '')));
         if (unknownProfile) return fail(r.fullName, 'FIELD_INTEGRITY_EXCEPTION', `Profile ${unknownProfile.profile} not found`);
+        if (overrides.some(o => this.rejectAppProfiles.has(o.profile ?? ''))) return fail(r.fullName, 'INVALID_CROSS_REFERENCE_KEY', 'invalid cross reference id');
         pages.apps[i] = structuredClone(r);
         return { fullName: r.fullName, success: true, errors: [] };
       });

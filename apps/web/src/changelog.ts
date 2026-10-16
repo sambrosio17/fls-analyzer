@@ -15,6 +15,15 @@ export interface ChangeEntry {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-10-16', prs: [28], guide: 'layouts',
+    text: {
+      en: { title: 'Lightning pages on desktop and phone', body: 'Lightning page assignments now show and change desktop and phone separately, or both at once. If Salesforce refuses an assignment, only that row fails and the others are saved; the result shows how long each step took.' },
+      it: { title: 'Lightning page su desktop e telefono', body: 'Le assegnazioni delle Lightning page ora si vedono e si cambiano separatamente per desktop e telefono, o per entrambi insieme. Se Salesforce rifiuta un’assegnazione, fallisce solo quella riga e le altre vengono salvate; il risultato mostra quanto ha richiesto ogni passo.' },
+      fr: { title: 'Pages Lightning sur ordinateur et téléphone', body: 'Les attributions de pages Lightning s’affichent et se modifient séparément pour l’ordinateur et le téléphone, ou les deux à la fois. Si Salesforce refuse une attribution, seule cette ligne échoue et les autres sont enregistrées ; le résultat indique la durée de chaque étape.' },
+      es: { title: 'Páginas Lightning en escritorio y teléfono', body: 'Las asignaciones de páginas Lightning ahora se ven y se cambian por separado para escritorio y teléfono, o para ambos a la vez. Si Salesforce rechaza una asignación, solo falla esa fila y las demás se guardan; el resultado muestra cuánto tardó cada paso.' }
+    }
+  },
+  {
     date: '2026-10-16', prs: [27], guide: 'layouts', demo: 'layouts',
     text: {
       en: { title: 'Edit page layout and Lightning page assignments', body: 'In Layouts and pages, Edit assignments lets you pick the layout or Lightning page of each profile and record type, one cell or a whole column at a time. The changes become a change set with preview, approval in production, a check against the org before writing, and Undo.' },

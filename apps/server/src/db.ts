@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { Access, AssignmentChange, ChangeItem, ChangeSetStatus, Operation, SkippedItem, WarningCode } from '@fls/core';
+import type { Access, AssignmentChange, ChangeItem, FormFactor, ChangeSetStatus, Operation, SkippedItem, WarningCode } from '@fls/core';
 
 /** Single tenant in the personal MVP; every table already carries tenant_id for the multi-client phase. */
 export const DEFAULT_TENANT = 'default';
@@ -126,6 +126,8 @@ export interface ChangeSetRow {
   finished_at: string | null;
   /** 'fls' (field and Apex access) or 'assignments' (page layouts and Lightning pages). */
   kind: ChangeSetKind;
+  /** Assignment runs: how long each step took, [{ step, ms }]. */
+  timings_json: string | null;
 }
 
 export type ChangeSetKind = 'fls' | 'assignments';
@@ -158,6 +160,7 @@ export interface AssignmentRow {
   profile_label: string;
   record_type: string | null;
   app: string | null;
+  form_factor: FormFactor | null;
   before_value: string | null;
   after_value: string | null;
   status: ItemStatus;
@@ -166,7 +169,7 @@ export interface AssignmentRow {
 }
 
 export const assignmentFromRow = (r: AssignmentRow): AssignmentChange => ({
-  kind: r.kind, object: r.object, profile: r.profile, profileLabel: r.profile_label, recordType: r.record_type, app: r.app, before: r.before_value, after: r.after_value
+  kind: r.kind, object: r.object, profile: r.profile, profileLabel: r.profile_label, recordType: r.record_type, app: r.app, formFactor: r.form_factor, before: r.before_value, after: r.after_value
 });
 
 export const now = () => new Date().toISOString();
@@ -197,6 +200,9 @@ export class Db {
     if (!cols.includes('accent')) this.sql.exec('ALTER TABLE orgs ADD COLUMN accent TEXT');
     const csCols = (this.sql.prepare('PRAGMA table_info(change_sets)').all() as { name: string }[]).map(c => c.name);
     if (!csCols.includes('kind')) this.sql.exec("ALTER TABLE change_sets ADD COLUMN kind TEXT NOT NULL DEFAULT 'fls'");
+    if (!csCols.includes('timings_json')) this.sql.exec('ALTER TABLE change_sets ADD COLUMN timings_json TEXT');
+    const aCols = (this.sql.prepare('PRAGMA table_info(assignment_items)').all() as { name: string }[]).map(c => c.name);
+    if (!aCols.includes('form_factor')) this.sql.exec('ALTER TABLE assignment_items ADD COLUMN form_factor TEXT');
   }
 
   // ---- orgs
@@ -248,8 +254,8 @@ export class Db {
     items: (ChangeItem & { parentLabel: string })[], assignments: AssignmentChange[] = []): ChangeSetRow {
     const insertItem = this.sql.prepare(`INSERT INTO change_items (change_set_id, parent_id, parent_label, field, sobject_type, before_access, after_access, record_id, op, warnings)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    const insertAssignment = this.sql.prepare(`INSERT INTO assignment_items (change_set_id, kind, object, profile, profile_label, record_type, app, before_value, after_value)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const insertAssignment = this.sql.prepare(`INSERT INTO assignment_items (change_set_id, kind, object, profile, profile_label, record_type, app, form_factor, before_value, after_value)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const kind: ChangeSetKind = assignments.length && !items.length ? 'assignments' : 'fls';
     this.sql.exec('BEGIN');
     try {
@@ -258,7 +264,7 @@ export class Db {
         VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`)
         .run(cs.id, cs.tenant, seq, cs.orgId, cs.author, cs.description, JSON.stringify(cs.skipped), cs.rollbackOf, now(), kind);
       for (const a of assignments) {
-        insertAssignment.run(cs.id, a.kind, a.object, a.profile, a.profileLabel, a.recordType, a.app, a.before, a.after);
+        insertAssignment.run(cs.id, a.kind, a.object, a.profile, a.profileLabel, a.recordType, a.app, a.kind === 'page' ? a.formFactor ?? 'Large' : null, a.before, a.after);
       }
       for (const i of items) {
         insertItem.run(cs.id, i.parentId, i.parentLabel, i.field, i.sobjectType, i.before, i.after, i.recordId, i.op, i.warnings.join(','));
@@ -287,7 +293,7 @@ export class Db {
       WHERE ${where} GROUP BY cs.id ORDER BY cs.seq DESC LIMIT 200`).all(...args) as never;
   }
 
-  updateChangeSet(id: string, fields: Partial<Pick<ChangeSetRow, 'status' | 'submitted_at' | 'approved_by' | 'approved_at' | 'started_at' | 'finished_at'>>): void {
+  updateChangeSet(id: string, fields: Partial<Pick<ChangeSetRow, 'status' | 'submitted_at' | 'approved_by' | 'approved_at' | 'started_at' | 'finished_at' | 'timings_json'>>): void {
     const keys = Object.keys(fields) as (keyof typeof fields)[];
     if (!keys.length) return;
     this.sql.prepare(`UPDATE change_sets SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`)
@@ -306,7 +312,7 @@ export class Db {
   }
 
   listAssignments(changeSetId: string): AssignmentRow[] {
-    return this.sql.prepare('SELECT * FROM assignment_items WHERE change_set_id = ? ORDER BY kind, object, app, profile_label, record_type').all(changeSetId) as unknown as AssignmentRow[];
+    return this.sql.prepare('SELECT * FROM assignment_items WHERE change_set_id = ? ORDER BY kind, object, app, form_factor, profile_label, record_type').all(changeSetId) as unknown as AssignmentRow[];
   }
 
   updateAssignment(id: number, fields: Partial<Pick<AssignmentRow, 'status' | 'error_code' | 'error_message'>>): void {
