@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, type ChangeSet, type Status } from '../api.ts';
 import { useT } from '../i18n.tsx';
+import { ExportMenu } from '../export/ExportMenu.tsx';
+import { CSV_TYPE, XLSX_TYPE, download, slug, toCsv, toXlsx, type Sheet } from '../export/table.ts';
 
 const STATUS_CLASS: Record<Status, string> = {
   draft: '', pending_approval: 'st-part', approved: 'st-info', rejected: 'st-err', running: 'st-info', done: 'st-ok', partial: 'st-part', failed: 'st-err'
@@ -46,6 +48,15 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
   const finished = ['done', 'partial', 'failed'].includes(cs.status);
   const prod = cs.requiresApproval;
   const canRun = reviewed && (!prod || confirmName.trim() === cs.org.label);
+  const sheet = (): Sheet => ({
+    name: t.export.sheetChanges,
+    rows: [
+      [...t.changeSet.cols, t.export.warnings, t.export.error],
+      ...shown.map(i => [i.parentLabel, i.field, t.access.long[i.before]!, t.access.long[i.after]!, i.op, t.changeSet.item[i.status] ?? i.status,
+        i.warnings.map(w => t.warning[w] ?? w).join(' '), i.errorMessage ? `${i.errorCode ?? ''} ${i.errorMessage}`.trim() : null])
+    ]
+  });
+  const fileName = (ext: string) => `orgsmith-${cs.number}-${slug(cs.org.label)}.${ext}`;
 
   return (
     <>
@@ -56,7 +67,13 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
           <p>{cs.description}{cs.rollbackOf && t.changeSet.undoes}</p>
         </div>
         <span className="spacer" />
-        <button className="btn" onClick={onBack}>{t.common.close}</button>
+        <div className="row">
+          <ExportMenu note={t.export.rowsScope(shown.length)} items={[
+            { id: 'xlsx', label: t.export.excel, run: () => download(fileName('xlsx'), toXlsx([sheet()]), XLSX_TYPE) },
+            { id: 'csv', label: t.export.csv, run: () => download(fileName('csv'), toCsv(sheet().rows, t.locale), CSV_TYPE) }
+          ]} />
+          <button className="btn" onClick={onBack}>{t.common.close}</button>
+        </div>
       </div>
       {error && <div className="banner prod">{error}</div>}
       {notice && <div className="banner info">{notice}</div>}

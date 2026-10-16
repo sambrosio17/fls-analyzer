@@ -71,6 +71,8 @@ export const api = {
   renameOrg: (id: string, alias: string) => call<Org>('PATCH', `/api/orgs/${id}`, { alias }),
   /** Gets a new access token; fails with status 409 when the org must be logged in again. */
   refreshToken: (id: string) => call<{ refreshedAt: string }>('POST', `/api/orgs/${id}/token`),
+  /** Profile metadata names by profile-owned permission set id. */
+  profileNames: (orgId: string) => call<Record<string, string>>('GET', `/api/orgs/${orgId}/profile-names`),
   objects: (orgId: string) => call<SObject[]>('GET', `/api/orgs/${orgId}/objects`),
   layouts: (orgId: string, object: string) => call<LayoutAnalysis>('GET', `/api/orgs/${orgId}/layouts?object=${encodeURIComponent(object)}`),
   lightningPages: (orgId: string, object: string) => call<PageAnalysis>('GET', `/api/orgs/${orgId}/lightning-pages?object=${encodeURIComponent(object)}`),

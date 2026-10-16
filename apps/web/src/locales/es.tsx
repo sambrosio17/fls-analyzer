@@ -231,6 +231,25 @@ export const es: Messages = {
     noPages: 'No hay páginas de registro Lightning para este objeto.'
   },
 
+  export: {
+    button: 'Exportar', preparing: 'Preparando…',
+    excel: 'Excel (.xlsx)', excelHint: 'Matriz y una fila por campo y perfil',
+    csvGrid: 'CSV, como en pantalla', csvLong: 'CSV, una fila por campo y perfil',
+    metadata: 'Metadatos de Salesforce (.zip)', metadataHint: 'Perfiles y conjuntos de permisos para desplegar con sf o guardar en Git',
+    csv: 'CSV',
+    scope: (f: number, c: number) => `${f} campos × ${c} perfiles/conjuntos de permisos, con los filtros actuales.`,
+    rowsScope: (n: number) => `${n} filas, con los filtros actuales.`,
+    pending: (n: number) => n === 1 ? 'Incluye 1 cambio pendiente.' : `Incluye ${n} cambios pendientes.`,
+    leftOut: (profiles: number, locked: number) => [
+      profiles ? `${profiles} perfiles excluidos: Salesforce no devolvió su nombre de metadatos.` : '',
+      locked ? `${locked} conjuntos de permisos gestionados o de grupo excluidos: no se pueden desplegar.` : ''
+    ].filter(Boolean).join(' '),
+    nothing: 'Nada que exportar con los filtros actuales.',
+    sheetMatrix: 'Matriz', sheetDetails: 'Detalle', sheetAssignments: 'Asignaciones', sheetLayouts: 'Formatos', sheetPages: 'Páginas', sheetChanges: 'Cambios',
+    object: 'Objeto', field: 'Campo', apiName: 'Nombre API', type: 'Tipo', kind: 'Perfil o conjunto de permisos', name: 'Nombre', read: 'Lectura', edit: 'Edición',
+    profile: 'Perfil', permSet: 'Conjunto de permisos', warnings: 'Avisos', error: 'Error', source: 'Origen'
+  },
+
   help: {
     title: 'Cómo funciona la matriz FLS',
     menuCells: (n: number) => `${n} celdas`,

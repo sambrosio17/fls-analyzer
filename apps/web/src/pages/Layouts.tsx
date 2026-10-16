@@ -2,6 +2,8 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import { effectivePage, unassignedPages, type PageSource } from '@fls/core';
 import { MultiPick } from '../MultiPick.tsx';
 import { useT } from '../i18n.tsx';
+import { ExportMenu, type ExportItem } from '../export/ExportMenu.tsx';
+import { CSV_TYPE, XLSX_TYPE, download, slug, stamp, toCsv, toXlsx, type Sheet } from '../export/table.ts';
 import { api, type LayoutAnalysis, type Org, type PageAnalysis, type RecordTypeInfo, type SObject } from '../api.ts';
 
 type Tab = 'layouts' | 'pages';
@@ -66,7 +68,7 @@ export function LayoutsPage({ org, initialObject = null, initialTab = 'layouts',
       {error && <div className="banner prod">{error}</div>}
       {loading && <p className="muted">{tab === 'layouts' ? t.layouts.loadingLayouts : t.layouts.loadingPages}</p>}
       {!object && <div className="panel empty">{t.layouts.empty}</div>}
-      {object && !loading && current?.object === object && (tab === 'layouts' ? <LayoutView data={layouts!} /> : <PageView data={pages!} />)}
+      {object && !loading && current?.object === object && (tab === 'layouts' ? <LayoutView data={layouts!} orgLabel={org.label} /> : <PageView data={pages!} orgLabel={org.label} />)}
     </>
   );
 }
@@ -98,9 +100,17 @@ function Filters({ value, onChange, profiles, recordTypes, targets, targetLabel,
   );
 }
 
+/** Excel and CSV for a view: the CSV holds the first sheet. */
+function exportItems(t: ReturnType<typeof useT>, base: string, sheets: () => Sheet[]): ExportItem[] {
+  return [
+    { id: 'xlsx', label: t.export.excel, run: () => download(`${base}.xlsx`, toXlsx(sheets()), XLSX_TYPE) },
+    { id: 'csv', label: t.export.csv, run: () => download(`${base}.csv`, toCsv(sheets()[0]!.rows, t.locale), CSV_TYPE) }
+  ];
+}
+
 const dot = (i: number) => ({ background: `hsl(${(i * 67) % 360} 55% 55%)` });
 
-function LayoutView({ data }: { data: LayoutAnalysis }) {
+function LayoutView({ data, orgLabel }: { data: LayoutAnalysis; orgLabel: string }) {
   const t = useT();
   const [filter, setFilter] = useState(NO_FILTER);
   const layoutIndex = useMemo(() => new Map(data.layouts.map((l, i) => [l.id, i])), [data]);
@@ -128,7 +138,21 @@ function LayoutView({ data }: { data: LayoutAnalysis }) {
       </div>
 
       <section className="panel" style={{ marginBottom: 16 }}>
-        <div className="panel-h"><h2>{t.layouts.assignments}</h2></div>
+        <div className="panel-h"><h2>{t.layouts.assignments}</h2>
+          <ExportMenu note={t.export.rowsScope(profiles.length)} items={exportItems(t, `orgsmith-layouts-${slug(orgLabel)}-${data.object}-${stamp()}`, () => [
+            {
+              name: t.export.sheetAssignments,
+              rows: [[t.layouts.profile, ...rts.map(rt => rt.label)], ...profiles.map(p => [p.name, ...rts.map(rt => {
+                const id = layoutOf(p.id, rt), l = id ? data.layouts[layoutIndex.get(id)!] : undefined, missing = id ? gaps.get(`${p.id}|${id}`) : undefined;
+                return l ? `${l.name}${missing ? ` (⚠ ${t.layouts.unreadable(missing.length)})` : ''}` : null;
+              })])]
+            },
+            {
+              name: t.export.sheetLayouts,
+              rows: [t.layouts.layoutCols, ...data.layouts.map(l => [l.name, l.fields.length, assignedCount(l.id), assignedCount(l.id) ? t.layouts.inUse : t.layouts.unassignedOne])]
+            }
+          ])} />
+        </div>
         <div className="panel-b">
           <Filters value={filter} onChange={setFilter} profiles={data.profiles} recordTypes={data.recordTypes} targetLabel={t.layouts.layout} issuesLabel={t.layouts.onlyGaps}
             targets={data.layouts.map(l => ({ id: l.id, label: l.name }))} />
@@ -184,7 +208,7 @@ function LayoutView({ data }: { data: LayoutAnalysis }) {
 
 const SOURCE_CLASS: Record<PageSource, string> = { 'app-profile': 'st-info', app: 'st-ok', org: '', system: 'st-part' };
 
-function PageView({ data }: { data: PageAnalysis }) {
+function PageView({ data, orgLabel }: { data: PageAnalysis; orgLabel: string }) {
   const t = useT();
   const [app, setApp] = useState(data.apps.find(a => a.name === 'standard__LightningSales')?.name ?? data.apps[0]?.name ?? '');
   const [filter, setFilter] = useState(NO_FILTER);
@@ -216,6 +240,18 @@ function PageView({ data }: { data: PageAnalysis }) {
 
       <section className="panel" style={{ marginBottom: 16 }}>
         <div className="panel-h"><h2>{t.layouts.perProfile}</h2>
+          <span className="spacer" />
+          <ExportMenu note={t.export.rowsScope(rows.length)} items={exportItems(t, `orgsmith-pages-${slug(orgLabel)}-${data.object}-${slug(appLabel(app))}-${stamp()}`, () => [
+            {
+              name: t.export.sheetAssignments,
+              rows: [[t.layouts.profile, ...rts.flatMap(rt => [rt.label, `${rt.label} · ${t.export.source}`])],
+                ...rows.map(({ p, cells }) => [p.name, ...cells.flatMap(c => [c.page ? label.get(c.page) ?? c.page : t.layouts.systemPage, t.layouts.source[c.source]!])])]
+            },
+            {
+              name: t.export.sheetPages,
+              rows: [t.layouts.pageCols, ...data.pages.map(p => [p.label, p.components.length, p.fields.length, unassigned.has(p.name) ? t.layouts.pageUnassigned : usage(p.name).join('; ')])]
+            }
+          ])} />
           <select className="input" id="app-select" value={app} onChange={e => setApp(e.target.value)} style={{ maxWidth: 280 }}>
             {data.apps.map(a => <option key={a.name} value={a.name}>{a.label}</option>)}
           </select>

@@ -234,6 +234,25 @@ export const en = {
     noPages: 'No Lightning record pages for this object.'
   },
 
+  export: {
+    button: 'Export', preparing: 'Preparing…',
+    excel: 'Excel (.xlsx)', excelHint: 'Matrix and one row per field and profile',
+    csvGrid: 'CSV, as shown', csvLong: 'CSV, one row per field and profile',
+    metadata: 'Salesforce metadata (.zip)', metadataHint: 'Profiles and permission sets to deploy with sf or keep in Git',
+    csv: 'CSV',
+    scope: (f: number, c: number) => `${f} fields × ${c} profiles/permission sets, with the current filters.`,
+    rowsScope: (n: number) => `${n} rows, with the current filters.`,
+    pending: (n: number) => n === 1 ? 'Includes 1 pending change.' : `Includes ${n} pending changes.`,
+    leftOut: (profiles: number, locked: number) => [
+      profiles ? `${profiles} profiles left out: Salesforce did not return their metadata name.` : '',
+      locked ? `${locked} managed or group permission sets left out: they can't be deployed.` : ''
+    ].filter(Boolean).join(' '),
+    nothing: 'Nothing to export with the current filters.',
+    sheetMatrix: 'Matrix', sheetDetails: 'Details', sheetAssignments: 'Assignments', sheetLayouts: 'Layouts', sheetPages: 'Pages', sheetChanges: 'Changes',
+    object: 'Object', field: 'Field', apiName: 'API name', type: 'Type', kind: 'Profile or permission set', name: 'Name', read: 'Read', edit: 'Edit',
+    profile: 'Profile', permSet: 'Permission set', warnings: 'Warnings', error: 'Error', source: 'Source'
+  },
+
   help: {
     title: 'How the FLS matrix works',
     menuCells: (n: number) => `${n} cells`,

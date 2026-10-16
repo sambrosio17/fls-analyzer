@@ -231,6 +231,25 @@ export const fr: Messages = {
     noPages: "Aucune page d'enregistrement Lightning pour cet objet."
   },
 
+  export: {
+    button: 'Exporter', preparing: 'Préparation…',
+    excel: 'Excel (.xlsx)', excelHint: 'Matrice et une ligne par champ et profil',
+    csvGrid: "CSV, comme à l'écran", csvLong: 'CSV, une ligne par champ et profil',
+    metadata: 'Métadonnées Salesforce (.zip)', metadataHint: 'Profils et ensembles d’autorisations à déployer avec sf ou à garder dans Git',
+    csv: 'CSV',
+    scope: (f: number, c: number) => `${f} champs × ${c} profils/ensembles d’autorisations, avec les filtres actuels.`,
+    rowsScope: (n: number) => `${n} lignes, avec les filtres actuels.`,
+    pending: (n: number) => n === 1 ? 'Inclut 1 modification en attente.' : `Inclut ${n} modifications en attente.`,
+    leftOut: (profiles: number, locked: number) => [
+      profiles ? `${profiles} profils exclus : Salesforce n'a pas renvoyé leur nom de métadonnées.` : '',
+      locked ? `${locked} ensembles d’autorisations gérés ou de groupe exclus : ils ne peuvent pas être déployés.` : ''
+    ].filter(Boolean).join(' '),
+    nothing: 'Rien à exporter avec les filtres actuels.',
+    sheetMatrix: 'Matrice', sheetDetails: 'Détail', sheetAssignments: 'Attributions', sheetLayouts: 'Présentations', sheetPages: 'Pages', sheetChanges: 'Modifications',
+    object: 'Objet', field: 'Champ', apiName: 'Nom API', type: 'Type', kind: 'Profil ou ensemble d’autorisations', name: 'Nom', read: 'Lecture', edit: 'Modification',
+    profile: 'Profil', permSet: 'Ensemble d’autorisations', warnings: 'Avertissements', error: 'Erreur', source: 'Origine'
+  },
+
   help: {
     title: 'Comment fonctionne la matrice FLS',
     menuCells: (n: number) => `${n} cellules`,
