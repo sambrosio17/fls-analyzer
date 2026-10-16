@@ -3,11 +3,11 @@ import { en, type Messages } from './locales/en.tsx';
 import { it } from './locales/it.tsx';
 import { fr } from './locales/fr.tsx';
 import { es } from './locales/es.tsx';
+import { Flag } from './Flag.tsx';
 
 export type Lang = 'en' | 'it' | 'fr' | 'es';
-export const LANGS: { code: Lang; label: string; flag: string }[] = [
-  { code: 'en', label: 'English', flag: '🇬🇧' }, { code: 'it', label: 'Italiano', flag: '🇮🇹' },
-  { code: 'fr', label: 'Français', flag: '🇫🇷' }, { code: 'es', label: 'Español', flag: '🇪🇸' }
+export const LANGS: { code: Lang; label: string }[] = [
+  { code: 'en', label: 'English' }, { code: 'it', label: 'Italiano' }, { code: 'fr', label: 'Français' }, { code: 'es', label: 'Español' }
 ];
 export const MESSAGES: Record<Lang, Messages> = { en, it, fr, es };
 
@@ -58,14 +58,14 @@ export function LangPicker() {
   return (
     <div className="lang-pick" ref={box}>
       <button type="button" id="lang" className="btn sm lang-btn" aria-label={t.language} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span className="flag" aria-hidden="true">{current.flag}</span>{current.label}<span className="caret" aria-hidden="true">▾</span>
+        <Flag lang={current.code} />{current.label}<span className="caret" aria-hidden="true">▾</span>
       </button>
       {open && (
         <ul className="lang-menu" role="listbox" aria-label={t.language}>
           {LANGS.map(l => (
             <li key={l.code} role="option" aria-selected={l.code === lang}>
               <button type="button" lang={l.code} onClick={() => { setLang(l.code); setOpen(false); }}>
-                <span className="flag" aria-hidden="true">{l.flag}</span>{l.label}{l.code === lang && <span className="check-mark" aria-hidden="true">✓</span>}
+                <Flag lang={l.code} />{l.label}{l.code === lang && <span className="check-mark" aria-hidden="true">✓</span>}
               </button>
             </li>
           ))}
