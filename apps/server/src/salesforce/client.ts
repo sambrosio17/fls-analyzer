@@ -72,15 +72,23 @@ export class SalesforceClient implements SfApi {
   }
 
   async readMetadata(type: string, fullNames: string[]): Promise<MetadataRecord[]> {
-    const out: MetadataRecord[] = [];
-    for (let i = 0; i < fullNames.length; i += 10) {
-      const names = fullNames.slice(i, i + 10).map(n => `<met:fullNames>${xmlEscape(n)}</met:fullNames>`).join('');
-      const res = await this.soap(`<met:readMetadata><met:type>${xmlEscape(type)}</met:type>${names}</met:readMetadata>`) as
-        { readMetadataResponse?: { result?: { records?: MetadataRecord[] }[] } };
-      // Components that do not exist come back as empty (nil) records.
-      for (const r of (res.readMetadataResponse?.result ?? []).flatMap(x => x.records ?? [])) if (r && typeof r === 'object' && r.fullName) out.push(r);
-    }
-    return out;
+    // Batches of 10 (the API limit), a few at a time: big orgs have many apps.
+    const batches: string[][] = [];
+    for (let i = 0; i < fullNames.length; i += 10) batches.push(fullNames.slice(i, i + 10));
+    const results: MetadataRecord[][] = new Array(batches.length);
+    let next = 0;
+    const worker = async () => {
+      while (next < batches.length) {
+        const i = next++;
+        const names = batches[i]!.map(n => `<met:fullNames>${xmlEscape(n)}</met:fullNames>`).join('');
+        const res = await this.soap(`<met:readMetadata><met:type>${xmlEscape(type)}</met:type>${names}</met:readMetadata>`) as
+          { readMetadataResponse?: { result?: { records?: MetadataRecord[] }[] } };
+        // Components that do not exist come back as empty (nil) records.
+        results[i] = (res.readMetadataResponse?.result ?? []).flatMap(x => x.records ?? []).filter(r => r && typeof r === 'object' && r.fullName);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, batches.length) }, worker));
+    return results.flat();
   }
 
   async updateMetadata(type: string, records: MetadataRecord[]): Promise<MetadataSaveResult[]> {

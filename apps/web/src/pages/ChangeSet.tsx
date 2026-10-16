@@ -119,7 +119,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
       {error && <div className="banner prod">{error}</div>}
       {notice && <div className="banner info">{notice}</div>}
 
-      {assign ? <AssignmentView items={cs.assignments} finished={finished} /> : <>
+      {assign ? <AssignmentView items={cs.assignments} finished={finished} timings={cs.timings} /> : <>
       <div className="kpis">
         <div className="kpi"><div className="k">{t.changeSet.kpiChanges}</div><div className="n">{items.length}</div></div>
         <div className="kpi good"><div className="k">{t.changeSet.kpiNew}</div><div className="n">{count('insert')}</div></div>
@@ -233,7 +233,7 @@ function assignmentSheet(t: T, items: AssignmentItem[]): Sheet {
     name: t.export.sheetChanges,
     rows: [
       [...t.changeSet.assign.cols, t.export.error],
-      ...items.map(a => [t.changeSet.assign.kind[a.kind], a.object, a.app, a.profileLabel, a.recordType ?? t.changeSet.assign.master,
+      ...items.map(a => [t.changeSet.assign.kind[a.kind], a.object, a.app && a.formFactor ? `${a.app} · ${t.layouts.formFactor[a.formFactor]}` : a.app, a.profileLabel, a.recordType ?? t.changeSet.assign.master,
         assignmentValue(t, a, a.before), assignmentValue(t, a, a.after), t.changeSet.item[a.status] ?? a.status,
         a.errorMessage ? `${a.errorCode ?? ''} ${a.errorMessage}`.trim() : null])
     ]
@@ -241,7 +241,7 @@ function assignmentSheet(t: T, items: AssignmentItem[]): Sheet {
 }
 
 /** Page layout and Lightning page assignments: who sees which layout or page, before and after. */
-function AssignmentView({ items, finished }: { items: AssignmentItem[]; finished: boolean }) {
+function AssignmentView({ items, finished, timings }: { items: AssignmentItem[]; finished: boolean; timings: ChangeSet['timings'] }) {
   const t = useT();
   const a = t.changeSet.assign;
   const [filter, setFilter] = useState<'all' | 'layout' | 'page' | 'failed'>('all');
@@ -274,7 +274,7 @@ function AssignmentView({ items, finished }: { items: AssignmentItem[]; finished
                 <tr key={i.id}>
                   <td><span className="tag">{a.kind[i.kind]}</span></td>
                   <td className="mono">{i.object}</td>
-                  <td>{i.app ?? <span className="muted">—</span>}</td>
+                  <td>{i.app ?? <span className="muted">—</span>}{i.formFactor && <div className="muted small">{t.layouts.formFactor[i.formFactor]}</div>}</td>
                   <td>{i.profileLabel}</td>
                   <td>{i.recordType ?? <span className="muted">{a.master}</span>}</td>
                   <td>{i.before ? i.before : <span className="muted">{assignmentValue(t, i, null)}</span>}</td>
@@ -289,6 +289,27 @@ function AssignmentView({ items, finished }: { items: AssignmentItem[]; finished
           </table>
         </div>
       </section>
+      {timings && timings.length > 0 && <Timings steps={timings} />}
     </>
+  );
+}
+
+/** How long each step of an assignment run took, summed per step. */
+function Timings({ steps }: { steps: { step: string; ms: number }[] }) {
+  const t = useT();
+  const tm = t.changeSet.timing;
+  const sums = [...steps.reduce((m, s) => m.set(s.step, { ms: (m.get(s.step)?.ms ?? 0) + s.ms, n: (m.get(s.step)?.n ?? 0) + 1 }), new Map<string, { ms: number; n: number }>())];
+  const total = steps.reduce((a, s) => a + s.ms, 0);
+  const sec = (ms: number) => `${(ms / 1000).toLocaleString(t.locale, { maximumFractionDigits: 1, minimumFractionDigits: 1 })} s`;
+  return (
+    <section className="panel" style={{ marginBottom: 16 }} id="timings">
+      <div className="panel-h"><h2>{tm.title}</h2><span className="muted">{sec(total)}</span></div>
+      <div className="panel-b">
+        <ul className="plain">
+          {sums.map(([step, v]) => <li key={step}><b>{sec(v.ms)}</b> {tm.steps[step] ?? step}{tm.times(v.n)}</li>)}
+        </ul>
+        <p className="muted small">{tm.note}</p>
+      </div>
+    </section>
   );
 }

@@ -35,9 +35,9 @@ describe('Lightning page analysis', () => {
     expect(r.pages.map(p => p.name)).toEqual(['Account_Record_Page', 'Account_Sales_Page', 'Account_Partner_Page', 'Account_Draft']);
     expect(r.pages[1]!.fields).toEqual(['Account.Industry', 'Account.AnnualRevenue', 'Account.Tax_Code__c', 'Account.Billing_IBAN__c']);
     expect(r.apps.map(a => a.label)).toEqual(['Sales', 'Service Console']);
-    expect(r.orgDefault).toBe('Account_Record_Page');
-    expect(r.appDefaults).toEqual([{ app: 'standard__LightningSales', page: 'Account_Sales_Page' }]);
-    expect(r.assignments).toEqual([
+    expect(r.forms.Large.orgDefault).toBe('Account_Record_Page');
+    expect(r.forms.Large.appDefaults).toEqual([{ app: 'standard__LightningSales', page: 'Account_Sales_Page' }]);
+    expect(r.forms.Large.assignments).toEqual([
       { app: 'standard__LightningSales', profile: 'Sales User', recordType: 'Partner', page: 'Account_Partner_Page' },
       { app: 'standard__LightningSales', profile: 'Partner Community User', recordType: 'Partner', page: 'Account_Partner_Page' }
     ]);

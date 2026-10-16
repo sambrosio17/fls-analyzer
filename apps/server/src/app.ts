@@ -40,7 +40,7 @@ const assignmentSchema = z.object({
   description: z.string().max(500).optional(),
   changes: z.array(z.object({
     kind: z.enum(['layout', 'page']), object: z.string().regex(/^[A-Za-z0-9_]+$/), profile: name, profileLabel: name,
-    recordType: name.nullable(), app: name.nullable(), before: name.nullable().default(null), after: name.nullable()
+    recordType: name.nullable(), app: name.nullable(), formFactor: z.enum(['Large', 'Small']).nullable().optional(), before: name.nullable().default(null), after: name.nullable()
   }).refine(c => (c.kind === 'page') === !!c.app, 'Page assignments need an app, layout assignments none.')).min(1).max(5000)
 });
 
@@ -240,9 +240,9 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
       id: cs.id, number: `CS-${String(cs.seq).padStart(4, '0')}`, org: orgDto(org), author: cs.author, description: cs.description,
       status: cs.status, rollbackOf: cs.rollback_of, createdAt: cs.created_at, submittedAt: cs.submitted_at,
       approvedBy: cs.approved_by, approvedAt: cs.approved_at, startedAt: cs.started_at, finishedAt: cs.finished_at,
-      requiresApproval: !org.is_sandbox, skipped: JSON.parse(cs.skipped_json), kind: cs.kind,
+      requiresApproval: !org.is_sandbox, skipped: JSON.parse(cs.skipped_json), kind: cs.kind, timings: cs.timings_json ? JSON.parse(cs.timings_json) : null,
       assignments: db.listAssignments(cs.id).map(r => ({
-        id: r.id, kind: r.kind, object: r.object, profile: r.profile, profileLabel: r.profile_label, recordType: r.record_type, app: r.app,
+        id: r.id, kind: r.kind, object: r.object, profile: r.profile, profileLabel: r.profile_label, recordType: r.record_type, app: r.app, formFactor: r.form_factor,
         before: r.before_value, after: r.after_value, status: r.status, errorCode: r.error_code, errorMessage: r.error_message
       })),
       items: db.listItems(cs.id).map(r => ({

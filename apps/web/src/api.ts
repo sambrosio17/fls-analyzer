@@ -25,9 +25,11 @@ export interface ChangeSet {
   createdAt: string; submittedAt: string | null; approvedBy: string | null; approvedAt: string | null; startedAt: string | null; finishedAt: string | null;
   requiresApproval: boolean; skipped: { parentId: string; field: string; reason: string }[]; items: ChangeItem[]; conflicts?: number;
   kind: 'fls' | 'assignments'; assignments: AssignmentItem[];
+  /** Assignment runs: time per step. */
+  timings: { step: string; ms: number }[] | null;
 }
 export interface AssignmentInput {
-  kind: 'layout' | 'page'; object: string; profile: string; profileLabel: string; recordType: string | null; app: string | null; after: string | null;
+  kind: 'layout' | 'page'; object: string; profile: string; profileLabel: string; recordType: string | null; app: string | null; formFactor?: 'Large' | 'Small' | null; after: string | null;
 }
 export interface AssignmentItem extends AssignmentInput {
   id: number; before: string | null; status: 'pending' | 'ok' | 'error' | 'conflict'; errorCode: string | null; errorMessage: string | null;
@@ -45,11 +47,14 @@ export interface LayoutAnalysis {
 }
 export interface PageAnalysis {
   object: string; recordTypes: RecordTypeInfo[]; profiles: ProfileInfo[];
-  apps: { name: string; label: string }[];
+  apps: { name: string; label: string; formFactors: ('Large' | 'Small')[] }[];
   pages: { id: string; name: string; label: string; components: string[]; fields: string[] }[];
-  orgDefault: string | null;
-  appDefaults: { app: string; page: string }[];
-  assignments: { app: string; profile: string; recordType: string | null; page: string }[];
+  /** Desktop (Large) and phone (Small) assignments. */
+  forms: Record<'Large' | 'Small', {
+    orgDefault: string | null;
+    appDefaults: { app: string; page: string }[];
+    assignments: { app: string; profile: string; recordType: string | null; page: string }[];
+  }>;
 }
 
 export class ApiError extends Error {

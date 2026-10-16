@@ -61,7 +61,7 @@ export const it: Messages = {
       tabs: { title: 'Schede di lavoro', body: <>Le schede sono su tre livelli: le <b>org</b> aperte, lo <b>strumento</b> dell'org attiva (Matrice FLS, Classi Apex, Layout e pagine, Change set) e gli <b>oggetti</b> aperti in quello strumento. Ogni scheda oggetto tiene i suoi filtri e le modifiche in sospeso. <b>Trascina</b> una scheda per spostarla, oppure usa <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd>. Il pallino colorato sulla scheda dell'org ne cambia il colore, ↻ rinnova la sessione, il clic centrale chiude una scheda.</> },
       notices: { title: 'Caricamenti lunghi in sottofondo', body: <>I caricamenti continuano anche se cambi scheda. Se lasci una scheda mentre carica una matrice, i layout o esegue un change set, un pannello in basso a destra lo segue e ti dice quando è pronto; <b>Apri</b> ti riporta lì. Quando torni sulla scheda l'avviso sparisce.</> },
       apex: { title: 'Classi Apex', body: <>Quali profili e permission set possono eseguire ogni classe Apex. Funziona come la matrice FLS con due stati, abilitata o no: clic, trascinamento, tasto destro e azioni in blocco, poi anteprima e approvazione. Le classi dei pacchetti gestiti si possono nascondere con un filtro.</> },
-      layouts: { title: 'Layout e pagine', body: <>Scegli un oggetto per vedere, per ogni profilo e record type, quale <b>page layout</b> e quale <b>Lightning page</b> riceve (per app, record type e default dell'org), e i campi del layout che il profilo non può leggere. Con <b>Modifica assegnazioni</b> le cambi cella per cella, o tutta una colonna con <b>Tutta la colonna…</b>; le celle cambiate diventano viola. <b>Vai all'anteprima</b> crea un change set, che si applica come quelli FLS. Per le Lightning page la modifica vale per l'app scelta, e togliendo un'assegnazione specifica il profilo torna al default dell'app o dell'org.</> },
+      layouts: { title: 'Layout e pagine', body: <>Scegli un oggetto per vedere, per ogni profilo e record type, quale <b>page layout</b> e quale <b>Lightning page</b> riceve (per app, record type e default dell'org), e i campi del layout che il profilo non può leggere. Con <b>Modifica assegnazioni</b> le cambi cella per cella, o tutta una colonna con <b>Tutta la colonna…</b>; le celle cambiate diventano viola. <b>Vai all'anteprima</b> crea un change set, che si applica come quelli FLS. Per le Lightning page la modifica vale per l'app scelta, e togliendo un'assegnazione specifica il profilo torna al default dell'app o dell'org. <b>Desktop</b> e <b>Telefono</b> hanno assegnazioni separate: si passa dall'uno all'altro accanto all'app, e in modifica “Applica ogni modifica a desktop e telefono” cambia entrambi. Se Salesforce rifiuta alcune modifiche, le altre passano comunque e il risultato mostra quanto ha richiesto ogni passo.</> },
       changesets: { title: 'Change set', body: <>Nulla viene scritto finché non confermi. <b>Vai all'anteprima</b> trasforma le modifiche in sospeso in un change set con cosa viene aggiunto, cambiato e tolto, e gli avvisi. In produzione serve un'approvazione e devi scrivere il nome dell'org. L'esecuzione mostra l'avanzamento e il risultato riga per riga.</> },
       export: { title: 'Esportare', body: <>Il pulsante <b>Esporta</b> salva quello che vedi: la matrice in Excel o CSV o come metadata Salesforce (package.xml e un file per profilo e permission set), i change set in Excel, CSV o metadata con i valori che impostano, e i layout in Excel o CSV. Un pannello in basso a destra mostra l'avanzamento dei file grandi.</> },
       history: { title: 'Storico e annullamento', body: <>Lo <b>Storico</b> elenca ogni change set con chi l'ha preparato e approvato, e quando. Ognuno conserva i valori di prima, quindi <b>Annulla queste modifiche</b>, nel change set, crea un change set che li ripristina.</> },
@@ -148,6 +148,12 @@ export const it: Messages = {
       kpiCleared: 'Assegnazioni di pagina rimosse',
       defaultPage: "Default (app o org)",
       master: 'Master'
+    },
+    timing: {
+      title: 'Tempi per passo',
+      steps: { 'check org': "Controllo sull'org", check: 'Controllo di profili, pagine e record type', 'read app': "Lettura dell'app", 'save app': "Salvataggio dell'app", 'save profiles': 'Salvataggio dei profili', verify: 'Rilettura per verifica' } as Record<string, string>,
+      times: (n: number) => n > 1 ? ` (${n} volte)` : '',
+      note: "Salvare un'app vuol dire che Salesforce ridistribuisce tutta l'app: con molte assegnazioni ci mette un po'. Se Salesforce rifiuta alcune modifiche, l'app viene salvata di nuovo per isolarle."
     }
   },
 
@@ -275,7 +281,7 @@ export const it: Messages = {
     kpiPages: 'Lightning page', kpiPagesUnassigned: 'Non assegnate', kpiApps: 'App Lightning',
     kpiAssignments: 'Assegnazioni app, record type e profilo', kpiOrgDefault: "Default dell'org",
     systemPage: 'Pagina di sistema',
-    perProfile: 'Pagina vista da ogni profilo (desktop)',
+    perProfile: 'Pagina vista da ogni profilo',
     defaults: (app: ReactNode, org: ReactNode) => <>Default dell'app: <b>{app}</b>. Default dell'org: <b>{org}</b>.</>,
     systemPageLower: 'pagina di sistema',
     orgDefault: "Default dell'org",
@@ -290,6 +296,10 @@ export const it: Messages = {
     finishFirst: "Prima scarta le modifiche o vai all'anteprima.",
     setColumn: 'Tutta la colonna…',
     noSpecific: "(nessuna: default dell'app o dell'org)",
+    device: 'Dispositivo',
+    formFactor: { Large: 'Desktop', Small: 'Telefono' },
+    appNotOn: (app: string, device: string) => `${app} non è abilitata su ${device}: queste assegnazioni lì non hanno effetto.`,
+    mirror: 'Applica ogni modifica a desktop e telefono',
     noFullName: 'Salesforce non ha restituito il nome metadata di questo profilo: non si può modificare.',
     layoutEditHint: "Le celle cambiate sono evidenziate. Niente viene scritto finché non confermi l'anteprima.",
     pageEditHint: "Le modifiche valgono per l'app scelta. Togliendo un'assegnazione specifica il profilo torna al default dell'app o dell'org.",

@@ -1,4 +1,16 @@
-/** Lightning record page assignments of one object (desktop), as stored in CustomObject and CustomApplication metadata. */
+/** Lightning page form factors: Large is desktop, Small is phone. */
+export type FormFactor = 'Large' | 'Small';
+export const FORM_FACTORS: FormFactor[] = ['Large', 'Small'];
+
+/**
+ * Profile names as the Metadata API gives them encode some characters (for example "(" as %28), while
+ * other metadata can hold them plain; compare them decoded.
+ */
+export function profileKey(name: string): string {
+  try { return decodeURIComponent(name); } catch { return name; }
+}
+
+/** Lightning record page assignments of one object for one form factor, as stored in CustomObject and CustomApplication metadata. */
 export interface PageAssignments {
   /** Org default page (CustomObject actionOverrides). */
   orgDefault: string | null;
@@ -16,7 +28,8 @@ export type PageSource = 'app-profile' | 'app' | 'org' | 'system';
  * app + record type + profile, then app default, then org default, then the system default page.
  */
 export function effectivePage(a: PageAssignments, app: string, profile: string, recordType: string | null): { page: string | null; source: PageSource } {
-  const specific = a.assignments.find(x => x.app === app && x.profile === profile && x.recordType === recordType);
+  const key = profileKey(profile);
+  const specific = a.assignments.find(x => x.app === app && profileKey(x.profile) === key && x.recordType === recordType);
   if (specific) return { page: specific.page, source: 'app-profile' };
   const appDefault = a.appDefaults.find(x => x.app === app);
   if (appDefault) return { page: appDefault.page, source: 'app' };
