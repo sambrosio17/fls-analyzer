@@ -523,3 +523,9 @@ td.c button:disabled { pointer-events: none; }
 .orgtab .orgtab-label { padding-left: 8px; }
 .accent-pop { position: fixed; z-index: 50; display: grid; gap: 8px; width: 152px; padding: 10px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgb(0 0 0 / .25); }
 .accent-pop-h { font-size: 12px; color: var(--muted); }
+
+/* Each org tab shows its own colour, not the active org's: the dark tone on the top bar, the light one on the open tab. */
+.orgtab { --org-c: var(--org-d); }
+.orgtab.on { --org-c: var(--org-l); }
+@media (prefers-color-scheme: dark) { .orgtab.on { --org-c: var(--org-d); } }
+.orgtab .env.sandbox { color: var(--org-c); background: color-mix(in srgb, var(--org-c) 18%, transparent); }

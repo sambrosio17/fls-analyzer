@@ -141,6 +141,7 @@ export function App() {
             const changed = ws.tabs.some(x => x.orgId === id && dirty.has(x.id));
             return (
               <div key={id} className={`orgtab${on ? ' on' : ''}${o.isSandbox ? '' : ' prod'}${changed ? ' dirty' : ''}`} title={`${o.name} · ${o.username}`}
+                style={{ '--org-l': ACCENT_COLORS[accentOf(o.accent)].light, '--org-d': ACCENT_COLORS[accentOf(o.accent)].dark } as CSSProperties}
                 onAuxClick={e => { if (e.button === 1) closeOrgTab(id); }}>
                 <button className="accent-dot" aria-label={t.accent.change} title={t.accent.change}
                   style={{ '--sw': ACCENT_COLORS[accentOf(o.accent)].dark } as CSSProperties}
