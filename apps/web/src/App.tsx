@@ -7,6 +7,7 @@ import { ChangeSetPage } from './pages/ChangeSet.tsx';
 import { History } from './pages/History.tsx';
 import { LayoutsPage } from './pages/Layouts.tsx';
 import { Brand } from './Brand.tsx';
+import { TokenTabButton } from './TokenButton.tsx';
 import {
   TOOLS, TOOL_LABEL, closeOrg, closeTab, groupTabs, loadWorkspace, newObjectTab, openChangeSet, openOrg, pruneOrgs, saveWorkspace,
   selectTab, selectTool, tabTitle, toolOf, updateTab, visibleTab, type WorkTab, type Workspace
@@ -115,6 +116,7 @@ export function App() {
                 <button role="tab" aria-selected={on} className="orgtab-label" onClick={() => go(openOrg(ws, id))}>
                   <b>{o.label}</b><span className={`env ${o.isSandbox ? 'sandbox' : 'prod'}`}>{o.isSandbox ? 'Sandbox' : 'Produzione'}</span>
                 </button>
+                {on && <TokenTabButton org={o} />}
                 <button className="tab-x" aria-label={`Chiudi ${o.label}`} onClick={() => closeOrgTab(id)}>×</button>
               </div>
             );
