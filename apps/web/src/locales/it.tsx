@@ -34,7 +34,7 @@ export const it: Messages = {
 
   app: {
     guide: 'Guida', news: 'Novità', newsUnread: 'Ci sono novità da leggere',
-    orgs: 'Org', history: 'Storico', logout: 'Esci',
+    orgs: 'Org', history: 'Storico', logout: 'Esci', settings: 'Impostazioni',
     openOrgs: 'Org aperte', toolsLabel: 'Strumenti', openObjects: 'Oggetti aperti', openChangeSets: 'Change set aperti',
     closeX: (name: string) => `Chiudi ${name}`,
     openOrg: "Apri un'org",
@@ -61,11 +61,112 @@ export const it: Messages = {
       tabs: { title: 'Schede di lavoro', body: <>Le schede sono su tre livelli: le <b>org</b> aperte, lo <b>strumento</b> dell'org attiva (Matrice FLS, Classi Apex, Layout e pagine, Change set) e gli <b>oggetti</b> aperti in quello strumento. Ogni scheda oggetto tiene i suoi filtri e le modifiche in sospeso. <b>Trascina</b> una scheda per spostarla, oppure usa <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd>. Il pallino colorato sulla scheda dell'org ne cambia il colore, ↻ rinnova la sessione, il clic centrale chiude una scheda.</> },
       notices: { title: 'Caricamenti lunghi in sottofondo', body: <>I caricamenti continuano anche se cambi scheda. Se lasci una scheda mentre carica una matrice, i layout o esegue un change set, un pannello in basso a destra lo segue e ti dice quando è pronto; <b>Apri</b> ti riporta lì. Quando torni sulla scheda l'avviso sparisce.</> },
       apex: { title: 'Classi Apex', body: <>Quali profili e permission set possono eseguire ogni classe Apex. Funziona come la matrice FLS con due stati, abilitata o no: clic, trascinamento, tasto destro e azioni in blocco, poi anteprima e approvazione. Le classi dei pacchetti gestiti si possono nascondere con un filtro.</> },
+      views: { title: 'Quattro modi di vedere la matrice', body: <>Il menu <b>Vista</b> in alto nella matrice FLS e nelle classi Apex, oppure la pagina <b>Impostazioni</b>, passa da una vista all'altra degli stessi dati e delle stesse modifiche in sospeso. <b>Griglia</b> è la tabella classica. <b>Focus</b> apre un profilo o permission set (oppure un campo) con i pulsanti <b>Nessuno</b>, <b>Lettura</b> e <b>Modifica</b> su ogni riga; con <b>confronta</b> ne affianchi fino ad altri tre per vederli insieme e copiarne i valori. <b>Mappa</b> disegna ogni cella come un quadratino, così entrano molti più profili a schermo: passa il mouse per leggere una cella, trascina per selezionare un blocco, poi scegli l'accesso o premi <kbd>N</kbd>, <kbd>L</kbd>, <kbd>M</kbd>. <b>Regole</b> scrive la modifica come una frase, per esempio "Concedi la modifica su questi campi a questi permission set", e mostra quante celle cambiano prima di aggiungerla.</> },
+      layoutViews: { title: 'Pennello e bacheca per le assegnazioni', body: <>Anche Layout e pagine ha tre viste, da <b>Vista</b> o da <b>Impostazioni</b>. <b>Tabella</b> è l'elenco con un menu per cella. <b>Pennello</b> dà a ogni layout o Lightning page un colore: con <b>Modifica assegnazioni</b> attivo, scegline uno dalla tavolozza e clicca o trascina sulle celle, oppure clicca un profilo o un record type per colorare tutta la riga o la colonna; <kbd>Alt</kbd> + clic prende il layout di una cella. <b>Bacheca</b> ha una colonna per layout o pagina e una scheda per profilo, un record type alla volta: trascina le schede, oppure cliccane più di una e usa <b>Sposta in…</b>. Una colonna vuota è un layout che nessuno usa.</> },
       layouts: { title: 'Layout e pagine', body: <>Scegli un oggetto per vedere, per ogni profilo e record type, quale <b>page layout</b> e quale <b>Lightning page</b> riceve (per app, record type e default dell'org), e i campi del layout che il profilo non può leggere. Con <b>Modifica assegnazioni</b> le cambi cella per cella, o tutta una colonna con <b>Tutta la colonna…</b>; le celle cambiate diventano viola. <b>Vai all'anteprima</b> crea un change set, che si applica come quelli FLS. Per le Lightning page la modifica vale per l'app scelta, e togliendo un'assegnazione specifica il profilo torna al default dell'app o dell'org. <b>Desktop</b> e <b>Telefono</b> hanno assegnazioni separate: si passa dall'uno all'altro accanto all'app, e in modifica “Applica ogni modifica a desktop e telefono” cambia entrambi. Se Salesforce rifiuta alcune modifiche, le altre passano comunque e il risultato mostra quanto ha richiesto ogni passo.</> },
       changesets: { title: 'Change set', body: <>Nulla viene scritto finché non confermi. <b>Vai all'anteprima</b> trasforma le modifiche in sospeso in un change set con cosa viene aggiunto, cambiato e tolto, e gli avvisi. In produzione serve un'approvazione e devi scrivere il nome dell'org. L'esecuzione mostra l'avanzamento e il risultato riga per riga.</> },
       export: { title: 'Esportare', body: <>Il pulsante <b>Esporta</b> salva quello che vedi: la matrice in Excel o CSV o come metadata Salesforce (package.xml e un file per profilo e permission set), i change set in Excel, CSV o metadata con i valori che impostano, e i layout in Excel o CSV. Un pannello in basso a destra mostra l'avanzamento dei file grandi.</> },
       history: { title: 'Storico e annullamento', body: <>Lo <b>Storico</b> elenca ogni change set con chi l'ha preparato e approvato, e quando. Ognuno conserva i valori di prima, quindi <b>Annulla queste modifiche</b>, nel change set, crea un change set che li ripristina.</> },
       settings: { title: 'Lingua e sessione', body: <>Scegli English, Italiano, Français o Español dal menu con le bandiere. <b>Esci</b> chiude la sessione di Orgsmith; le org restano collegate.</> }
+    }
+  },
+
+  settings: {
+    title: 'Impostazioni',
+    intro: 'Scegli come Orgsmith mostra le matrici. La scelta resta in questo browser, e la puoi cambiare anche dal menu Vista in alto in ogni strumento.',
+    matrix: 'Matrici dei permessi (FLS e classi Apex)',
+    layouts: 'Assegnazioni di page layout e Lightning page',
+    current: 'In uso',
+    language: 'La lingua si sceglie dal menu con le bandiere in alto.'
+  },
+
+  views: {
+    label: 'Vista',
+    matrix: {
+      grid: { name: 'Griglia', desc: 'Ogni campo contro ogni profilo e permission set. Clicca una cella, trascina su più celle o spunta righe e colonne.' },
+      focus: { name: 'Focus', desc: 'Un profilo o permission set alla volta, oppure un campo, con i pulsanti Nessuno, Lettura e Modifica su ogni riga. Confrontane fino ad altri tre e copia i loro valori.' },
+      dense: { name: 'Mappa', desc: 'Ogni cella come un quadratino colorato: a schermo entrano da quattro a cinque volte più colonne. Passa il mouse per leggere, trascina per selezionare, imposta dalla tastiera.' },
+      rules: { name: 'Regole', desc: 'Scrivi la modifica come una frase: concedi la modifica su questi campi a questi permission set. Vedi quante celle cambiano prima di aggiungerla.' }
+    },
+    layouts: {
+      table: { name: 'Tabella', desc: 'Una riga per profilo, una colonna per record type, con un menu in ogni cella mentre modifichi.' },
+      paint: { name: 'Pennello', desc: 'Ogni layout ha un colore. Sceglilo dalla tavolozza e colora celle, righe intere o colonne intere.' },
+      board: { name: 'Bacheca', desc: 'Una colonna per layout, una scheda per profilo. Trascini i profili da un layout all’altro, un record type alla volta.' }
+    },
+    levels: ['Nessuno', 'Lettura', 'Modifica'],
+    focus: {
+      byPs: 'Per profilo', byField: 'Per campo', byClass: 'Per classe',
+      searchPs: 'Cerca profili e permission set', searchField: 'Cerca campi', searchClass: 'Cerca classi',
+      profiles: 'Profili', permSets: 'Permission set',
+      compare: 'confronta', comparing: 'a confronto',
+      uncompare: (name: string) => `Togli ${name} dal confronto`,
+      pick: 'Scegli un profilo o permission set a sinistra.',
+      pickField: 'Scegli un campo a sinistra.',
+      stats: (r: number, e: number, hidden: number) => `${r} in lettura · ${e} in modifica · ${hidden} nascosti`,
+      statsApex: (on: number, off: number) => `${on} abilitate · ${off} disabilitate`,
+      copyAll: (from: string) => `Copia tutto da ${from}`,
+      copyOne: (v: string, from: string) => `Copia “${v}” da ${from}`,
+      lockedPs: 'Permission set di un pacchetto gestito, un gruppo o un muting: si può solo leggere.',
+      selected: (n: number) => n === 1 ? '1 selezionato' : `${n} selezionati`,
+      set: 'Imposta:',
+      selectAll: 'Seleziona tutti',
+      access: 'Accesso',
+      only: { all: 'Tutti', diff: 'Solo differenze', none: 'Solo senza accesso', pending: 'Con modifiche' },
+      noFls: 'Sempre visibile (senza FLS)',
+      more: (n: number) => `Mostra altri ${n}`
+    },
+    dense: {
+      size: 'Dimensione',
+      keys: { none: 'n', read: 'l', edit: 'm' },
+      help: (keys: string[]) => <>Clicca o trascina per selezionare · clicca un nome per tutta la riga o colonna · {keys.map(k => <kbd key={k}>{k}</kbd>)} imposta · <kbd>Spazio</kbd> cicla · <kbd>Maiusc</kbd>+frecce estende · <kbd>Esc</kbd> annulla</>
+    },
+    rules: {
+      action: 'Azione', from: 'Scegli da chi copiare l’accesso',
+      actions: { edit: 'Concedi la modifica', read: 'Concedi la lettura', removeEdit: 'Togli solo la modifica', none: 'Togli ogni accesso', copy: 'Copia l’accesso di' },
+      onWord: 'su', toWord: 'a', forWord: 'per', toWordCopy: 'verso',
+      allFields: (n: number, apex: boolean) => apex ? `tutte le ${n} classi` : `tutti i ${n} campi`,
+      someFields: (n: number, apex: boolean) => apex ? (n === 1 ? '1 classe' : `${n} classi`) : (n === 1 ? '1 campo' : `${n} campi`),
+      allPs: (n: number) => `tutti i ${n} profili e permission set`,
+      somePs: (n: number) => n === 1 ? '1 profilo o permission set' : `${n} profili e permission set`,
+      reads: (what: string, fields: string, ps: string) => `${what} su ${fields} per ${ps}. Un filtro vuoto vuol dire tutto quello che mostra la matrice.`,
+      sentence: (what: string, fields: string, ps: string) => `${what} · ${fields} · ${ps}`,
+      recipes: 'Scorciatoie:',
+      recipeClone: 'Stesso accesso di un altro profilo',
+      recipeEncrypted: 'Niente modifica sui campi cifrati',
+      recipeCustom: 'Lettura sui campi custom',
+      recipePackage: 'Disabilita le classi dei pacchetti',
+      changes: 'celle cambiano', more: 'più accesso', less: 'meno accesso',
+      skipped: (n: number) => `${n} celle bloccate escluse`,
+      add: 'Aggiungi alle modifiche in sospeso',
+      cols: ['Campo', 'Profilo / permission set', 'Ora', 'Dopo'],
+      pickFrom: 'Scegli da chi copiare l’accesso.',
+      nothing: 'Non cambia niente: l’accesso è già così.',
+      andMore: (n: number) => `e altre ${n}`,
+      queue: 'Regole aggiunte',
+      queueEmpty: 'Ancora nessuna. Scrivi una regola e aggiungila.',
+      queueNote: 'Le regole aggiunte sono già tra le modifiche in sospeso; Vai all’anteprima le trasforma in un change set. Togli annulla l’ultima.',
+      cells: (n: number) => n === 1 ? '1 cella' : `${n} celle`,
+      remove: 'Togli'
+    },
+    paint: {
+      brush: 'Pennello:',
+      none: 'Default dell’app o dell’org',
+      unused: 'mai usato',
+      hint: 'Clicca una cella o trascina su più celle. Clicca un profilo o un record type per colorare tutta la riga o la colonna. Alt + clic prende il layout di una cella.',
+      readOnly: 'Attiva Modifica assegnazioni per colorare.',
+      row: 'Colora tutta la riga', col: 'Colora tutta la colonna',
+      was: (v: string) => `era ${v}`
+    },
+    board: {
+      recordType: 'Record type:',
+      hint: 'Trascina i profili in un’altra colonna, oppure cliccane più di uno e usa Sposta in…',
+      readOnly: 'Attiva Modifica assegnazioni per spostare i profili.',
+      moveTo: 'Sposta in…',
+      selected: (n: number) => n === 1 ? '1 profilo selezionato' : `${n} profili selezionati`,
+      clear: 'Deseleziona',
+      empty: 'Nessun profilo',
+      unused: 'Non usato con questo record type',
+      before: (v: string) => `prima: ${v}`
     }
   },
 

@@ -2,7 +2,14 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { MatrixHelp } from './MatrixHelp.tsx';
 import { AccessLegend } from '../AccessLegend.tsx';
 import { MultiPick, type PickOption } from '../MultiPick.tsx';
-import { bounds, forEachCell, menuPosition, rangeSize, type CellRange } from '../cellRange.ts';
+import { bounds, forEachCell, rangeSize, type CellRange } from '../cellRange.ts';
+import { CellMenu } from './matrix/CellMenu.tsx';
+import { FocusView } from './matrix/FocusView.tsx';
+import { DenseView } from './matrix/DenseView.tsx';
+import { RulesView } from './matrix/RulesView.tsx';
+import { lockedPs, targetFor, type MatrixModel } from './matrix/model.ts';
+import { ViewSwitch } from '../ViewSwitch.tsx';
+import { useViews } from '../views.ts';
 import { useT } from '../i18n.tsx';
 import { ExportMenu, type ExportItem } from '../export/ExportMenu.tsx';
 import { CSV_TYPE, XLSX_TYPE, download, slug, stamp, toCsv, toXlsx, type Sheet } from '../export/table.ts';
@@ -12,7 +19,6 @@ import { mapWithProgress, part, type Progress } from '../export/progress.ts';
 import { trackLoad, useTabId } from '../loads.ts';
 import { api, type Access, type BulkAction, type FieldMeta, type Matrix, type Org, type PermSet, type SObject } from '../api.ts';
 
-const lockedPs = (p: PermSet) => !!p.namespace || p.type === 'Group' || p.type === 'Muting';
 type Filter = 'all' | 'custom' | 'none' | 'editall' | 'pending';
 type PsKind = 'all' | 'profiles' | 'permsets';
 
@@ -34,6 +40,8 @@ export function MatrixPage({ org, mode = 'fls', onChangeSet, initialObjects = []
   const m = apex ? { ...t.matrix, ...t.apex.matrix } : t.matrix;
   const A = apex ? t.apex.access : t.access;
   const tabId = useTabId();
+  const [views] = useViews();
+  const mv = views.matrix;
   const [objects, setObjects] = useState<SObject[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [objectQuery, setObjectQuery] = useState('');
@@ -169,8 +177,6 @@ export function MatrixPage({ org, mode = 'fls', onChangeSet, initialObjects = []
     setCell(f, idx, states[(states.indexOf(cur(idx)) + 1) % states.length]!);
     touch();
   };
-
-  const targetFor = (action: BulkAction, c: Access): Access => action === 'read' ? 1 : action === 'edit' ? 2 : action === 'none' ? 0 : c === 2 ? 1 : c;
 
   const applyBulk = () => {
     for (const i of rows) {
@@ -408,6 +414,14 @@ export function MatrixPage({ org, mode = 'fls', onChangeSet, initialObjects = []
     { id: 'csv-long', label: t.export.csvLong, run: async p => download(exportName('csv', apex ? 'apex-rows' : 'fls-rows'), await toCsv((await longSheet(part(p, 0, 0.4))).rows, t.locale, part(p, 0.4, 1)), CSV_TYPE) },
     { id: 'metadata', label: t.export.metadata, hint: t.export.metadataHint, run: exportMetadata }
   ];
+  const model: MatrixModel = {
+    apex, allFields, allPs, F, fields, columns, base, pending, rev, cur, counts,
+    editable: (i, j) => allFields[i]!.permissionable && !locked(allFields[i]!, allPs[j]!),
+    assign: (i, j, v) => { const f = allFields[i]!; if (!f.permissionable || locked(f, allPs[j]!)) return false; setCell(f, j * F + i, v); return true; },
+    restore: (idx, v) => { if (v === undefined || v === base[idx]) { pending.delete(idx); current[idx] = base[idx]!; } else { pending.set(idx, v); current[idx] = v; } },
+    commit: touch
+  };
+
   const objectMatches = objectQuery.length < 2 ? [] : objects.filter(o =>
     !selected.includes(o.name) && (o.label.toLowerCase().includes(objectQuery.toLowerCase()) || o.name.toLowerCase().includes(objectQuery.toLowerCase()))).slice(0, 8);
 
@@ -418,6 +432,7 @@ export function MatrixPage({ org, mode = 'fls', onChangeSet, initialObjects = []
           <p>{m.intro}</p></div>
         <span className="spacer" />
         <div className="row">
+          <ViewSwitch kind="matrix" />
           {matrix && !loading && <ExportMenu items={exportItems}
             note={[t.export.scope(fields.length, columns.length), pending.size ? t.export.pending(pending.size) : ''].filter(Boolean).join(' ')} />}
           {!apex && <button className="btn" onClick={() => setHelp(true)}>{t.matrix.guide}</button>}
@@ -465,6 +480,7 @@ export function MatrixPage({ org, mode = 'fls', onChangeSet, initialObjects = []
           </div>
 
           <div className="selbar">
+            {mv === 'grid' && <>
             <span>{m.selected(rows.size, cols.size)}</span>
             <select className="input" id="bulk-action" value={bulkAction} onChange={e => setBulkAction(e.target.value as BulkAction)}>
               {apex ? <><option value="read">{t.apex.bulk.enable}</option><option value="none">{t.apex.bulk.disable}</option></> : <>
@@ -474,6 +490,7 @@ export function MatrixPage({ org, mode = 'fls', onChangeSet, initialObjects = []
             </select>
             <button className="btn sm" disabled={!rows.size || !cols.size} onClick={applyBulk}>{t.matrix.applyToSelection}</button>
             <button className="btn sm" disabled={!rows.size && !cols.size} onClick={() => { setRows(new Set()); setCols(new Set()); }}>{t.matrix.deselect}</button>
+            </>}
             <span className="spacer" />
             <span className={pending.size ? 'warn-text' : 'muted'}>{t.matrix.pending(pending.size)}</span>
             <button className="btn sm danger" disabled={!pending.size} onClick={discard}>{t.matrix.discard}</button>
@@ -482,6 +499,10 @@ export function MatrixPage({ org, mode = 'fls', onChangeSet, initialObjects = []
 
           <p className="muted mx-size">{m.size(fields.length, columns.length)}</p>
 
+          {mv === 'focus' && <FocusView model={model} />}
+          {mv === 'dense' && <DenseView model={model} />}
+          {mv === 'rules' && <RulesView model={model} />}
+          {mv === 'grid' && <>
           <div className="scroller" ref={scroller} onScroll={onScroll}>
             <table className="mx" style={{ width: view.fcolW + columns.length * COL_W }}>
               <thead ref={head}>
@@ -568,38 +589,9 @@ export function MatrixPage({ org, mode = 'fls', onChangeSet, initialObjects = []
           <div className="legend">
             <AccessLegend apex={apex} />
           </div>
+          </>}
         </>
       )}
     </>
-  );
-}
-
-const MENU_W = 240, MENU_H = 290;
-
-/** Access choices for the cells picked by dragging. */
-function CellMenu({ apex, x, y, stats, onPick, onClose }: {
-  apex: boolean; x: number; y: number; stats: { cells: number; editable: number; pending: number };
-  onPick: (action: BulkAction | 'revert') => void; onClose: () => void;
-}) {
-  const t = useT();
-  const [none0, read, edit] = t.access.short;
-  const pos = menuPosition(x, y, MENU_W, MENU_H, window.innerWidth, window.innerHeight);
-  const none = stats.editable === 0;
-  return (
-    <div className="cell-menu" role="menu" style={pos} onContextMenu={e => e.preventDefault()}>
-      <div className="cell-menu-h">{t.cellMenu.cells(stats.cells)}{stats.editable !== stats.cells && t.cellMenu.editable(stats.editable)}</div>
-      {apex ? <>
-        <button role="menuitem" disabled={none} onClick={() => onPick('read')}><span className="box b1">{t.apex.access.short[1]}</span>{t.apex.bulk.enable}</button>
-        <button role="menuitem" disabled={none} onClick={() => onPick('none')}><span className="box">{t.apex.access.short[0]}</span>{t.apex.bulk.disable}</button>
-      </> : <>
-        <button role="menuitem" disabled={none} onClick={() => onPick('none')}><span className="box">{none0}</span>{t.access.long[0]}</button>
-        <button role="menuitem" disabled={none} onClick={() => onPick('read')}><span className="box b1">{read}</span>{t.access.long[1]}</button>
-        <button role="menuitem" disabled={none} onClick={() => onPick('edit')}><span className="box b2">{edit}</span>{t.access.long[2]}</button>
-        <button role="menuitem" disabled={none} onClick={() => onPick('removeEdit')}><span className="box b1">{read}</span>{t.cellMenu.removeEditOnly}</button>
-      </>}
-      <hr />
-      <button role="menuitem" disabled={!stats.pending} onClick={() => onPick('revert')}><span className="box bp" />{t.cellMenu.revert}{stats.pending ? ` (${stats.pending})` : ''}</button>
-      <button role="menuitem" onClick={onClose}><span className="box" />{t.cellMenu.clear}</button>
-    </div>
   );
 }

@@ -34,7 +34,7 @@ export const es: Messages = {
 
   app: {
     guide: 'Guía', news: 'Novedades', newsUnread: 'Hay novedades por leer',
-    orgs: 'Orgs', history: 'Historial', logout: 'Salir',
+    orgs: 'Orgs', history: 'Historial', logout: 'Salir', settings: 'Ajustes',
     openOrgs: 'Orgs abiertas', toolsLabel: 'Herramientas', openObjects: 'Objetos abiertos', openChangeSets: 'Change sets abiertos',
     closeX: (name: string) => `Cerrar ${name}`,
     openOrg: 'Abrir una org',
@@ -61,11 +61,112 @@ export const es: Messages = {
       tabs: { title: 'Pestañas de trabajo', body: <>Las pestañas tienen tres niveles: las <b>orgs</b> abiertas, la <b>herramienta</b> de la org activa (Matriz FLS, Clases Apex, Formatos y páginas, Change sets) y los <b>objetos</b> abiertos en esa herramienta. Cada pestaña de objeto guarda sus filtros y cambios pendientes. <b>Arrastra</b> una pestaña para moverla, o usa <kbd>Ctrl</kbd>+<kbd>Mayús</kbd>+<kbd>←</kbd>/<kbd>→</kbd>. El punto de color de la pestaña de la org cambia su color, ↻ renueva la sesión, el clic central cierra una pestaña.</> },
       notices: { title: 'Cargas largas en segundo plano', body: <>Las cargas siguen aunque cambies de pestaña. Si dejas una pestaña mientras carga una matriz, formatos o ejecuta un change set, un panel abajo a la derecha la sigue y te avisa cuando está lista; <b>Abrir</b> te lleva de vuelta. Al volver a la pestaña el aviso desaparece.</> },
       apex: { title: 'Clases Apex', body: <>Qué perfiles y conjuntos de permisos pueden ejecutar cada clase Apex. Funciona como la matriz FLS con dos estados, activada o no: clic, arrastre, clic derecho y acciones en bloque, luego vista previa y aprobación. Las clases de paquetes gestionados se pueden ocultar con un filtro.</> },
+      views: { title: 'Cuatro formas de ver la matriz', body: <>El menú <b>Vista</b> arriba en la matriz FLS y en las clases Apex, o la página <b>Ajustes</b>, cambia entre cuatro vistas de los mismos datos y de los mismos cambios pendientes. <b>Cuadrícula</b> es la tabla clásica. <b>Foco</b> abre un perfil o conjunto de permisos (o un campo) con los botones <b>Ninguno</b>, <b>Lectura</b> y <b>Edición</b> en cada fila; con <b>comparar</b> pones al lado hasta otros tres para copiar sus valores. <b>Mapa</b> dibuja cada celda como un cuadradito, así caben muchos más perfiles: pasa el ratón para leer una celda, arrastra para seleccionar un bloque y elige el acceso o pulsa <kbd>N</kbd>, <kbd>L</kbd>, <kbd>E</kbd>. <b>Reglas</b> escribe el cambio como una frase, por ejemplo «Conceder edición en estos campos a estos conjuntos de permisos», y muestra cuántas celdas cambian antes de añadirlo.</> },
+      layoutViews: { title: 'Pincel y tablero para las asignaciones', body: <>Formatos y páginas también tiene tres vistas, desde <b>Vista</b> o <b>Ajustes</b>. <b>Tabla</b> es la lista con un menú por celda. <b>Pincel</b> da a cada formato o página Lightning un color: con <b>Editar asignaciones</b> activo, elige uno de la paleta y haz clic o arrastra sobre las celdas, o haz clic en un perfil o tipo de registro para pintar toda la fila o la columna; <kbd>Alt</kbd> + clic toma el formato de una celda. <b>Tablero</b> tiene una columna por formato o página y una tarjeta por perfil, un tipo de registro a la vez: arrastra las tarjetas, o haz clic en varias y usa <b>Mover a…</b>. Una columna vacía es un formato que nadie usa.</> },
       layouts: { title: 'Formatos y páginas', body: <>Elige un objeto para ver, por cada perfil y tipo de registro, qué <b>formato de página</b> y qué <b>página Lightning</b> recibe (por app, tipo de registro y valor por defecto de la org), y los campos del formato que el perfil no puede leer. Con <b>Editar asignaciones</b> las cambias celda por celda, o toda una columna con <b>Toda la columna…</b>; las celdas cambiadas se vuelven moradas. <b>Ir a la vista previa</b> crea un change set, que se aplica como los de FLS. Para las páginas Lightning el cambio vale para la app elegida, y quitar una asignación específica devuelve el perfil a la predeterminada de la app o la org. <b>Escritorio</b> y <b>Teléfono</b> tienen asignaciones separadas: se cambia entre ellos junto a la app, y al editar “Aplicar cada cambio a escritorio y teléfono” cambia ambos. Si Salesforce rechaza algunos cambios, los demás pasan igualmente y el resultado muestra cuánto tardó cada paso.</> },
       changesets: { title: 'Change sets', body: <>No se escribe nada hasta que confirmas. <b>Ir a la vista previa</b> convierte los cambios pendientes en un change set con lo que se añade, cambia y quita, y los avisos. En producción necesita aprobación y escribir el nombre de la org. La ejecución muestra el progreso y el resultado fila por fila.</> },
       export: { title: 'Exportar', body: <>El botón <b>Exportar</b> guarda lo que ves: la matriz en Excel, CSV o como metadatos de Salesforce (package.xml y un archivo por perfil y conjunto de permisos), los change sets en Excel, CSV o metadatos con los valores que fijan, y los formatos en Excel o CSV. Un panel abajo a la derecha muestra el progreso de los archivos grandes.</> },
       history: { title: 'Historial y deshacer', body: <>El <b>Historial</b> muestra cada change set con quién lo preparó y aprobó, y cuándo. Cada uno guarda los valores anteriores, así que <b>Deshacer estos cambios</b>, en el change set, crea un change set que los restaura.</> },
       settings: { title: 'Idioma y sesión', body: <>Elige English, Italiano, Français o Español en el menú con las banderas. <b>Salir</b> cierra la sesión de Orgsmith; tus orgs siguen conectadas.</> }
+    }
+  },
+
+  settings: {
+    title: 'Ajustes',
+    intro: 'Elige cómo muestra Orgsmith las matrices. La elección se guarda en este navegador, y el menú Vista arriba en cada herramienta también la cambia.',
+    matrix: 'Matrices de permisos (FLS y clases Apex)',
+    layouts: 'Asignaciones de formatos y páginas Lightning',
+    current: 'En uso',
+    language: 'El idioma se elige en el menú con las banderas, arriba.'
+  },
+
+  views: {
+    label: 'Vista',
+    matrix: {
+      grid: { name: 'Cuadrícula', desc: 'Cada campo frente a cada perfil y conjunto de permisos. Haz clic en una celda, arrastra sobre varias o marca filas y columnas.' },
+      focus: { name: 'Foco', desc: 'Un perfil o conjunto de permisos a la vez, o un campo, con los botones Ninguno, Lectura y Edición en cada fila. Compara hasta otros tres y copia sus valores.' },
+      dense: { name: 'Mapa', desc: 'Cada celda como un cuadradito de color: caben de cuatro a cinco veces más columnas. Pasa el ratón para leer, arrastra para seleccionar, cambia con el teclado.' },
+      rules: { name: 'Reglas', desc: 'Escribe el cambio como una frase: conceder edición en estos campos a estos conjuntos de permisos. Ves cuántas celdas cambian antes de añadirlo.' }
+    },
+    layouts: {
+      table: { name: 'Tabla', desc: 'Una fila por perfil, una columna por tipo de registro, con un menú en cada celda al editar.' },
+      paint: { name: 'Pincel', desc: 'Cada formato tiene un color. Elígelo en la paleta y pinta celdas, filas enteras o columnas enteras.' },
+      board: { name: 'Tablero', desc: 'Una columna por formato, una tarjeta por perfil. Arrastra los perfiles de un formato a otro, un tipo de registro a la vez.' }
+    },
+    levels: ['Ninguno', 'Lectura', 'Edición'],
+    focus: {
+      byPs: 'Por perfil', byField: 'Por campo', byClass: 'Por clase',
+      searchPs: 'Buscar perfiles y conjuntos de permisos', searchField: 'Buscar campos', searchClass: 'Buscar clases',
+      profiles: 'Perfiles', permSets: 'Conjuntos de permisos',
+      compare: 'comparar', comparing: 'comparando',
+      uncompare: (name: string) => `Dejar de comparar ${name}`,
+      pick: 'Elige un perfil o conjunto de permisos a la izquierda.',
+      pickField: 'Elige un campo a la izquierda.',
+      stats: (r: number, e: number, hidden: number) => `${r} en lectura · ${e} en edición · ${hidden} ocultos`,
+      statsApex: (on: number, off: number) => `${on} activadas · ${off} desactivadas`,
+      copyAll: (from: string) => `Copiar todo de ${from}`,
+      copyOne: (v: string, from: string) => `Copiar «${v}» de ${from}`,
+      lockedPs: 'Conjunto de permisos de un paquete gestionado, un grupo o un muting: solo se puede leer.',
+      selected: (n: number) => n === 1 ? '1 seleccionado' : `${n} seleccionados`,
+      set: 'Asignar:',
+      selectAll: 'Seleccionar todo',
+      access: 'Acceso',
+      only: { all: 'Todos', diff: 'Solo diferencias', none: 'Solo sin acceso', pending: 'Con cambios' },
+      noFls: 'Siempre visible (sin FLS)',
+      more: (n: number) => `Mostrar ${n} más`
+    },
+    dense: {
+      size: 'Tamaño',
+      keys: { none: 'n', read: 'l', edit: 'e' },
+      help: (keys: string[]) => <>Haz clic o arrastra para seleccionar · clic en un nombre para toda la fila o columna · {keys.map(k => <kbd key={k}>{k}</kbd>)} asigna · <kbd>Espacio</kbd> alterna · <kbd>Mayús</kbd>+flechas amplía · <kbd>Esc</kbd> cancela</>
+    },
+    rules: {
+      action: 'Acción', from: 'Elige de quién copiar el acceso',
+      actions: { edit: 'Conceder edición', read: 'Conceder lectura', removeEdit: 'Quitar solo la edición', none: 'Quitar todo acceso', copy: 'Copiar el acceso de' },
+      onWord: 'en', toWord: 'a', forWord: 'para', toWordCopy: 'hacia',
+      allFields: (n: number, apex: boolean) => apex ? `las ${n} clases` : `los ${n} campos`,
+      someFields: (n: number, apex: boolean) => apex ? (n === 1 ? '1 clase' : `${n} clases`) : (n === 1 ? '1 campo' : `${n} campos`),
+      allPs: (n: number) => `los ${n} perfiles y conjuntos de permisos`,
+      somePs: (n: number) => n === 1 ? '1 perfil o conjunto de permisos' : `${n} perfiles y conjuntos de permisos`,
+      reads: (what: string, fields: string, ps: string) => `${what} en ${fields} para ${ps}. Un filtro vacío significa todo lo que muestra la matriz.`,
+      sentence: (what: string, fields: string, ps: string) => `${what} · ${fields} · ${ps}`,
+      recipes: 'Atajos:',
+      recipeClone: 'Mismo acceso que otro perfil',
+      recipeEncrypted: 'Sin edición en campos cifrados',
+      recipeCustom: 'Lectura en campos personalizados',
+      recipePackage: 'Desactivar las clases de paquetes',
+      changes: 'celdas cambian', more: 'más acceso', less: 'menos acceso',
+      skipped: (n: number) => `${n} celdas bloqueadas excluidas`,
+      add: 'Añadir a los cambios pendientes',
+      cols: ['Campo', 'Perfil / conjunto de permisos', 'Ahora', 'Después'],
+      pickFrom: 'Elige de quién copiar el acceso.',
+      nothing: 'No cambia nada: el acceso ya es así.',
+      andMore: (n: number) => `y ${n} más`,
+      queue: 'Reglas añadidas',
+      queueEmpty: 'Ninguna todavía. Escribe una regla y añádela.',
+      queueNote: 'Las reglas añadidas ya están en los cambios pendientes; Ir a la vista previa las convierte en un change set. Quitar deshace la última.',
+      cells: (n: number) => n === 1 ? '1 celda' : `${n} celdas`,
+      remove: 'Quitar'
+    },
+    paint: {
+      brush: 'Pincel:',
+      none: 'Predeterminada de la app o la org',
+      unused: 'nunca usado',
+      hint: 'Haz clic en una celda o arrastra sobre varias. Haz clic en un perfil o tipo de registro para pintar toda la fila o la columna. Alt + clic toma el formato de una celda.',
+      readOnly: 'Activa Editar asignaciones para pintar.',
+      row: 'Pintar toda la fila', col: 'Pintar toda la columna',
+      was: (v: string) => `antes ${v}`
+    },
+    board: {
+      recordType: 'Tipo de registro:',
+      hint: 'Arrastra los perfiles a otra columna, o haz clic en varios y usa Mover a…',
+      readOnly: 'Activa Editar asignaciones para mover los perfiles.',
+      moveTo: 'Mover a…',
+      selected: (n: number) => n === 1 ? '1 perfil seleccionado' : `${n} perfiles seleccionados`,
+      clear: 'Deseleccionar',
+      empty: 'Ningún perfil',
+      unused: 'No se usa con este tipo de registro',
+      before: (v: string) => `antes: ${v}`
     }
   },
 

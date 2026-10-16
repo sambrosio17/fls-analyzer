@@ -4,7 +4,7 @@ import type { Lang } from './i18n.tsx';
  * What changed in Orgsmith, newest first. Every change users can see (above all UI and UX) gets an entry here
  * and an update to the guide, in all four languages. `guide` links to a guide section, `demo` shows its animation.
  */
-export type ChangeDemo = 'orgs' | 'layouts' | 'tabs' | 'load' | 'apex' | 'drag' | 'filter' | 'export' | 'flow';
+export type ChangeDemo = 'orgs' | 'layouts' | 'tabs' | 'load' | 'apex' | 'drag' | 'filter' | 'export' | 'flow' | 'views' | 'paint';
 export interface ChangeEntry {
   date: string;
   prs: number[];
@@ -14,6 +14,24 @@ export interface ChangeEntry {
 }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-10-16', prs: [29], guide: 'layoutViews', demo: 'paint',
+    text: {
+      en: { title: 'Brush and board for layout assignments', body: 'Layouts and pages has two new views. Brush gives each layout or Lightning page a colour: pick one and paint cells, whole rows or columns. Board shows one column per layout and one card per profile, to drag from one to another. Choose them from View or Settings.' },
+      it: { title: 'Pennello e bacheca per le assegnazioni dei layout', body: 'Layout e pagine ha due nuove viste. Pennello dà a ogni layout o Lightning page un colore: scegline uno e colora celle, righe o colonne intere. Bacheca mostra una colonna per layout e una scheda per profilo, da trascinare da una all’altra. Le scegli da Vista o da Impostazioni.' },
+      fr: { title: 'Pinceau et colonnes pour les attributions de présentations', body: 'Présentations et pages a deux nouvelles vues. Pinceau donne une couleur à chaque présentation ou page Lightning : choisissez-en une et peignez des cellules, des lignes ou des colonnes entières. Colonnes affiche une colonne par présentation et une carte par profil, à faire glisser de l’une à l’autre. Choisissez-les dans Vue ou Paramètres.' },
+      es: { title: 'Pincel y tablero para las asignaciones de formatos', body: 'Formatos y páginas tiene dos vistas nuevas. Pincel da a cada formato o página Lightning un color: elige uno y pinta celdas, filas o columnas enteras. Tablero muestra una columna por formato y una tarjeta por perfil, para arrastrarlas de una a otra. Elígelas en Vista o en Ajustes.' }
+    }
+  },
+  {
+    date: '2026-10-16', prs: [29], guide: 'views', demo: 'views',
+    text: {
+      en: { title: 'Four views of the permission matrix, and Settings', body: 'The FLS matrix and Apex classes can now be shown four ways: Grid, Focus (one profile or field at a time with None, Read and Edit buttons, and compare), Map (small coloured squares, many more columns on screen, keyboard shortcuts) and Rules (write the change as a sentence and see how many cells change). Switch from the View menu or the new Settings page.' },
+      it: { title: 'Quattro viste della matrice dei permessi, e Impostazioni', body: 'La matrice FLS e le classi Apex ora si vedono in quattro modi: Griglia, Focus (un profilo o un campo alla volta con i pulsanti Nessuno, Lettura e Modifica, e il confronto), Mappa (quadratini colorati, molte più colonne a schermo, scorciatoie da tastiera) e Regole (scrivi la modifica come una frase e vedi quante celle cambiano). Cambi vista dal menu Vista o dalla nuova pagina Impostazioni.' },
+      fr: { title: 'Quatre vues de la matrice des autorisations, et Paramètres', body: 'La matrice FLS et les classes Apex s’affichent maintenant de quatre façons : Grille, Focus (un profil ou un champ à la fois avec les boutons Aucun, Lecture et Modification, et la comparaison), Carte (petits carrés colorés, bien plus de colonnes à l’écran, raccourcis clavier) et Règles (écrivez la modification comme une phrase et voyez combien de cellules changent). Changez de vue avec le menu Vue ou la nouvelle page Paramètres.' },
+      es: { title: 'Cuatro vistas de la matriz de permisos, y Ajustes', body: 'La matriz FLS y las clases Apex ahora se ven de cuatro formas: Cuadrícula, Foco (un perfil o un campo a la vez con los botones Ninguno, Lectura y Edición, y comparación), Mapa (cuadraditos de color, muchas más columnas en pantalla, atajos de teclado) y Reglas (escribe el cambio como una frase y ve cuántas celdas cambian). Cambia de vista en el menú Vista o en la nueva página Ajustes.' }
+    }
+  },
   {
     date: '2026-10-16', prs: [28], guide: 'layouts',
     text: {

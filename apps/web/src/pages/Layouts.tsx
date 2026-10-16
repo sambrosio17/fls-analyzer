@@ -5,6 +5,9 @@ import { trackLoad, useTabId } from '../loads.ts';
 import { useT } from '../i18n.tsx';
 import { ExportMenu, type ExportItem } from '../export/ExportMenu.tsx';
 import { CSV_TYPE, XLSX_TYPE, download, slug, stamp, toCsv, toXlsx, type Sheet } from '../export/table.ts';
+import { ViewSwitch } from '../ViewSwitch.tsx';
+import { useViews } from '../views.ts';
+import { BoardView, PaintView, optionColor, type AssignModel } from './layouts/AssignViews.tsx';
 import { api, type AssignmentInput, type LayoutAnalysis, type Org, type PageAnalysis, type ProfileInfo, type RecordTypeInfo, type SObject } from '../api.ts';
 
 type Tab = 'layouts' | 'pages';
@@ -59,6 +62,8 @@ export function LayoutsPage({ org, initialObject = null, initialTab = 'layouts',
       <div className="view-head">
         <div><div className="eyebrow">{org.label}</div><h1>{t.layouts.title}</h1>
           <p>{t.layouts.intro}</p></div>
+        <span className="spacer" />
+        <ViewSwitch kind="layouts" />
       </div>
 
       <section className="panel panel-b object-picker">
@@ -178,7 +183,7 @@ function EditToggle({ editing, onChange, pending }: { editing: boolean; onChange
 
 const editable = (p: ProfileInfo) => !!p.fullName;
 
-const dot = (i: number) => ({ background: `hsl(${(i * 67) % 360} 55% 55%)` });
+const dot = (i: number) => ({ background: optionColor(i) });
 
 function LayoutView({ data, orgLabel, onSubmit, onDirty }: { data: LayoutAnalysis; orgLabel: string } & EditProps) {
   const t = useT();
@@ -206,6 +211,7 @@ function LayoutView({ data, orgLabel, onSubmit, onDirty }: { data: LayoutAnalysi
     const l = data.layouts[layoutIndex.get(layoutId)!]!;
     return { kind: 'layout', object: data.object, profile: p.fullName!, profileLabel: p.name, recordType: rt.developerName, app: null, after: l.namespace ? `${l.namespace}__${l.name}` : l.name };
   }));
+  const [views] = useViews();
   const profiles = data.profiles.filter(p =>
     (!filter.profile.length || filter.profile.includes(p.id))
     && (!filter.onlyIssues || rts.some(rt => { const l = layoutOf(p.id, rt); return !!l && gaps.has(`${p.id}|${l}`); }))
@@ -242,7 +248,21 @@ function LayoutView({ data, orgLabel, onSubmit, onDirty }: { data: LayoutAnalysi
         <div className="panel-b">
           <Filters value={filter} onChange={setFilter} profiles={data.profiles} recordTypes={data.recordTypes} targetLabel={t.layouts.layout} issuesLabel={t.layouts.onlyGaps}
             targets={data.layouts.map(l => ({ id: l.id, label: l.name }))} />
-          <div className="tbl-wrap">
+          {views.layouts !== 'table' && (() => {
+            const rtOf = (k: string) => rts.find(rt => rtKey(rt) === k)!;
+            const model: AssignModel = {
+              editing,
+              rows: profiles.map(p => ({ id: p.id, label: p.name, editable: editable(p) })),
+              cols: rts.map(rt => ({ id: rtKey(rt), label: `${rt.label}${rt.active ? '' : t.layouts.inactive}` })),
+              options: data.layouts.map(l => ({ id: l.id, label: l.name })),
+              value: (row, col) => layoutOf(row, rtOf(col)) ?? '',
+              original: (row, col) => orgLayoutOf(row, rtOf(col)) ?? '',
+              pending: (row, col) => edits.pending.has(`${row}|${col}`),
+              set: (rows, col, layoutId) => { if (layoutId) setLayout(profiles.filter(p => rows.includes(p.id)), rtOf(col), layoutId); }
+            };
+            return views.layouts === 'paint' ? <PaintView model={model} /> : <BoardView model={model} />;
+          })()}
+          {views.layouts === 'table' && <div className="tbl-wrap">
             <table className="dt assign">
               <thead><tr><th>{t.layouts.profile}</th>{rts.map(rt => (
                 <th key={rt.id ?? 'master'}>{rt.label}{!rt.active && <span className="muted">{t.layouts.inactive}</span>}
@@ -282,7 +302,7 @@ function LayoutView({ data, orgLabel, onSubmit, onDirty }: { data: LayoutAnalysi
                 {!profiles.length && <tr><td colSpan={rts.length + 1} className="muted">{t.layouts.noProfiles}</td></tr>}
               </tbody>
             </table>
-          </div>
+          </div>}
           {editing && <EditBar count={edits.pending.size} busy={edits.busy} error={edits.error} onDiscard={edits.discard} onSend={send} hint={t.layouts.layoutEditHint} />}
           <p className="muted small">{t.layouts.gapNote}</p>
         </div>
@@ -358,6 +378,7 @@ function PageView({ data: analysis, orgLabel, onSubmit, onDirty }: { data: PageA
   const appDefault = data.appDefaults.find(a => a.app === app)?.page ?? null;
   const activeRts = data.recordTypes.filter(rt => rt.active);
   const rts = activeRts.filter(rt => !filter.recordType.length || filter.recordType.includes(rtKey(rt)));
+  const [views] = useViews();
   const rows = data.profiles
     .filter(p => !filter.profile.length || filter.profile.includes(p.id))
     .map(p => ({ p, cells: rts.map(rt => shownPage(p, rt)) }))
@@ -409,7 +430,23 @@ function PageView({ data: analysis, orgLabel, onSubmit, onDirty }: { data: PageA
           <p className="muted small">{t.layouts.defaults(appDefault ? label.get(appDefault) ?? appDefault : t.common.none, data.orgDefault ? label.get(data.orgDefault) ?? data.orgDefault : t.layouts.systemPageLower)}</p>
           <Filters value={filter} onChange={setFilter} profiles={data.profiles} recordTypes={activeRts} targetLabel={t.layouts.lightningPage} issuesLabel={t.layouts.onlySpecific}
             targets={data.pages.map(pg => ({ id: pg.name, label: pg.label }))} />
-          <div className="tbl-wrap">
+          {views.layouts !== 'table' && (() => {
+            const rtOf = (k: string) => rts.find(rt => rtKey(rt) === k)!;
+            const pOf = (id: string) => data.profiles.find(p => p.id === id)!;
+            const model: AssignModel = {
+              editing,
+              rows: rows.map(({ p }) => ({ id: p.id, label: p.name, editable: editable(p) })),
+              cols: rts.map(rt => ({ id: rtKey(rt), label: rt.label })),
+              options: [{ id: '', label: t.layouts.noSpecific }, ...data.pages.map(pg => ({ id: pg.name, label: pg.label }))],
+              value: (row, col) => specific(pOf(row), rtOf(col)),
+              original: (row, col) => orgSpecific(pOf(row), rtOf(col)),
+              pending: (row, col) => edits.pending.has(cellKey(pOf(row), rtOf(col))),
+              fallback: (row, col) => { const c = shownPage(pOf(row), rtOf(col)); return c.page ? label.get(c.page) ?? c.page : t.layouts.systemPage; },
+              set: (ids, col, page) => setPage(ids.map(pOf), rtOf(col), page)
+            };
+            return views.layouts === 'paint' ? <PaintView model={model} /> : <BoardView model={model} />;
+          })()}
+          {views.layouts === 'table' && <div className="tbl-wrap">
             <table className="dt assign">
               <thead><tr><th>{t.layouts.profile}</th>{rts.map(rt => (
                 <th key={rt.id ?? 'master'}>{rt.label}
@@ -446,7 +483,7 @@ function PageView({ data: analysis, orgLabel, onSubmit, onDirty }: { data: PageA
                 {!rows.length && <tr><td colSpan={rts.length + 1} className="muted">{t.layouts.noProfiles}</td></tr>}
               </tbody>
             </table>
-          </div>
+          </div>}
           {editing && <EditBar count={edits.pending.size} busy={edits.busy} error={edits.error} onDiscard={edits.discard} onSend={send} hint={t.layouts.pageEditHint} />}
         </div>
       </section>

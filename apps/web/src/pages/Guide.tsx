@@ -95,14 +95,47 @@ export function OrgDemo() {
   );
 }
 
+/** The Map view: small squares, a block dragged and set to edit in one go. */
+export function MapDemo() {
+  const t = useT();
+  const S = 18, L = 10, T = 30;
+  const values = [[2, 1, 0, 2, 1, 1, 0, 2, 1, 0, 2, 1], [1, 0, 0, 1, 2, 0, 1, 1, 0, 2, 1, 0], [0, 1, 2, 0, 0, 1, 2, 0, 1, 1, 0, 2], [2, 2, 1, 0, 1, 0, 0, 1, 2, 1, 1, 0], [1, 0, 2, 1, 0, 2, 1, 0, 0, 1, 2, 1]];
+  return (
+    <div className="h-demo g-map" style={{ height: T + values.length * S + 20, width: L + 12 * S + 20 }} aria-hidden="true">
+      <span className="g-viewpick" style={{ left: L, top: 2 }}>{t.views.label}: <b>{t.views.matrix.dense.name}</b></span>
+      {values.map((row, r) => row.map((v, c) => <span key={`${r}-${c}`} className={`g-sq g-v${v}`} style={{ left: L + c * S, top: T + r * S, width: S, height: S }}><i /></span>))}
+      <span className="h-range" style={{ left: L + 3 * S, top: T + S, '--w': `${S * 5}px`, '--h': `${S * 3}px`, '--w0': `${S}px`, '--h0': `${S}px` } as React.CSSProperties} />
+      {[1, 2, 3].flatMap(r => [3, 4, 5, 6, 7].map(c => <span key={`f${r}${c}`} className="g-sq g-v2 h-fill" style={{ left: L + c * S, top: T + r * S, width: S, height: S }}><i /></span>))}
+      <Cursor anim="h-drag" from={px(L + 3 * S + 9, T + S + 9)} to={px(L + 7 * S + 9, T + 3 * S + 9)} then={px(L + 7 * S + 9, T + 3 * S + 9)} />
+    </div>
+  );
+}
+
+/** The Brush view: pick a layout from the palette and paint a row. */
+export function PaintDemo() {
+  const t = useT();
+  const colors = ['hsl(0 55% 55%)', 'hsl(67 55% 55%)', 'hsl(134 55% 55%)'];
+  const block = (i: number) => ({ background: `color-mix(in srgb, ${colors[i]} 16%, var(--surface))`, borderColor: `color-mix(in srgb, ${colors[i]} 45%, transparent)` });
+  const grid = [[0, 0, 1], [1, 0, 0], [2, 2, 0]];
+  return (
+    <div className="h-demo g-paint" style={{ height: 160, width: 300 }} aria-hidden="true">
+      <span className="g-pal" style={{ left: 0, top: 0 }}>{t.views.paint.brush} {colors.map((c, i) => <i key={c} className={i === 2 ? 'g-pick' : ''} style={{ background: c }} />)}</span>
+      {['Sales', 'Service', 'Partner'].map((r, i) => <span key={r} className="h-row" style={{ left: 0, top: 36 + i * 36 }}>{r}</span>)}
+      {grid.map((row, r) => row.map((v, c) => <span key={`${r}${c}`} className="g-blk" style={{ left: 70 + c * 74, top: 40 + r * 36, ...block(v) }} />))}
+      {[0, 1, 2].map(c => <span key={`p${c}`} className="g-blk h-fill" style={{ left: 70 + c * 74, top: 40, ...block(2) }} />)}
+      <Cursor anim="h-drag" from={px(98, 8)} to={px(100, 52)} then={px(254, 52)} />
+    </div>
+  );
+}
+
 type GuideKey = keyof Messages['guide']['sections'];
 type MatrixKey = typeof MATRIX_SECTIONS[number]['key'];
 
 /** The guide's chapters; matrix chapters reuse the matrix guide's text and animations. */
 const CHAPTERS: { group: keyof Messages['guide']['groups']; items: ({ guide: GuideKey; demo?: ReactNode } | { matrix: MatrixKey })[] }[] = [
   { group: 'start', items: [{ guide: 'orgs', demo: <OrgDemo /> }, { guide: 'tabs', demo: <TabsDemo /> }, { guide: 'notices', demo: <LoadDemo /> }] },
-  { group: 'matrix', items: [{ matrix: 'read' }, { matrix: 'click' }, { matrix: 'drag' }, { matrix: 'right' }, { matrix: 'bulk' }, { matrix: 'filter' }] },
-  { group: 'tools', items: [{ guide: 'apex', demo: <ApexDemo /> }, { guide: 'layouts', demo: <LayoutEditDemo /> }] },
+  { group: 'matrix', items: [{ guide: 'views', demo: <MapDemo /> }, { matrix: 'read' }, { matrix: 'click' }, { matrix: 'drag' }, { matrix: 'right' }, { matrix: 'bulk' }, { matrix: 'filter' }] },
+  { group: 'tools', items: [{ guide: 'apex', demo: <ApexDemo /> }, { guide: 'layouts', demo: <LayoutEditDemo /> }, { guide: 'layoutViews', demo: <PaintDemo /> }] },
   { group: 'apply', items: [{ guide: 'changesets', demo: <FlowDemo /> }, { guide: 'export', demo: <ExportDemo /> }, { guide: 'history' }] },
   { group: 'more', items: [{ guide: 'settings' }] }
 ];

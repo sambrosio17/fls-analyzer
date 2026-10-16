@@ -34,7 +34,7 @@ export const fr: Messages = {
 
   app: {
     guide: 'Guide', news: 'Nouveautés', newsUnread: 'Nouveautés à lire',
-    orgs: 'Orgs', history: 'Historique', logout: 'Déconnexion',
+    orgs: 'Orgs', history: 'Historique', logout: 'Déconnexion', settings: 'Paramètres',
     openOrgs: 'Orgs ouvertes', toolsLabel: 'Outils', openObjects: 'Objets ouverts', openChangeSets: 'Change sets ouverts',
     closeX: (name: string) => `Fermer ${name}`,
     openOrg: 'Ouvrir une org',
@@ -61,11 +61,112 @@ export const fr: Messages = {
       tabs: { title: 'Onglets de travail', body: <>Les onglets sont sur trois niveaux : les <b>orgs</b> ouvertes, l’<b>outil</b> de l’org active (Matrice FLS, Classes Apex, Présentations et pages, Change sets) et les <b>objets</b> ouverts dans cet outil. Chaque onglet d’objet garde ses filtres et ses changements en attente. <b>Faites glisser</b> un onglet pour le déplacer, ou utilisez <kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>←</kbd>/<kbd>→</kbd>. Le point coloré de l’onglet d’org change sa couleur, ↻ renouvelle la session, le clic du milieu ferme un onglet.</> },
       notices: { title: 'Chargements longs en arrière-plan', body: <>Les chargements continuent quand vous changez d’onglet. Si vous quittez un onglet pendant qu’il charge une matrice, des présentations ou exécute un change set, un panneau en bas à droite le suit et vous prévient quand c’est prêt ; <b>Ouvrir</b> vous y ramène. Revenir sur l’onglet efface l’avis.</> },
       apex: { title: 'Classes Apex', body: <>Quels profils et ensembles d’autorisations peuvent exécuter chaque classe Apex. Cela fonctionne comme la matrice FLS avec deux états, activée ou non : clic, glisser, clic droit et actions en masse, puis aperçu et approbation. Les classes de packages gérés peuvent être masquées par un filtre.</> },
+      views: { title: 'Quatre façons de voir la matrice', body: <>Le menu <b>Vue</b> en haut de la matrice FLS et des classes Apex, ou la page <b>Paramètres</b>, passe d’une vue à l’autre des mêmes données et des mêmes modifications en attente. <b>Grille</b> est le tableau classique. <b>Focus</b> ouvre un profil ou ensemble d’autorisations (ou un champ) avec les boutons <b>Aucun</b>, <b>Lecture</b> et <b>Modification</b> sur chaque ligne ; avec <b>comparer</b>, affichez jusqu’à trois autres à côté pour copier leurs valeurs. <b>Carte</b> dessine chaque cellule comme un petit carré, ce qui affiche bien plus de profils : survolez pour lire une cellule, faites glisser pour sélectionner un bloc, puis choisissez l’accès ou appuyez sur <kbd>N</kbd>, <kbd>L</kbd>, <kbd>M</kbd>. <b>Règles</b> écrit la modification comme une phrase, par exemple « Accorder la modification sur ces champs à ces ensembles d’autorisations », et montre combien de cellules changent avant de l’ajouter.</> },
+      layoutViews: { title: 'Pinceau et tableau pour les attributions', body: <>Présentations et pages a aussi trois vues, depuis <b>Vue</b> ou <b>Paramètres</b>. <b>Tableau</b> est la liste avec un menu par cellule. <b>Pinceau</b> donne une couleur à chaque présentation ou page Lightning : avec <b>Modifier les attributions</b> actif, choisissez-en une dans la palette et cliquez ou faites glisser sur les cellules, ou cliquez un profil ou un type d’enregistrement pour peindre toute la ligne ou la colonne ; <kbd>Alt</kbd> + clic reprend la présentation d’une cellule. <b>Colonnes</b> affiche une colonne par présentation ou page et une carte par profil, un type d’enregistrement à la fois : faites glisser les cartes, ou cliquez-en plusieurs et utilisez <b>Déplacer vers…</b>. Une colonne vide est une présentation que personne n’utilise.</> },
       layouts: { title: 'Présentations et pages', body: <>Choisissez un objet pour voir, pour chaque profil et type d’enregistrement, quelle <b>présentation de page</b> et quelle <b>page Lightning</b> il reçoit (par application, type d’enregistrement et valeur par défaut de l’org), et les champs de la présentation que le profil ne peut pas lire. Avec <b>Modifier les attributions</b>, vous les changez cellule par cellule, ou toute une colonne avec <b>Toute la colonne…</b> ; les cellules modifiées passent en violet. <b>Voir l’aperçu</b> crée un change set, appliqué comme ceux de FLS. Pour les pages Lightning, la modification vaut pour l’app choisie, et supprimer une attribution spécifique renvoie le profil au défaut de l’app ou de l’org. <b>Ordinateur</b> et <b>Téléphone</b> ont des attributions séparées : on passe de l’un à l’autre à côté de l’app, et en modification « Appliquer chaque modification à l’ordinateur et au téléphone » change les deux. Si Salesforce refuse certaines modifications, les autres passent quand même et le résultat indique le temps de chaque étape.</> },
       changesets: { title: 'Change sets', body: <>Rien n’est écrit avant votre confirmation. <b>Voir l’aperçu</b> transforme les changements en attente en change set avec ce qui est ajouté, modifié et retiré, et les avertissements. En production il faut une approbation et saisir le nom de l’org. L’exécution montre la progression et le résultat ligne par ligne.</> },
       export: { title: 'Exporter', body: <>Le bouton <b>Exporter</b> enregistre ce que vous voyez : la matrice en Excel, en CSV ou en métadonnées Salesforce (package.xml et un fichier par profil et ensemble d’autorisations), les change sets en Excel, CSV ou métadonnées avec les valeurs qu’ils définissent, et les présentations en Excel ou CSV. Un panneau en bas à droite montre la progression des gros fichiers.</> },
       history: { title: 'Historique et annulation', body: <>L’<b>Historique</b> liste chaque change set avec qui l’a préparé et approuvé, et quand. Chacun garde les valeurs d’avant, donc <b>Annuler ces modifications</b>, dans le change set, crée un change set qui les restaure.</> },
       settings: { title: 'Langue et session', body: <>Choisissez English, Italiano, Français ou Español dans le menu avec les drapeaux. <b>Se déconnecter</b> ferme la session Orgsmith ; vos orgs restent connectées.</> }
+    }
+  },
+
+  settings: {
+    title: 'Paramètres',
+    intro: 'Choisissez comment Orgsmith affiche les matrices. Le choix est gardé dans ce navigateur, et le menu Vue en haut de chaque outil le change aussi.',
+    matrix: 'Matrices des autorisations (FLS et classes Apex)',
+    layouts: 'Attributions de présentations et de pages Lightning',
+    current: 'Utilisée',
+    language: 'La langue se choisit dans le menu avec les drapeaux, en haut.'
+  },
+
+  views: {
+    label: 'Vue',
+    matrix: {
+      grid: { name: 'Grille', desc: 'Chaque champ face à chaque profil et ensemble d’autorisations. Cliquez une cellule, faites glisser sur plusieurs ou cochez lignes et colonnes.' },
+      focus: { name: 'Focus', desc: 'Un profil ou ensemble d’autorisations à la fois, ou un champ, avec les boutons Aucun, Lecture et Modification sur chaque ligne. Comparez-en jusqu’à trois autres et copiez leurs valeurs.' },
+      dense: { name: 'Carte', desc: 'Chaque cellule en petit carré coloré : quatre à cinq fois plus de colonnes à l’écran. Survolez pour lire, faites glisser pour sélectionner, réglez au clavier.' },
+      rules: { name: 'Règles', desc: 'Écrivez la modification comme une phrase : accorder la modification sur ces champs à ces ensembles d’autorisations. Vous voyez combien de cellules changent avant de l’ajouter.' }
+    },
+    layouts: {
+      table: { name: 'Tableau', desc: 'Une ligne par profil, une colonne par type d’enregistrement, avec un menu dans chaque cellule en mode modification.' },
+      paint: { name: 'Pinceau', desc: 'Chaque présentation a une couleur. Choisissez-la dans la palette et peignez des cellules, des lignes ou des colonnes entières.' },
+      board: { name: 'Colonnes', desc: 'Une colonne par présentation, une carte par profil. Faites glisser les profils d’une présentation à l’autre, un type d’enregistrement à la fois.' }
+    },
+    levels: ['Aucun', 'Lecture', 'Modification'],
+    focus: {
+      byPs: 'Par profil', byField: 'Par champ', byClass: 'Par classe',
+      searchPs: 'Rechercher profils et ensembles d’autorisations', searchField: 'Rechercher des champs', searchClass: 'Rechercher des classes',
+      profiles: 'Profils', permSets: 'Ensembles d’autorisations',
+      compare: 'comparer', comparing: 'comparé',
+      uncompare: (name: string) => `Ne plus comparer ${name}`,
+      pick: 'Choisissez un profil ou ensemble d’autorisations à gauche.',
+      pickField: 'Choisissez un champ à gauche.',
+      stats: (r: number, e: number, hidden: number) => `${r} en lecture · ${e} en modification · ${hidden} masqués`,
+      statsApex: (on: number, off: number) => `${on} activées · ${off} désactivées`,
+      copyAll: (from: string) => `Tout copier depuis ${from}`,
+      copyOne: (v: string, from: string) => `Copier « ${v} » depuis ${from}`,
+      lockedPs: 'Ensemble d’autorisations d’un package géré, un groupe ou un muting : en lecture seule.',
+      selected: (n: number) => n === 1 ? '1 sélectionné' : `${n} sélectionnés`,
+      set: 'Définir :',
+      selectAll: 'Tout sélectionner',
+      access: 'Accès',
+      only: { all: 'Tous', diff: 'Différences seulement', none: 'Sans accès seulement', pending: 'Avec modifications' },
+      noFls: 'Toujours visible (sans FLS)',
+      more: (n: number) => `Afficher ${n} de plus`
+    },
+    dense: {
+      size: 'Taille',
+      keys: { none: 'n', read: 'l', edit: 'm' },
+      help: (keys: string[]) => <>Cliquez ou faites glisser pour sélectionner · cliquez un nom pour toute la ligne ou colonne · {keys.map(k => <kbd key={k}>{k}</kbd>)} définit · <kbd>Espace</kbd> fait défiler · <kbd>Maj</kbd>+flèches étend · <kbd>Échap</kbd> annule</>
+    },
+    rules: {
+      action: 'Action', from: 'Choisissez de qui copier l’accès',
+      actions: { edit: 'Accorder la modification', read: 'Accorder la lecture', removeEdit: 'Retirer seulement la modification', none: 'Retirer tout accès', copy: 'Copier l’accès de' },
+      onWord: 'sur', toWord: 'à', forWord: 'pour', toWordCopy: 'vers',
+      allFields: (n: number, apex: boolean) => apex ? `les ${n} classes` : `les ${n} champs`,
+      someFields: (n: number, apex: boolean) => apex ? (n === 1 ? '1 classe' : `${n} classes`) : (n === 1 ? '1 champ' : `${n} champs`),
+      allPs: (n: number) => `les ${n} profils et ensembles d’autorisations`,
+      somePs: (n: number) => n === 1 ? '1 profil ou ensemble d’autorisations' : `${n} profils et ensembles d’autorisations`,
+      reads: (what: string, fields: string, ps: string) => `${what} sur ${fields} pour ${ps}. Un filtre vide signifie tout ce que montre la matrice.`,
+      sentence: (what: string, fields: string, ps: string) => `${what} · ${fields} · ${ps}`,
+      recipes: 'Raccourcis :',
+      recipeClone: 'Même accès qu’un autre profil',
+      recipeEncrypted: 'Pas de modification sur les champs chiffrés',
+      recipeCustom: 'Lecture sur les champs personnalisés',
+      recipePackage: 'Désactiver les classes des packages',
+      changes: 'cellules changent', more: 'plus d’accès', less: 'moins d’accès',
+      skipped: (n: number) => `${n} cellules verrouillées exclues`,
+      add: 'Ajouter aux modifications en attente',
+      cols: ['Champ', 'Profil / ensemble d’autorisations', 'Actuel', 'Après'],
+      pickFrom: 'Choisissez de qui copier l’accès.',
+      nothing: 'Rien ne change : l’accès est déjà ainsi.',
+      andMore: (n: number) => `et ${n} de plus`,
+      queue: 'Règles ajoutées',
+      queueEmpty: 'Aucune pour l’instant. Écrivez une règle et ajoutez-la.',
+      queueNote: 'Les règles ajoutées sont déjà dans les modifications en attente ; Voir l’aperçu en fait un change set. Retirer annule la dernière.',
+      cells: (n: number) => n === 1 ? '1 cellule' : `${n} cellules`,
+      remove: 'Retirer'
+    },
+    paint: {
+      brush: 'Pinceau :',
+      none: 'Défaut de l’app ou de l’org',
+      unused: 'jamais utilisée',
+      hint: 'Cliquez une cellule ou faites glisser sur plusieurs. Cliquez un profil ou un type d’enregistrement pour peindre toute la ligne ou la colonne. Alt + clic reprend la présentation d’une cellule.',
+      readOnly: 'Activez Modifier les attributions pour peindre.',
+      row: 'Peindre toute la ligne', col: 'Peindre toute la colonne',
+      was: (v: string) => `avant ${v}`
+    },
+    board: {
+      recordType: 'Type d’enregistrement :',
+      hint: 'Faites glisser les profils vers une autre colonne, ou cliquez-en plusieurs et utilisez Déplacer vers…',
+      readOnly: 'Activez Modifier les attributions pour déplacer les profils.',
+      moveTo: 'Déplacer vers…',
+      selected: (n: number) => n === 1 ? '1 profil sélectionné' : `${n} profils sélectionnés`,
+      clear: 'Désélectionner',
+      empty: 'Aucun profil',
+      unused: 'Pas utilisée avec ce type d’enregistrement',
+      before: (v: string) => `avant : ${v}`
     }
   },
 
