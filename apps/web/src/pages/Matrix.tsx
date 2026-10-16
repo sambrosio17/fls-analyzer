@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { MatrixHelp } from './MatrixHelp.tsx';
+import { bounds, forEachCell, menuPosition, rangeSize, type CellRange } from '../cellRange.ts';
 import { ACCESS_LONG, ACCESS_SHORT, api, type Access, type BulkAction, type FieldMeta, type Matrix, type Org, type PermSet, type SObject } from '../api.ts';
 
 const lockedPs = (p: PermSet) => !!p.namespace || p.type === 'Group' || p.type === 'Muting';
@@ -36,6 +38,11 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   const [bulkAction, setBulkAction] = useState<BulkAction>('read');
   const [creating, setCreating] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
+  const [help, setHelp] = useState(false);
+  // Cells picked by dragging the mouse, by position in `fields` and `columns`, and the menu shown for them.
+  const [range, setRange] = useState<CellRange | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const drag = useRef<{ active: boolean; moved: boolean; i: number; j: number; x: number; y: number }>({ active: false, moved: false, i: 0, j: 0, x: 0, y: 0 });
 
   useEffect(() => { api.objects(org.id).then(setObjects).catch(e => setError(e.message)); }, [org.id]);
   useEffect(() => { onDirtyChange?.(pending.size > 0); }, [rev > 0 && pending.size > 0]);
@@ -147,19 +154,131 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
     touch();
   };
 
+  const targetFor = (action: BulkAction, c: Access): Access => action === 'read' ? 1 : action === 'edit' ? 2 : action === 'none' ? 0 : c === 2 ? 1 : c;
+
   const applyBulk = () => {
     for (const i of rows) {
       const f = allFields[i]!;
       for (const j of cols) {
         if (locked(f, allPs[j]!)) continue;
         const idx = j * F + i;
-        const c = cur(idx);
-        const target: Access = bulkAction === 'read' ? 1 : bulkAction === 'edit' ? 2 : bulkAction === 'none' ? 0 : c === 2 ? 1 : c;
-        setCell(f, idx, target);
+        setCell(f, idx, targetFor(bulkAction, cur(idx)));
       }
     }
     touch();
   };
+
+  // ---- drag selection
+  const fieldPos = useMemo(() => { const m = new Int32Array(F).fill(-1); fields.forEach((i, p) => { m[i] = p; }); return m; }, [fields]);
+  const colPos = useMemo(() => { const m = new Int32Array(allPs.length).fill(-1); columns.forEach((j, p) => { m[j] = p; }); return m; }, [columns]);
+  useEffect(() => { setRange(null); setMenu(null); }, [fields, columns]);
+
+  const rangeStats = useMemo(() => {
+    if (!range) return { cells: 0, editable: 0, pending: 0 };
+    let editable = 0, pend = 0;
+    forEachCell(range, fields, columns, (i, j) => {
+      const f = allFields[i]!;
+      if (!f.permissionable || locked(f, allPs[j]!)) return;
+      editable++;
+      if (pending.has(j * F + i)) pend++;
+    });
+    return { cells: rangeSize(range), editable, pending: pend };
+  }, [range, rev]);
+
+  const applyRange = (action: BulkAction | 'revert') => {
+    if (!range) return;
+    forEachCell(range, fields, columns, (i, j) => {
+      const f = allFields[i]!;
+      if (!f.permissionable || locked(f, allPs[j]!)) return;
+      const idx = j * F + i;
+      setCell(f, idx, action === 'revert' ? base[idx] as Access : targetFor(action, cur(idx)));
+    });
+    touch(); setMenu(null); setRange(null);
+  };
+
+  const cellAt = (x: number, y: number) => {
+    const td = (document.elementFromPoint(x, y) as Element | null)?.closest<HTMLElement>('td[data-i]');
+    if (!td || !scroller.current?.contains(td)) return null;
+    return { i: Number(td.dataset.i), j: Number(td.dataset.j) };
+  };
+  const extendTo = (i: number, j: number) => {
+    const r = fieldPos[i]!, c = colPos[j]!;
+    if (r < 0 || c < 0) return;
+    setRange(prev => prev && (prev.r1 !== r || prev.c1 !== c) ? { ...prev, r1: r, c1: c } : prev);
+  };
+
+  const onCellMouseDown = (e: React.MouseEvent, i: number, j: number) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    setMenu(null);
+    const r = fieldPos[i]!, c = colPos[j]!;
+    if (e.shiftKey && range) setRange({ ...range, r1: r, c1: c });
+    else setRange({ r0: r, c0: c, r1: r, c1: c });
+    drag.current = { active: true, moved: e.shiftKey && !!range, i, j, x: e.clientX, y: e.clientY };
+  };
+
+  const onCellContextMenu = (e: React.MouseEvent, i: number, j: number) => {
+    e.preventDefault();
+    const r = fieldPos[i]!, c = colPos[j]!;
+    const b = range && bounds(range);
+    if (!b || r < b.top || r > b.bottom || c < b.left || c > b.right) setRange({ r0: r, c0: c, r1: r, c1: c });
+    setMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  // While dragging: follow the pointer, scroll the grid near its edges, and on release either cycle the one cell or open the menu.
+  // The listeners are registered once and read the current render through `live`, so re-renders don't stop the scroll loop.
+  const live = useRef({ cellAt, extendTo, clickCell, setRange, setMenu, headH: 90, fcolW: 280 });
+  useEffect(() => {
+    let raf = 0;
+    const follow = (x: number, y: number) => {
+      const d = drag.current, hit = live.current.cellAt(x, y);
+      if (!hit) return;
+      if (hit.i !== d.i || hit.j !== d.j) d.moved = true;
+      live.current.extendTo(hit.i, hit.j);
+    };
+    const tick = () => {
+      raf = 0;
+      const d = drag.current, el = scroller.current;
+      if (!d.active || !el) return;
+      const { headH, fcolW } = live.current;
+      const box = el.getBoundingClientRect(), edge = 40, step = 18;
+      let dx = 0, dy = 0;
+      if (d.y > box.bottom - edge) dy = step; else if (d.y < box.top + headH + edge / 2) dy = -step;
+      if (d.x > box.right - edge) dx = step; else if (d.x < box.left + fcolW + edge / 2) dx = -step;
+      if (dx || dy) {
+        el.scrollBy(dx, dy);
+        follow(Math.min(Math.max(d.x, box.left + fcolW + 1), box.right - 2), Math.min(Math.max(d.y, box.top + headH + 1), box.bottom - 2));
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    const move = (e: MouseEvent) => {
+      const d = drag.current;
+      if (!d.active) return;
+      d.x = e.clientX; d.y = e.clientY;
+      follow(e.clientX, e.clientY);
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+    const up = (e: MouseEvent) => {
+      const d = drag.current;
+      if (!d.active) return;
+      d.active = false;
+      cancelAnimationFrame(raf); raf = 0;
+      if (!d.moved) { live.current.clickCell(d.i, d.j); live.current.setRange(null); return; }
+      live.current.setMenu({ x: e.clientX, y: e.clientY });
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+    return () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); cancelAnimationFrame(raf); };
+  }, []);
+
+  useEffect(() => {
+    if (!menu && !range) return;
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMenu(null); setRange(null); } };
+    const down = (e: MouseEvent) => { if (menu && !(e.target as Element).closest?.('.cell-menu')) setMenu(null); };
+    document.addEventListener('keydown', key);
+    document.addEventListener('mousedown', down);
+    return () => { document.removeEventListener('keydown', key); document.removeEventListener('mousedown', down); };
+  }, [menu, range]);
 
   const createChangeSet = async () => {
     if (pending.size > MAX_CHANGES) {
@@ -212,6 +331,8 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   const leftPad = firstCol * COL_W, rightPad = (columns.length - lastCol) * COL_W;
   const padCells = (pad: number, k: string) => pad > 0 ? <td className="pad" key={k} style={{ width: pad, minWidth: pad }} /> : null;
 
+  const rb = range && bounds(range);
+  live.current = { cellAt, extendTo, clickCell, setRange, setMenu, headH: view.headH, fcolW: view.fcolW };
   const permissionableVisible = fields.filter(i => allFields[i]!.permissionable);
   const objectMatches = objectQuery.length < 2 ? [] : objects.filter(o =>
     !selected.includes(o.name) && (o.label.toLowerCase().includes(objectQuery.toLowerCase()) || o.name.toLowerCase().includes(objectQuery.toLowerCase()))).slice(0, 8);
@@ -220,8 +341,11 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
     <>
       <div className="view-head">
         <div><div className="eyebrow">{org.label}</div><h1>Matrice Field Level Security</h1>
-          <p>Scegli gli oggetti. Clicca una cella per cambiarla, oppure seleziona righe e colonne e applica un'azione in blocco. Niente viene scritto finché non confermi l'anteprima.</p></div>
+          <p>Scegli gli oggetti. Clicca una cella per cambiarla, trascina il mouse su più celle per scegliere l'accesso da un menu, oppure seleziona righe e colonne e applica un'azione in blocco. Niente viene scritto finché non confermi l'anteprima.</p></div>
+        <span className="spacer" />
+        <button className="btn" onClick={() => setHelp(true)}>? Guida</button>
       </div>
+      <MatrixHelp open={help} onClose={() => setHelp(false)} />
 
       <section className="panel panel-b object-picker">
         <div className="row">
@@ -331,12 +455,20 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
                       {padCells(leftPad, 'lp')}
                       {visCols.map(j => {
                         const p = allPs[j]!;
-                        if (!f.permissionable) return <td key={j} className="c locked"><button disabled title="Campo senza FLS: sempre visibile">sempre</button></td>;
+                        if (!f.permissionable) {
+                          const pk = !!rb && fieldPos[i]! >= rb.top && fieldPos[i]! <= rb.bottom && colPos[j]! >= rb.left && colPos[j]! <= rb.right;
+                          return <td key={j} data-i={i} data-j={j} className={`c locked${pk ? ' rsel' : ''}`} onMouseDown={e => onCellMouseDown(e, i, j)} onContextMenu={e => onCellContextMenu(e, i, j)}>
+                            <button disabled title="Campo senza FLS: sempre visibile">sempre</button></td>;
+                        }
                         const idx = j * F + i;
                         const v = cur(idx), b = base[idx] as Access, isPending = pending.has(idx);
+                        const r = fieldPos[i]!, c = colPos[j]!;
+                        const picked = !!rb && r >= rb.top && r <= rb.bottom && c >= rb.left && c <= rb.right;
                         return (
-                          <td key={j} className={`c v${v}${isPending ? ' pend' : ''}${locked(f, p) ? ' locked' : ''}${cols.has(j) ? ' colsel' : ''}`}>
-                            <button onClick={() => clickCell(i, j)} title={`${p.label} · ${f.name}: ${ACCESS_LONG[v]}${isPending ? ` (prima: ${ACCESS_LONG[b]})` : ''}`}>
+                          <td key={j} data-i={i} data-j={j} className={`c v${v}${isPending ? ' pend' : ''}${locked(f, p) ? ' locked' : ''}${cols.has(j) ? ' colsel' : ''}${picked ? ' rsel' : ''}`}
+                            onMouseDown={e => onCellMouseDown(e, i, j)} onContextMenu={e => onCellContextMenu(e, i, j)}>
+                            {/* Mouse clicks are handled on mousedown/up (they may start a drag); this onClick is for the keyboard. */}
+                            <button onClick={e => { if (e.detail === 0) clickCell(i, j); }} title={`${p.label} · ${f.name}: ${ACCESS_LONG[v]}${isPending ? ` (prima: ${ACCESS_LONG[b]})` : ''}`}>
                               <span className="v">{ACCESS_SHORT[v]}</span>{isPending && <span className="was">da {ACCESS_SHORT[b]}</span>}
                             </button>
                           </td>
@@ -350,6 +482,9 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
               </tbody>
             </table>
           </div>
+          {menu && range && (
+            <CellMenu x={menu.x} y={menu.y} stats={rangeStats} onPick={applyRange} onClose={() => { setMenu(null); setRange(null); }} />
+          )}
           <div className="legend">
             <span><span className="box">—</span>Nessun accesso</span><span><span className="box b1">L</span>Lettura</span><span><span className="box b2">L+M</span>Lettura e modifica</span>
             <span><span className="box bp" />Modifica in sospeso</span><span><span className="box bl" />Non modificabile</span>
@@ -357,5 +492,28 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
         </>
       )}
     </>
+  );
+}
+
+const MENU_W = 240, MENU_H = 290;
+
+/** Access choices for the cells picked by dragging. */
+function CellMenu({ x, y, stats, onPick, onClose }: {
+  x: number; y: number; stats: { cells: number; editable: number; pending: number };
+  onPick: (action: BulkAction | 'revert') => void; onClose: () => void;
+}) {
+  const pos = menuPosition(x, y, MENU_W, MENU_H, window.innerWidth, window.innerHeight);
+  const none = stats.editable === 0;
+  return (
+    <div className="cell-menu" role="menu" style={pos} onContextMenu={e => e.preventDefault()}>
+      <div className="cell-menu-h">{stats.cells === 1 ? '1 cella' : `${stats.cells} celle`}{stats.editable !== stats.cells && ` · ${stats.editable} modificabili`}</div>
+      <button role="menuitem" disabled={none} onClick={() => onPick('none')}><span className="box">—</span>Nessun accesso</button>
+      <button role="menuitem" disabled={none} onClick={() => onPick('read')}><span className="box b1">L</span>Lettura</button>
+      <button role="menuitem" disabled={none} onClick={() => onPick('edit')}><span className="box b2">L+M</span>Lettura e modifica</button>
+      <button role="menuitem" disabled={none} onClick={() => onPick('removeEdit')}><span className="box b1">L</span>Togli solo la modifica</button>
+      <hr />
+      <button role="menuitem" disabled={!stats.pending} onClick={() => onPick('revert')}><span className="box bp" />Ripristina i valori dell'org{stats.pending ? ` (${stats.pending})` : ''}</button>
+      <button role="menuitem" onClick={onClose}><span className="box" />Annulla selezione</button>
+    </div>
   );
 }
