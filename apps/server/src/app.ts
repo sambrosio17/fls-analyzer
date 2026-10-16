@@ -88,7 +88,7 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
     }
     if (path === '/api/session' || !(path.startsWith('/api/') || path.startsWith('/oauth/')) || authed(req)) return;
     if (path.startsWith('/oauth/')) {
-      return reply.redirect(`/?oauthError=${encodeURIComponent("Sessione dell'app non trovata: entra nell'app e ricollega l'org.")}`);
+      return reply.redirect(`/?oauthError=${encodeURIComponent('App session not found: log in to the app and connect the org again.')}`);
     }
     return reply.code(401).send({ error: 'Login required' });
   });
@@ -173,7 +173,7 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
     if (!extraApis?.has(org.id)) {
       try { await renewToken(org); } catch (e) {
         db.audit({ tenant, orgId: org.id, actor: config.appUser, action: 'org.token_refresh_failed', detail: (e as Error).message });
-        return reply.code(409).send({ error: `Salesforce non ha rinnovato il token (${(e as Error).message}). Ricollega l'org con il login.`, reauth: true });
+        return reply.code(409).send({ error: `Salesforce did not renew the token (${(e as Error).message}). Log in to the org again.`, detail: (e as Error).message, reauth: true });
       }
     }
     db.audit({ tenant, orgId: org.id, actor: config.appUser, action: 'org.token_refreshed' });

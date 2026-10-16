@@ -9,7 +9,7 @@ describe('workspace tabs', () => {
     const ws = openOrg(EMPTY, 'a');
     expect(ws.orgs).toEqual(['a']);
     expect(toolOf(ws, 'a')).toBe('matrix');
-    expect(tabTitle(visibleTab(ws)!)).toBe('Nuovo oggetto');
+    expect(tabTitle(visibleTab(ws)!, { changeSet: 'Change set', newObject: 'New object' })).toBe('New object');
     expect(openOrg(ws, 'a').tabs).toHaveLength(1);
   });
 

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ACCESS_SHORT, SKIP_LABEL, STATUS_LABEL, WARNING_LABEL, api, type ChangeSet, type Status } from '../api.ts';
+import { api, type ChangeSet, type Status } from '../api.ts';
+import { useT } from '../i18n.tsx';
 
 const STATUS_CLASS: Record<Status, string> = {
   draft: '', pending_approval: 'st-part', approved: 'st-info', rejected: 'st-err', running: 'st-info', done: 'st-ok', partial: 'st-part', failed: 'st-err'
 };
-const ITEM_LABEL = { pending: 'Da applicare', ok: 'Applicata', error: 'Errore', conflict: 'Conflitto' } as const;
 
 interface Props { id: string; onOpen: (id: string, number: string) => void; onBack: () => void }
 
@@ -12,6 +12,7 @@ interface Props { id: string; onOpen: (id: string, number: string) => void; onBa
 const PAGE = 250;
 
 export function ChangeSetPage({ id, onOpen, onBack }: Props) {
+  const t = useT();
   const [cs, setCs] = useState<ChangeSet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -29,7 +30,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
   }, [id, cs?.status]);
 
   if (error && !cs) return <div className="banner prod">{error}</div>;
-  if (!cs) return <p className="muted">Caricamento…</p>;
+  if (!cs) return <p className="muted">{t.common.loading}</p>;
 
   const act = async (fn: () => Promise<ChangeSet>, after?: (r: ChangeSet) => void) => {
     setBusy(true); setError(null);
@@ -51,54 +52,54 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
       <div className="view-head">
         <div>
           <div className="eyebrow">{cs.number} · {cs.org.label}</div>
-          <h1>{finished ? 'Risultato' : 'Anteprima modifiche'} <span className={`pill ${STATUS_CLASS[cs.status]}`}>{STATUS_LABEL[cs.status]}</span></h1>
-          <p>{cs.description}{cs.rollbackOf && ' · annulla un change set precedente'}</p>
+          <h1>{finished ? t.changeSet.result : t.changeSet.preview} <span className={`pill ${STATUS_CLASS[cs.status]}`}>{t.status[cs.status]}</span></h1>
+          <p>{cs.description}{cs.rollbackOf && t.changeSet.undoes}</p>
         </div>
         <span className="spacer" />
-        <button className="btn" onClick={onBack}>Chiudi</button>
+        <button className="btn" onClick={onBack}>{t.common.close}</button>
       </div>
       {error && <div className="banner prod">{error}</div>}
       {notice && <div className="banner info">{notice}</div>}
 
       <div className="kpis">
-        <div className="kpi"><div className="k">Modifiche</div><div className="n">{items.length}</div></div>
-        <div className="kpi good"><div className="k">Nuovi accessi</div><div className="n">{count('insert')}</div></div>
-        <div className="kpi"><div className="k">Accessi cambiati</div><div className="n">{count('update')}</div></div>
-        <div className="kpi bad"><div className="k">Accessi rimossi</div><div className="n">{count('delete')}</div></div>
+        <div className="kpi"><div className="k">{t.changeSet.kpiChanges}</div><div className="n">{items.length}</div></div>
+        <div className="kpi good"><div className="k">{t.changeSet.kpiNew}</div><div className="n">{count('insert')}</div></div>
+        <div className="kpi"><div className="k">{t.changeSet.kpiChanged}</div><div className="n">{count('update')}</div></div>
+        <div className="kpi bad"><div className="k">{t.changeSet.kpiRemoved}</div><div className="n">{count('delete')}</div></div>
         {finished
-          ? <div className="kpi bad"><div className="k">Errori e conflitti</div><div className="n">{failed.length}</div></div>
-          : <div className="kpi warn"><div className="k">Con avvisi</div><div className="n">{items.filter(i => i.warnings.length).length}</div></div>}
+          ? <div className="kpi bad"><div className="k">{t.changeSet.kpiFailed}</div><div className="n">{failed.length}</div></div>
+          : <div className="kpi warn"><div className="k">{t.changeSet.kpiWarnings}</div><div className="n">{items.filter(i => i.warnings.length).length}</div></div>}
       </div>
 
       <div className="prev-grid">
         <section className="panel" style={{ minWidth: 0 }}>
-          <div className="panel-h"><h2>Dettaglio</h2>
+          <div className="panel-h"><h2>{t.changeSet.detail}</h2>
             <div className="row">
-              {([['all', 'Tutte'], ['insert', 'Insert'], ['update', 'Update'], ['delete', 'Delete'], ['warn', 'Con avvisi'], ...(finished ? [['failed', 'Errori']] : [])] as [typeof opFilter, string][]).map(([f, l]) => (
+              {(['all', 'insert', 'update', 'delete', 'warn', ...(finished ? ['failed'] : [])] as (typeof opFilter)[]).map(f => [f, t.changeSet.filters[f]] as const).map(([f, l]) => (
                 <button key={f} className="chip" aria-pressed={opFilter === f} onClick={() => { setOpFilter(f); setLimit(PAGE); }}>{l}</button>
               ))}
             </div>
           </div>
           <div className="tbl-wrap">
             <table className="dt">
-              <thead><tr><th>Profilo / permission set</th><th>Campo</th><th>Prima</th><th>Dopo</th><th>Operazione</th><th>Esito</th></tr></thead>
+              <thead><tr>{t.changeSet.cols.map(c => <th key={c}>{c}</th>)}</tr></thead>
               <tbody>
                 {shown.slice(0, limit).map(i => (
                   <tr key={i.id}>
                     <td>{i.parentLabel}</td>
                     <td><span className="mono">{i.field}</span>
-                      {i.warnings.map(w => <div className="warn-text" key={w}>⚠ {WARNING_LABEL[w] ?? w}</div>)}
+                      {i.warnings.map(w => <div className="warn-text" key={w}>⚠ {t.warning[w] ?? w}</div>)}
                       {i.errorMessage && <div className="err-text"><span className="mono">{i.errorCode}</span> {i.errorMessage}</div>}
                     </td>
-                    <td className="mono">{ACCESS_SHORT[i.before]}</td>
-                    <td className="mono"><b>{ACCESS_SHORT[i.after]}</b></td>
+                    <td className="mono">{t.access.short[i.before]}</td>
+                    <td className="mono"><b>{t.access.short[i.after]}</b></td>
                     <td><span className={`pill op-${i.op}`}>{i.op}</span></td>
-                    <td><span className={`pill ${i.status === 'ok' ? 'st-ok' : i.status === 'pending' ? '' : 'st-err'}`}>{ITEM_LABEL[i.status]}</span></td>
+                    <td><span className={`pill ${i.status === 'ok' ? 'st-ok' : i.status === 'pending' ? '' : 'st-err'}`}>{t.changeSet.item[i.status]}</span></td>
                   </tr>
                 ))}
-                {!shown.length && <tr><td colSpan={6} className="muted">Nessuna riga.</td></tr>}
+                {!shown.length && <tr><td colSpan={6} className="muted">{t.changeSet.noRows}</td></tr>}
                 {shown.length > limit && (
-                  <tr><td colSpan={6}><span className="muted">Mostrate {limit} di {shown.length}.</span> <button className="btn sm" onClick={() => setLimit(l => l + PAGE * 4)}>Mostra altre</button></td></tr>
+                  <tr><td colSpan={6}><span className="muted">{t.changeSet.shown(limit, shown.length)}</span> <button className="btn sm" onClick={() => setLimit(l => l + PAGE * 4)}>{t.changeSet.showMore}</button></td></tr>
                 )}
               </tbody>
             </table>
@@ -107,51 +108,51 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
 
         <aside className="stack">
           {Object.keys(skippedByReason).length > 0 && (
-            <section className="panel"><div className="panel-h"><h2>Escluse automaticamente</h2></div>
-              <ul className="panel-b plain">{Object.entries(skippedByReason).map(([r, n]) => <li key={r}><b>{n}</b> {SKIP_LABEL[r] ?? r}</li>)}</ul>
+            <section className="panel"><div className="panel-h"><h2>{t.changeSet.skipped}</h2></div>
+              <ul className="panel-b plain">{Object.entries(skippedByReason).map(([r, n]) => <li key={r}><b>{n}</b> {t.skip[r] ?? r}</li>)}</ul>
             </section>
           )}
 
           <section className="panel">
-            <div className="panel-h"><h2>{prod ? 'Approvazione' : 'Conferma'}</h2>{prod && <span className="env prod">2 step</span>}</div>
+            <div className="panel-h"><h2>{prod ? t.changeSet.approval : t.changeSet.confirmation}</h2>{prod && <span className="env prod">{t.changeSet.twoStep}</span>}</div>
             <div className="panel-b stack">
-              {cs.status === 'draft' && items.length === 0 && <p className="muted">Nessuna modifica da applicare.</p>}
+              {cs.status === 'draft' && items.length === 0 && <p className="muted">{t.changeSet.nothing}</p>}
               {cs.status === 'draft' && items.length > 0 && prod && (
                 <>
-                  <p className="muted">Org di produzione: il change set va inviato per approvazione prima di essere eseguito.</p>
-                  <button className="btn primary" disabled={busy} onClick={() => act(() => api.submit(cs.id))}>Invia per approvazione</button>
+                  <p className="muted">{t.changeSet.prodNeedsApproval}</p>
+                  <button className="btn primary" disabled={busy} onClick={() => act(() => api.submit(cs.id))}>{t.changeSet.submit}</button>
                 </>
               )}
               {cs.status === 'pending_approval' && (
                 <>
-                  <p className="muted">Inviato il {new Date(cs.submittedAt!).toLocaleString('it-IT')}. Approvando, l'app ricontrolla lo stato attuale dell'org.</p>
+                  <p className="muted">{t.changeSet.submittedAt(new Date(cs.submittedAt!).toLocaleString(t.locale))}</p>
                   <div className="row">
-                    <button className="btn danger" disabled={busy} onClick={() => act(() => api.reject(cs.id))}>Rifiuta</button>
+                    <button className="btn danger" disabled={busy} onClick={() => act(() => api.reject(cs.id))}>{t.changeSet.reject}</button>
                     <button className="btn primary" disabled={busy} onClick={() => act(() => api.approve(cs.id), r => {
                       setCs(r);
-                      setNotice(r.conflicts ? `${r.conflicts} righe sono cambiate nell'org dopo l'anteprima: verranno saltate.` : 'Approvato. Nessun conflitto con lo stato attuale dell\'org.');
-                    })}>Approva</button>
+                      setNotice(r.conflicts ? t.changeSet.conflicts(r.conflicts) : t.changeSet.noConflicts);
+                    })}>{t.changeSet.approve}</button>
                   </div>
                 </>
               )}
               {((cs.status === 'draft' && !prod && items.length > 0) || cs.status === 'approved') && (
                 <>
                   {prod && (
-                    <label className="field"><span>Digita <b>{cs.org.label}</b> per confermare</span>
+                    <label className="field"><span>{t.changeSet.typeToConfirm(cs.org.label)}</span>
                       <input className="input" id="confirm-name" value={confirmName} onChange={e => setConfirmName(e.target.value)} />
                     </label>
                   )}
-                  <label className="check"><input type="checkbox" id="reviewed" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />Ho rivisto le {items.length} modifiche</label>
-                  <button className="btn primary" disabled={!canRun || busy} onClick={() => act(() => api.execute(cs.id, prod ? confirmName : undefined))}>Applica {items.length} modifiche</button>
+                  <label className="check"><input type="checkbox" id="reviewed" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />{t.changeSet.reviewed(items.length)}</label>
+                  <button className="btn primary" disabled={!canRun || busy} onClick={() => act(() => api.execute(cs.id, prod ? confirmName : undefined))}>{t.changeSet.apply(items.length)}</button>
                 </>
               )}
-              {cs.status === 'running' && <p>Applicazione in corso… la pagina si aggiorna da sola.</p>}
-              {cs.status === 'rejected' && <p className="muted">Change set rifiutato. Torna alla matrice per prepararne uno nuovo.</p>}
+              {cs.status === 'running' && <p>{t.changeSet.running}</p>}
+              {cs.status === 'rejected' && <p className="muted">{t.changeSet.rejected}</p>}
               {finished && (
                 <>
-                  <p>{cs.status === 'done' ? 'Tutte le modifiche sono state applicate e verificate rileggendo l\'org.' : `${items.length - failed.length} modifiche applicate, ${failed.length} non applicate.`}</p>
+                  <p>{cs.status === 'done' ? t.changeSet.allDone : t.changeSet.partial(items.length - failed.length, failed.length)}</p>
                   {items.some(i => i.status === 'ok') && (
-                    <button className="btn" disabled={busy} onClick={() => act(() => api.rollback(cs.id), r => onOpen(r.id, r.number))}>Annulla queste modifiche</button>
+                    <button className="btn" disabled={busy} onClick={() => act(() => api.rollback(cs.id), r => onOpen(r.id, r.number))}>{t.changeSet.rollback}</button>
                   )}
                 </>
               )}

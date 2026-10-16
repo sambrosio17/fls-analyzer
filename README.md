@@ -24,7 +24,7 @@ cp .env.example .env    # imposta APP_PASSWORD, APP_SECRET (32+ caratteri) e DEM
 npm start               # apri http://localhost:3000
 ```
 
-La modalità demo aggiunge un'org "Demo (dati di esempio)" in memoria: puoi usare matrice, modifica massiva, anteprima, esecuzione e rollback senza collegare un'org vera. Le modifiche demo si perdono al riavvio. Con `DEMO_LARGE=true` l'org demo ha oltre 400 campi su Account e 1500 profili/permission set, utile per provare la matrice su volumi grandi.
+La modalità demo aggiunge un'org "Demo (sample data)" in memoria: puoi usare matrice, modifica massiva, anteprima, esecuzione e rollback senza collegare un'org vera. Le modifiche demo si perdono al riavvio. Con `DEMO_LARGE=true` l'org demo ha oltre 400 campi su Account e 1500 profili/permission set, utile per provare la matrice su volumi grandi.
 
 ## Collegare un'org Salesforce
 
