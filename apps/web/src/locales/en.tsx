@@ -36,6 +36,7 @@ export const en = {
   tools: { matrix: 'FLS matrix', apex: 'Apex classes', layouts: 'Layouts and pages', changeset: 'Change sets' },
 
   app: {
+    guide: 'Guide', news: 'What’s new', newsUnread: 'New changes to read',
     orgs: 'Orgs', history: 'History', logout: 'Log out',
     openOrgs: 'Open orgs', toolsLabel: 'Tools', openObjects: 'Open objects', openChangeSets: 'Open change sets',
     closeX: (name: string) => `Close ${name}`,
@@ -53,6 +54,25 @@ export const en = {
     confirmCloseTab: 'This tab has changes not yet sent to preview. Close it and lose them?',
     confirmCloseOrg: 'Some tabs in this org have changes not yet sent to preview. Close it and lose them?'
   },
+
+  guide: {
+    title: 'Orgsmith guide',
+    intro: 'Everything Orgsmith does, with short animations. New features are listed in What’s new and link back here.',
+    groups: { start: 'Getting started', matrix: 'FLS matrix', tools: 'Other tools', apply: 'Change sets and exports', more: 'More' },
+    sections: {
+      orgs: { title: 'Connect an org', body: <>On the <b>Orgs</b> page, give the org an alias, pick Production, Sandbox or My Domain and log in with Salesforce: Orgsmith never sees your password and acts with your own user's permissions. Give each org one of 10 <b>colours</b>; the work area takes the colour of the open org. <b>Renew token</b> logs in again when the session expires.</> },
+      tabs: { title: 'Work tabs', body: <>Tabs go on three levels: the open <b>orgs</b>, the <b>tool</b> of the active org (FLS matrix, Apex classes, Layouts and pages, Change sets) and the <b>objects</b> open in that tool. Each object tab keeps its filters and pending changes. <b>Drag</b> a tab to move it, or use <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd>. The coloured dot on an org tab changes its colour, ↻ renews its session, a middle click closes a tab.</> },
+      notices: { title: 'Slow loads in the background', body: <>Loads keep going when you change tab. If you leave a tab while it loads a matrix, layouts or runs a change set, a panel at the bottom right follows it and says when it is ready; <b>Open</b> takes you back. Coming back to the tab clears the notice.</> },
+      apex: { title: 'Apex classes', body: <>Which profiles and permission sets can run each Apex class. It works like the FLS matrix with two states, enabled or not: click, drag, right click and bulk actions, then preview and approval. Managed package classes can be hidden with a filter.</> },
+      layouts: { title: 'Layouts and pages', body: <>Pick an object to see, for each profile and record type, which <b>page layout</b> and which <b>Lightning page</b> it gets (by app, record type and org default), and the layout fields the profile cannot read. This section is read only for now.</> },
+      changesets: { title: 'Change sets', body: <>Nothing is written until you confirm. <b>Go to preview</b> turns pending changes into a change set with what is added, changed and removed, and warnings. In production it needs approval and the org name typed in. Running it shows progress and the result per row.</> },
+      export: { title: 'Export', body: <>The <b>Export</b> button saves what you see: the matrix as Excel or CSV or as Salesforce metadata (package.xml and one file per profile and permission set), change sets as Excel, CSV or metadata with the values they set, and layouts as Excel or CSV. A panel at the bottom right shows the progress of big files.</> },
+      history: { title: 'History and undo', body: <><b>History</b> lists every change set with who prepared and approved it and when. Each one keeps the values from before, so <b>Undo these changes</b>, in the change set, creates a change set that restores them.</> },
+      settings: { title: 'Language and session', body: <>Pick English, Italiano, Français or Español from the menu with the flags. <b>Log out</b> ends the Orgsmith session; your orgs stay connected.</> }
+    }
+  },
+
+  news: { title: 'What’s new', intro: 'Every change to Orgsmith, newest first.', seeGuide: 'See in the guide' },
 
   login: { password: 'Password', wrong: 'Wrong password.', submit: 'Log in' },
 

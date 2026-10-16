@@ -27,9 +27,9 @@ function Grid({ rows, cols, values, below = 0, children }: { rows: string[]; col
 }
 
 type Pt = { x: string; y: string };
-const px = (x: number, y: number): Pt => ({ x: `${x}px`, y: `${y}px` });
+export const px = (x: number, y: number): Pt => ({ x: `${x}px`, y: `${y}px` });
 /** Animated pointer: starts at `from`, goes to `to`, then (for menus) to `then`. */
-const Cursor = ({ anim, from, to, then = to }: { anim: string; from: Pt; to: Pt; then?: Pt }) => (
+export const Cursor = ({ anim, from, to, then = to }: { anim: string; from: Pt; to: Pt; then?: Pt }) => (
   <span className={`h-cursor ${anim}`} style={vars({ '--x0': from.x, '--y0': from.y, '--x1': to.x, '--y1': to.y, '--x2': then.x, '--y2': then.y })}>
     <svg viewBox="0 0 16 20" width="16" height="20"><path d="M1 1 L1 16 L5 12 L8 19 L11 18 L8 11 L14 11 Z" /></svg>
   </span>
@@ -120,7 +120,7 @@ function FilterDemo() {
 }
 
 /** Pending changes go to a preview, then (in production) approval, then Salesforce. */
-function FlowDemo() {
+export function FlowDemo() {
   const t = useT();
   const steps = t.help.flow;
   return (
@@ -133,7 +133,7 @@ function FlowDemo() {
 }
 
 /** Export menu: pick Excel, the button locks and the side panel fills up, then says the file is ready. */
-function ExportDemo() {
+export function ExportDemo() {
   const t = useT();
   const x = t.export;
   return (
@@ -152,7 +152,7 @@ function ExportDemo() {
 }
 
 /** Demos for each guide section, in order; titles and text come from the locale. */
-const SECTIONS = [
+export const MATRIX_SECTIONS = [
   { key: 'read', demo: <div className="h-legend"><AccessLegend /></div> },
   { key: 'click', demo: <ClickDemo /> },
   { key: 'drag', demo: <DragDemo /> },
@@ -181,10 +181,10 @@ export function MatrixHelp({ open, onClose }: { open: boolean; onClose: () => vo
         <button className="btn sm" onClick={onClose} autoFocus>{t.common.close}</button>
       </div>
       <nav className="help-nav">
-        {SECTIONS.map((s, i) => <a key={s.key} href={`#help-${i}`} onClick={e => { e.preventDefault(); document.getElementById(`help-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{t.help.sections[s.key].title}</a>)}
+        {MATRIX_SECTIONS.map((s, i) => <a key={s.key} href={`#help-${i}`} onClick={e => { e.preventDefault(); document.getElementById(`help-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{t.help.sections[s.key].title}</a>)}
       </nav>
       <div className="help-body">
-        {open && SECTIONS.map((s, i) => (
+        {open && MATRIX_SECTIONS.map((s, i) => (
           <section key={s.key} id={`help-${i}`} className="help-sec">
             <div className="help-text"><h3>{t.help.sections[s.key].title}</h3><p>{t.help.sections[s.key].body}</p></div>
             <div className="help-stage">{s.demo}</div>

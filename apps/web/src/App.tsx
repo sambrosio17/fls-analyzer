@@ -6,6 +6,9 @@ import { MatrixPage } from './pages/Matrix.tsx';
 import { ChangeSetPage } from './pages/ChangeSet.tsx';
 import { History } from './pages/History.tsx';
 import { LayoutsPage } from './pages/Layouts.tsx';
+import { Guide } from './pages/Guide.tsx';
+import { News } from './pages/News.tsx';
+import { LATEST } from './changelog.ts';
 import { Brand } from './Brand.tsx';
 import { TokenTabButton } from './TokenButton.tsx';
 import { LangPicker, useT } from './i18n.tsx';
@@ -20,10 +23,12 @@ import {
   APEX_OBJECT, moveOrg, moveTab, selectTab, selectTool, tabTitle, toolOf, updateTab, visibleTab, type WorkTab, type Workspace
 } from './workspace.ts';
 
-type View = 'orgs' | 'history' | 'work';
+type View = 'orgs' | 'history' | 'work' | 'guide' | 'news';
 
 const ACCENT_STYLE = accentCss();
 const storage = (() => { try { return window.localStorage; } catch { return null; } })();
+const NEWS_SEEN = 'orgsmith.newsSeen';
+const readSeen = () => { try { return storage?.getItem(NEWS_SEEN) ?? null; } catch { return null; } };
 
 export function App() {
   const t = useT();
@@ -39,11 +44,19 @@ export function App() {
   const [oauthError, setOauthError] = useState<string | null>(null);
   // Colour picker opened from an org tab's dot, placed under it.
   const [accentMenu, setAccentMenu] = useState<{ orgId: string; x: number; y: number } | null>(null);
+  // Guide section to scroll to when the guide opens from What's new.
+  const [guideFocus, setGuideFocus] = useState<string | null>(null);
+  const [newsSeen, setNewsSeen] = useState(readSeen);
 
   const shown = view === 'work' ? visibleTab(ws) : null;
 
   useEffect(() => { api.session().then(s => setSession(s.authenticated)).catch(() => setSession(false)); }, []);
   useEffect(() => { saveWorkspace(storage, ws); }, [ws]);
+  useEffect(() => {
+    if (view !== 'news' || newsSeen === LATEST) return;
+    setNewsSeen(LATEST);
+    try { storage?.setItem(NEWS_SEEN, LATEST); } catch { /* best effort */ }
+  }, [view]);
   useEffect(() => { setVisibleTab(shown?.id ?? null); }, [shown?.id]);
   useEffect(() => { if (shown && !mounted.has(shown.id)) setMounted(new Set(mounted).add(shown.id)); }, [shown?.id]);
   useEffect(() => {
@@ -137,6 +150,10 @@ export function App() {
           <nav className="tabs">
             <button className="tab" aria-current={view === 'orgs' ? 'page' : undefined} onClick={() => setView('orgs')}>{t.app.orgs}</button>
             <button className="tab" aria-current={view === 'history' ? 'page' : undefined} onClick={() => setView('history')}>{t.app.history}</button>
+            <button className="tab" aria-current={view === 'guide' ? 'page' : undefined} onClick={() => { setGuideFocus(null); setView('guide'); }}>{t.app.guide}</button>
+            <button className="tab" aria-current={view === 'news' ? 'page' : undefined} onClick={() => setView('news')}>
+              {t.app.news}{newsSeen !== LATEST && <span className="news-dot" role="img" aria-label={t.app.newsUnread} title={t.app.newsUnread} />}
+            </button>
           </nav>
           <span className="spacer" />
           <LangPicker />
@@ -222,6 +239,8 @@ export function App() {
             onRemoved={id => { setOrgs(orgs.filter(o => o.id !== id)); setWs(w => closeOrg(w, id)); }}
             onRenamed={updated => setOrgs(orgs.map(o => o.id === updated.id ? updated : o))} />
         )}
+        {view === 'guide' && <Guide focus={guideFocus} />}
+        {view === 'news' && <News onGuide={section => { setGuideFocus(section); setView('guide'); }} />}
         {view === 'history' && <History orgs={orgs} onOpen={(id, orgId, number) => showChangeSet(orgId, id, number)} />}
         {view === 'work' && !activeOrg && (
           <div className="panel empty">{t.app.noOrgOpen(<button className="btn sm" onClick={() => setView('orgs')}>{t.app.orgs}</button>)}</div>
