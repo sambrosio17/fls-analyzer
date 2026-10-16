@@ -53,9 +53,14 @@ main.wrap { padding-block: 20px 60px; }
 .appbar .org-chip.muted { color: var(--bar-muted); }
 .appbar .btn { background: transparent; border-color: var(--bar-line); color: var(--bar-ink); }
 .appbar .btn:hover:not(:disabled) { border-color: var(--bar-muted); }
-.lang-pick { width: auto; padding: 5px 8px; font-size: 13px; }
-.appbar .lang-pick { background: transparent; border-color: var(--bar-line); color: var(--bar-ink); }
-.appbar .lang-pick option { color: initial; }
+.lang-pick { position: relative; }
+.lang-btn { display: inline-flex; align-items: center; gap: 6px; }
+.lang-btn .caret { font-size: 10px; opacity: .7; }
+.flag { font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; font-size: 15px; line-height: 1; }
+.lang-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 40; margin: 0; padding: 4px; list-style: none; min-width: 170px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / .18); }
+.lang-menu button { display: flex; gap: 8px; align-items: center; width: 100%; text-align: left; border: 0; background: none; color: inherit; padding: 8px 10px; border-radius: 6px; cursor: pointer; font: inherit; }
+.lang-menu button:hover, .lang-menu [aria-selected="true"] button { background: var(--surface-2); }
+.lang-menu .check-mark { margin-left: auto; color: var(--accent); }
 .login-head { align-items: center; margin-bottom: 8px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
 .dot.ok { background: var(--ok); }
