@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { effectivePage, unassignedPages, type PageSource } from '@fls/core';
+import { MultiPick } from '../MultiPick.tsx';
 import { api, type LayoutAnalysis, type Org, type PageAnalysis, type RecordTypeInfo, type SObject } from '../api.ts';
 
 type Tab = 'layouts' | 'pages';
@@ -68,30 +69,28 @@ export function LayoutsPage({ org, initialObject = null, initialTab = 'layouts',
   );
 }
 
-interface FilterState { profile: string; recordType: string; target: string; onlyIssues: boolean }
-const NO_FILTER: FilterState = { profile: '', recordType: '', target: '', onlyIssues: false };
+/** Ticked profile ids, record type keys and layout ids or page names; an empty list means no filter. */
+interface FilterState { profile: string[]; recordType: string[]; target: string[]; onlyIssues: boolean }
+const NO_FILTER: FilterState = { profile: [], recordType: [], target: [], onlyIssues: false };
+const toggleIn = (list: string[], v: string) => list.includes(v) ? list.filter(x => x !== v) : [...list, v];
 const rtKey = (rt: RecordTypeInfo) => rt.id ?? 'master';
 
-/** Filters shared by both views: profile name, record type (one column), layout or page (rows that use it), issues only. */
-function Filters({ value, onChange, recordTypes, targets, targetLabel, issuesLabel }: {
-  value: FilterState; onChange: (v: FilterState) => void; recordTypes: RecordTypeInfo[];
-  targets: { id: string; label: string }[]; targetLabel: string; issuesLabel: string;
+/** Filters shared by both views: profiles, record types (columns), layouts or pages (rows that use them), issues only. */
+function Filters({ value, onChange, profiles, recordTypes, targets, targetLabel, issuesLabel }: {
+  value: FilterState; onChange: (v: FilterState) => void; profiles: { id: string; name: string }[]; recordTypes: RecordTypeInfo[];
+  targets: { id: string; label: string; sub?: string }[]; targetLabel: string; issuesLabel: string;
 }) {
   const set = (patch: Partial<FilterState>) => onChange({ ...value, ...patch });
-  const active = value.profile || value.recordType || value.target || value.onlyIssues;
+  const active = value.profile.length || value.recordType.length || value.target.length || value.onlyIssues;
   return (
     <div className="toolbar">
-      <input className="input" type="search" id="profile-search" placeholder="Filtra profili" value={value.profile} onChange={e => set({ profile: e.target.value })} />
-      <select className="input" id="rt-filter" aria-label="Record type" value={value.recordType} onChange={e => set({ recordType: e.target.value })}>
-        <option value="">Tutti i record type</option>
-        {recordTypes.map(rt => <option key={rtKey(rt)} value={rtKey(rt)}>{rt.label}</option>)}
-      </select>
-      <select className="input" id="target-filter" aria-label={targetLabel} value={value.target} onChange={e => set({ target: e.target.value })}>
-        <option value="">{targetLabel}: tutti</option>
-        {targets.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-      </select>
+      <MultiPick id="profile-pick" label="Profili" allLabel="tutti" selected={value.profile} onChange={profile => set({ profile })}
+        options={profiles.map(p => ({ id: p.id, label: p.name }))} />
+      <MultiPick id="rt-pick" label="Record type" allLabel="tutti" selected={value.recordType} onChange={recordType => set({ recordType })}
+        options={recordTypes.map(rt => ({ id: rtKey(rt), label: rt.label, sub: rt.developerName ?? undefined }))} />
+      <MultiPick id="target-pick" label={targetLabel} allLabel="tutti" selected={value.target} onChange={target => set({ target })} options={targets} />
       <label className="check"><input type="checkbox" id="only-issues" checked={value.onlyIssues} onChange={e => set({ onlyIssues: e.target.checked })} />{issuesLabel}</label>
-      {active && <button className="btn sm" onClick={() => onChange(NO_FILTER)}>Azzera filtri</button>}
+      {active ? <button className="btn sm" onClick={() => onChange(NO_FILTER)}>Azzera filtri</button> : null}
     </div>
   );
 }
@@ -107,12 +106,12 @@ function LayoutView({ data }: { data: LayoutAnalysis }) {
   const assignedCount = (layoutId: string) => new Set(data.assignments.filter(a => a.layoutId === layoutId).map(a => a.profileId)).size;
   const unassigned = data.layouts.filter(l => assignedCount(l.id) === 0);
   const withGaps = new Set(data.gaps.map(g => g.profileId));
-  const rts = data.recordTypes.filter(rt => !filter.recordType || rtKey(rt) === filter.recordType);
+  const rts = data.recordTypes.filter(rt => !filter.recordType.length || filter.recordType.includes(rtKey(rt)));
   const layoutOf = (profileId: string, rt: RecordTypeInfo) => assignment.get(`${profileId}|${rt.id ?? ''}`);
   const profiles = data.profiles.filter(p =>
-    (!filter.profile || p.name.toLowerCase().includes(filter.profile.toLowerCase()))
+    (!filter.profile.length || filter.profile.includes(p.id))
     && (!filter.onlyIssues || rts.some(rt => { const l = layoutOf(p.id, rt); return !!l && gaps.has(`${p.id}|${l}`); }))
-    && (!filter.target || rts.some(rt => layoutOf(p.id, rt) === filter.target)));
+    && (!filter.target.length || rts.some(rt => filter.target.includes(layoutOf(p.id, rt) ?? ''))));
 
   return (
     <>
@@ -127,7 +126,7 @@ function LayoutView({ data }: { data: LayoutAnalysis }) {
       <section className="panel" style={{ marginBottom: 16 }}>
         <div className="panel-h"><h2>Assegnazioni per profilo e record type</h2></div>
         <div className="panel-b">
-          <Filters value={filter} onChange={setFilter} recordTypes={data.recordTypes} targetLabel="Layout" issuesLabel="Solo con campi non leggibili"
+          <Filters value={filter} onChange={setFilter} profiles={data.profiles} recordTypes={data.recordTypes} targetLabel="Layout" issuesLabel="Solo con campi non leggibili"
             targets={data.layouts.map(l => ({ id: l.id, label: l.name }))} />
           <div className="tbl-wrap">
             <table className="dt assign">
@@ -141,7 +140,7 @@ function LayoutView({ data }: { data: LayoutAnalysis }) {
                       const layout = layoutId ? data.layouts[layoutIndex.get(layoutId)!] : undefined;
                       const missing = layoutId ? gaps.get(`${p.id}|${layoutId}`) : undefined;
                       return (
-                        <td key={rt.id ?? 'master'} className={filter.target && layoutId !== filter.target ? 'off' : ''}>
+                        <td key={rt.id ?? 'master'} className={filter.target.length && !filter.target.includes(layoutId ?? '') ? 'off' : ''}>
                           {layout ? <span className="lay"><i style={dot(layoutIndex.get(layout.id)!)} />{layout.name}</span> : <span className="muted">—</span>}
                           {missing && <div className="warn-text small" title={missing.join('\n')}>⚠ {missing.length} {missing.length === 1 ? 'campo non leggibile' : 'campi non leggibili'}</div>}
                         </td>
@@ -164,8 +163,8 @@ function LayoutView({ data }: { data: LayoutAnalysis }) {
             <thead><tr><th>Layout</th><th>Campi</th><th>Profili assegnati</th><th>Stato</th></tr></thead>
             <tbody>
               {data.layouts.map((l, i) => (
-                <tr key={l.id} className={filter.target === l.id ? 'sel' : ''}>
-                  <td><button className="linklike" title="Mostra i profili che usano questo layout" onClick={() => setFilter({ ...filter, target: filter.target === l.id ? '' : l.id })}><span className="lay"><i style={dot(i)} />{l.name}</span></button>{l.namespace && <span className="muted"> · {l.namespace}</span>}</td>
+                <tr key={l.id} className={filter.target.includes(l.id) ? 'sel' : ''}>
+                  <td><button className="linklike" title="Mostra i profili che usano questo layout" onClick={() => setFilter({ ...filter, target: toggleIn(filter.target, l.id) })}><span className="lay"><i style={dot(i)} />{l.name}</span></button>{l.namespace && <span className="muted"> · {l.namespace}</span>}</td>
                   <td title={l.fields.map(f => f.split('.').slice(1).join('.')).join('\n')}>{l.fields.length}</td>
                   <td>{assignedCount(l.id)}</td>
                   <td>{assignedCount(l.id) ? <span className="pill st-ok">In uso</span> : <span className="pill st-part">Non assegnato</span>}</td>
@@ -190,11 +189,11 @@ function PageView({ data }: { data: PageAnalysis }) {
   const appLabel = (name: string) => data.apps.find(a => a.name === name)?.label ?? name;
   const appDefault = data.appDefaults.find(a => a.app === app)?.page ?? null;
   const activeRts = data.recordTypes.filter(rt => rt.active);
-  const rts = activeRts.filter(rt => !filter.recordType || rtKey(rt) === filter.recordType);
+  const rts = activeRts.filter(rt => !filter.recordType.length || filter.recordType.includes(rtKey(rt)));
   const rows = data.profiles
-    .filter(p => !filter.profile || p.name.toLowerCase().includes(filter.profile.toLowerCase()))
+    .filter(p => !filter.profile.length || filter.profile.includes(p.id))
     .map(p => ({ p, cells: rts.map(rt => p.fullName ? effectivePage(data, app, p.fullName, rt.developerName) : { page: null, source: 'system' as PageSource }) }))
-    .filter(r => (!filter.onlyIssues || r.cells.some(c => c.source === 'app-profile')) && (!filter.target || r.cells.some(c => c.page === filter.target)));
+    .filter(r => (!filter.onlyIssues || r.cells.some(c => c.source === 'app-profile')) && (!filter.target.length || r.cells.some(c => filter.target.includes(c.page ?? ''))));
   const usage = (name: string) => [
     ...(data.orgDefault === name ? ["Default dell'org"] : []),
     ...data.appDefaults.filter(a => a.page === name).map(a => `Default di ${appLabel(a.app)}`),
@@ -219,7 +218,7 @@ function PageView({ data }: { data: PageAnalysis }) {
         </div>
         <div className="panel-b">
           <p className="muted small">Default dell'app: <b>{appDefault ? label.get(appDefault) ?? appDefault : 'nessuno'}</b>. Default dell'org: <b>{data.orgDefault ? label.get(data.orgDefault) ?? data.orgDefault : 'pagina di sistema'}</b>.</p>
-          <Filters value={filter} onChange={setFilter} recordTypes={activeRts} targetLabel="Lightning page" issuesLabel="Solo con assegnazione specifica"
+          <Filters value={filter} onChange={setFilter} profiles={data.profiles} recordTypes={activeRts} targetLabel="Lightning page" issuesLabel="Solo con assegnazione specifica"
             targets={data.pages.map(pg => ({ id: pg.name, label: pg.label }))} />
           <div className="tbl-wrap">
             <table className="dt assign">
@@ -229,7 +228,7 @@ function PageView({ data }: { data: PageAnalysis }) {
                   <tr key={p.id}>
                     <td>{p.name}</td>
                     {cells.map((c, i) => (
-                      <td key={rts[i]!.id ?? 'master'} className={filter.target && c.page !== filter.target ? 'off' : ''}>
+                      <td key={rts[i]!.id ?? 'master'} className={filter.target.length && !filter.target.includes(c.page ?? '') ? 'off' : ''}>
                         <div>{c.page ? label.get(c.page) ?? c.page : <span className="muted">Pagina di sistema</span>}</div>
                         <span className={`pill ${SOURCE_CLASS[c.source]}`}>{SOURCE_LABEL[c.source]}</span>
                       </td>
@@ -250,8 +249,8 @@ function PageView({ data }: { data: PageAnalysis }) {
             <thead><tr><th>Pagina</th><th>Componenti</th><th>Campi Dynamic Forms</th><th>Dove è assegnata</th></tr></thead>
             <tbody>
               {data.pages.map(p => (
-                <tr key={p.id} className={filter.target === p.name ? 'sel' : ''}>
-                  <td><button className="linklike" title="Mostra i profili che vedono questa pagina" onClick={() => setFilter({ ...filter, target: filter.target === p.name ? '' : p.name })}>{p.label}</button><div className="mono muted small">{p.name}</div></td>
+                <tr key={p.id} className={filter.target.includes(p.name) ? 'sel' : ''}>
+                  <td><button className="linklike" title="Mostra i profili che vedono questa pagina" onClick={() => setFilter({ ...filter, target: toggleIn(filter.target, p.name) })}>{p.label}</button><div className="mono muted small">{p.name}</div></td>
                   <td title={p.components.join('\n')}>{p.components.length}<div className="muted small">{p.components.slice(0, 3).map(c => c.split(':').pop()).join(', ')}{p.components.length > 3 ? '…' : ''}</div></td>
                   <td title={p.fields.map(f => f.split('.').slice(1).join('.')).join('\n')}>{p.fields.length || <span className="muted">—</span>}</td>
                   <td>{unassigned.has(p.name) ? <span className="pill st-part">Non assegnata</span> : usage(p.name).map(u => <div key={u}>{u}</div>)}</td>

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { MatrixHelp } from './MatrixHelp.tsx';
+import { MultiPick, type PickOption } from '../MultiPick.tsx';
 import { bounds, forEachCell, menuPosition, rangeSize, type CellRange } from '../cellRange.ts';
 import { ACCESS_LONG, ACCESS_SHORT, api, type Access, type BulkAction, type FieldMeta, type Matrix, type Org, type PermSet, type SObject } from '../api.ts';
 
@@ -31,8 +32,9 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   const touch = () => setRev(r => r + 1);
   const [rows, setRows] = useState(new Set<number>());
   const [cols, setCols] = useState(new Set<number>());
-  const [search, setSearch] = useState('');
-  const [psSearch, setPsSearch] = useState('');
+  // Fields (API names) and permission sets (ids) ticked in the filters; empty means all.
+  const [fieldPick, setFieldPick] = useState<string[]>([]);
+  const [psPick, setPsPick] = useState<string[]>([]);
   const [psKind, setPsKind] = useState<PsKind>('all');
   const [filter, setFilter] = useState<Filter>('all');
   const [bulkAction, setBulkAction] = useState<BulkAction>('read');
@@ -52,7 +54,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   const load = async (list: string[]) => {
     setSelected(list); setSent(null);
     onObjectsChange?.(list);
-    discard(); setRows(new Set()); setCols(new Set());
+    discard(); setRows(new Set()); setCols(new Set()); setFieldPick([]);
     if (!list.length) { setMatrix(null); return; }
     setLoading(true); setError(null);
     try { setMatrix(await api.matrix(org.id, list)); } catch (e) { setError((e as Error).message); } finally { setLoading(false); }
@@ -80,22 +82,22 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   const locked = (f: FieldMeta, p: PermSet) => !f.permissionable || lockedPs(p);
 
   const columns = useMemo(() => {
-    const q = psSearch.toLowerCase();
+    const picked = new Set(psPick);
     const out: number[] = [];
     allPs.forEach((p, j) => {
       if (psKind === 'profiles' && !p.isProfile) return;
       if (psKind === 'permsets' && p.isProfile) return;
-      if (q && !p.label.toLowerCase().includes(q) && !p.name.toLowerCase().includes(q)) return;
+      if (picked.size && !picked.has(p.id)) return;
       out.push(j);
     });
     return out;
-  }, [matrix, psSearch, psKind]);
+  }, [matrix, psPick, psKind]);
 
   const fields = useMemo(() => {
-    const q = search.toLowerCase();
+    const picked = new Set(fieldPick);
     const out: number[] = [];
     allFields.forEach((f, i) => {
-      if (q && !f.label.toLowerCase().includes(q) && !f.name.toLowerCase().includes(q)) return;
+      if (picked.size && !picked.has(f.name)) return;
       if (filter === 'custom' && !f.custom) return;
       if (filter !== 'all' && filter !== 'custom') {
         if (!f.permissionable) return;
@@ -106,7 +108,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
       out.push(i);
     });
     return out;
-  }, [matrix, search, filter, columns, filter === 'all' || filter === 'custom' ? 0 : rev]);
+  }, [matrix, fieldPick, filter, columns, filter === 'all' || filter === 'custom' ? 0 : rev]);
 
   const displayRows = useMemo(() => {
     const out: DisplayRow[] = [];
@@ -331,6 +333,10 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   const leftPad = firstCol * COL_W, rightPad = (columns.length - lastCol) * COL_W;
   const padCells = (pad: number, k: string) => pad > 0 ? <td className="pad" key={k} style={{ width: pad, minWidth: pad }} /> : null;
 
+  const fieldOptions = useMemo<PickOption[]>(() => allFields.map(f => ({ id: f.name, label: f.label, sub: f.name })), [matrix]);
+  const psOptions = useMemo<PickOption[]>(() => allPs
+    .filter(p => psKind === 'all' || (psKind === 'profiles') === p.isProfile)
+    .map(p => ({ id: p.id, label: p.label, sub: p.isProfile ? 'profilo' : p.name })), [matrix, psKind]);
   const rb = range && bounds(range);
   live.current = { cellAt, extendTo, clickCell, setRange, setMenu, headH: view.headH, fcolW: view.fcolW };
   const permissionableVisible = fields.filter(i => allFields[i]!.permissionable);
@@ -376,8 +382,8 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
       {matrix && !loading && (
         <>
           <div className="toolbar">
-            <input className="input" id="field-search" type="search" placeholder="Cerca campo" value={search} onChange={e => setSearch(e.target.value)} />
-            <input className="input" id="ps-search" type="search" placeholder="Filtra profili e permission set" value={psSearch} onChange={e => setPsSearch(e.target.value)} />
+            <MultiPick id="field-pick" label="Campi" allLabel="tutti" options={fieldOptions} selected={fieldPick} onChange={setFieldPick} />
+            <MultiPick id="ps-pick" label="Profili e permission set" allLabel="tutti" options={psOptions} selected={psPick} onChange={setPsPick} />
             <select className="input" id="ps-kind" value={psKind} onChange={e => setPsKind(e.target.value as PsKind)}>
               <option value="all">Profili e permission set</option><option value="profiles">Solo profili</option><option value="permsets">Solo permission set</option>
             </select>
