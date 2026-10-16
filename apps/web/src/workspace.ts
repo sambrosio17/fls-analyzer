@@ -127,6 +127,28 @@ export function closeOrg(ws: Workspace, orgId: string): Workspace {
   return { orgs, activeOrg, tool: without(ws.tool, orgId), tab, tabs: ws.tabs.filter(t => t.orgId !== orgId) };
 }
 
+/** Moves an org tab before `beforeId`, or to the end when it is null. */
+export function moveOrg(ws: Workspace, orgId: string, beforeId: string | null): Workspace {
+  if (!ws.orgs.includes(orgId) || orgId === beforeId) return ws;
+  const rest = ws.orgs.filter(o => o !== orgId);
+  const at = beforeId ? rest.indexOf(beforeId) : -1;
+  const orgs = at < 0 ? [...rest, orgId] : [...rest.slice(0, at), orgId, ...rest.slice(at)];
+  return orgs.every((o, i) => o === ws.orgs[i]) ? ws : { ...ws, orgs };
+}
+
+/** Moves an object tab before `beforeId` in its own group, or to the end of the group when it is null. */
+export function moveTab(ws: Workspace, id: string, beforeId: string | null): Workspace {
+  const t = ws.tabs.find(x => x.id === id);
+  const target = beforeId ? ws.tabs.find(x => x.id === beforeId) : null;
+  if (!t || id === beforeId || (target && (target.orgId !== t.orgId || target.tool !== t.tool))) return ws;
+  const rest = ws.tabs.filter(x => x.id !== id);
+  const group = rest.filter(x => x.orgId === t.orgId && x.tool === t.tool);
+  // Without a target, it goes right after the last tab of its group.
+  const at = target ? rest.indexOf(target) : group.length ? rest.indexOf(group[group.length - 1]!) + 1 : rest.length;
+  const tabs = [...rest.slice(0, at), t, ...rest.slice(at)];
+  return tabs.every((x, i) => x === ws.tabs[i]) ? ws : { ...ws, tabs };
+}
+
 /** Drops orgs that are no longer connected. */
 export function pruneOrgs(ws: Workspace, orgIds: string[]): Workspace {
   const keep = new Set(orgIds);

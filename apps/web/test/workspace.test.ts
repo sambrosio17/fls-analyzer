@@ -1,10 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EMPTY, closeOrg, closeTab, groupTabs, loadWorkspace, newObjectTab, openChangeSet, openOrg, pruneOrgs, selectTab, selectTool,
+  EMPTY, closeOrg, closeTab, groupTabs, loadWorkspace, moveOrg, moveTab, newObjectTab, openChangeSet, openOrg, pruneOrgs, selectTab, selectTool,
   tabTitle, toolOf, updateTab, visibleTab
 } from '../src/workspace.ts';
 
 describe('workspace tabs', () => {
+  it('reorders org tabs and object tabs, keeping object tabs inside their group', () => {
+    let ws = ['a', 'b', 'c'].reduce(openOrg, EMPTY);
+    expect(moveOrg(ws, 'c', 'a').orgs).toEqual(['c', 'a', 'b']);
+    expect(moveOrg(ws, 'a', null).orgs).toEqual(['b', 'c', 'a']);
+    expect(moveOrg(ws, 'b', 'c')).toBe(ws);
+    ws = newObjectTab(newObjectTab(openOrg(ws, 'a'), 'a', 'matrix'), 'a', 'matrix');
+    const ids = groupTabs(ws, 'a', 'matrix').map(t => t.id);
+    expect(ids).toHaveLength(3);
+    const last = moveTab(ws, ids[0]!, null);
+    expect(groupTabs(last, 'a', 'matrix').map(t => t.id)).toEqual([ids[1], ids[2], ids[0]]);
+    expect(groupTabs(moveTab(ws, ids[2]!, ids[0]!), 'a', 'matrix').map(t => t.id)).toEqual([ids[2], ids[0], ids[1]]);
+    // Other orgs' tabs stay where they were, and a tab can't move into another group.
+    expect(last.tabs.filter(t => t.orgId !== 'a')).toEqual(ws.tabs.filter(t => t.orgId !== 'a'));
+    expect(moveTab(ws, ids[0]!, groupTabs(ws, 'b', 'matrix')[0]!.id)).toBe(ws);
+  });
+
   it('opens an org on the FLS matrix with an empty object tab', () => {
     const ws = openOrg(EMPTY, 'a');
     expect(ws.orgs).toEqual(['a']);

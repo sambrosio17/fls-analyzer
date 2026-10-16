@@ -535,3 +535,8 @@ td.c button:disabled { pointer-events: none; }
 .load-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sw-l); }
 @media (prefers-color-scheme: dark) { .load-dot { background: var(--sw-d); } }
 .load-foot { align-items: center; }
+
+/* Reordering tabs by dragging: a bar shows where the dragged tab will land. */
+.orgtab[data-dragging], .objtab[data-dragging] { opacity: .5; }
+.orgtab[data-drop="before"], .objtab[data-drop="before"] { box-shadow: inset 3px 0 0 var(--mark); }
+.orgtab[data-drop="after"], .objtab[data-drop="after"] { box-shadow: inset -3px 0 0 var(--mark); }
