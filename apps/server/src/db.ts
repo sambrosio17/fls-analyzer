@@ -85,6 +85,8 @@ export interface OrgRow {
   last_sync_at: string | null;
   /** Name chosen by the user, shown in place of the Salesforce org name (sandboxes share the production name). */
   alias: string | null;
+  /** Accent colour picked for the org (see ACCENTS in core); null is the default. */
+  accent?: string | null;
 }
 
 /** Name shown for an org: the user's alias, else the Salesforce org name. */
@@ -152,6 +154,7 @@ export class Db {
   private migrate(): void {
     const cols = (this.sql.prepare('PRAGMA table_info(orgs)').all() as { name: string }[]).map(c => c.name);
     if (!cols.includes('alias')) this.sql.exec('ALTER TABLE orgs ADD COLUMN alias TEXT');
+    if (!cols.includes('accent')) this.sql.exec('ALTER TABLE orgs ADD COLUMN accent TEXT');
   }
 
   // ---- orgs
@@ -180,6 +183,10 @@ export class Db {
 
   setAlias(tenant: string, id: string, alias: string): void {
     this.sql.prepare('UPDATE orgs SET alias = ? WHERE tenant_id = ? AND id = ?').run(alias, tenant, id);
+  }
+
+  setAccent(tenant: string, id: string, accent: string | null): void {
+    this.sql.prepare('UPDATE orgs SET accent = ? WHERE tenant_id = ? AND id = ?').run(accent, tenant, id);
   }
 
   deleteOrg(tenant: string, id: string): void {

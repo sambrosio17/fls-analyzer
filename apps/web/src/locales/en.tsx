@@ -201,6 +201,11 @@ export const en = {
     sheet: 'Apex classes'
   },
 
+  accent: {
+    color: 'Color', label: 'Org color', change: 'Change the org color',
+    names: { ember: 'Ember', amber: 'Amber', olive: 'Olive', emerald: 'Emerald', cyan: 'Cyan', blue: 'Blue', indigo: 'Indigo', magenta: 'Magenta', sand: 'Sand', slate: 'Slate' }
+  },
+
   cellMenu: {
     cells: (n: number) => n === 1 ? '1 cell' : `${n} cells`,
     editable: (n: number) => ` · ${n} editable`,

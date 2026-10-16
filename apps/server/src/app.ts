@@ -4,7 +4,7 @@ import cookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { TransitionError } from '@fls/core';
+import { ACCENTS, TransitionError } from '@fls/core';
 import type { Config } from './config.ts';
 import { pkcePair, randomToken, safeEqual, TokenCipher } from './crypto.ts';
 import { DEFAULT_TENANT, Db, orgLabel, type OrgRow } from './db.ts';
@@ -38,7 +38,7 @@ const createSchema = z.object({
 const aliasSchema = z.string().trim().min(1).max(40);
 
 export function orgDto(o: OrgRow) {
-  return { id: o.id, label: orgLabel(o), alias: o.alias, name: o.name, username: o.username, instanceUrl: o.instance_url, isSandbox: !!o.is_sandbox, lastSyncAt: o.last_sync_at };
+  return { id: o.id, label: orgLabel(o), alias: o.alias, name: o.name, username: o.username, instanceUrl: o.instance_url, isSandbox: !!o.is_sandbox, lastSyncAt: o.last_sync_at, accent: o.accent ?? null };
 }
 
 export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshToken }: AppOptions) {
@@ -157,9 +157,12 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
   app.get('/api/orgs', async () => db.listOrgs(tenant).map(orgDto));
   app.patch('/api/orgs/:id', async req => {
     const org = orgOr404((req.params as { id: string }).id);
-    const { alias } = z.object({ alias: aliasSchema }).parse(req.body);
-    db.setAlias(tenant, org.id, alias);
-    db.audit({ tenant, orgId: org.id, actor: config.appUser, action: 'org.renamed', detail: alias });
+    const { alias, accent } = z.object({ alias: aliasSchema.optional(), accent: z.enum(ACCENTS).nullable().optional() }).parse(req.body);
+    if (alias !== undefined) {
+      db.setAlias(tenant, org.id, alias);
+      db.audit({ tenant, orgId: org.id, actor: config.appUser, action: 'org.renamed', detail: alias });
+    }
+    if (accent !== undefined) db.setAccent(tenant, org.id, accent);
     return orgDto(orgOr404(org.id));
   });
   app.delete('/api/orgs/:id', async req => {

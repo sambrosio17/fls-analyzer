@@ -198,6 +198,11 @@ export const es: Messages = {
     sheet: 'Clases Apex'
   },
 
+  accent: {
+    color: 'Color', label: 'Color de la org', change: 'Cambiar el color de la org',
+    names: { ember: 'Brasa', amber: 'Ámbar', olive: 'Oliva', emerald: 'Esmeralda', cyan: 'Cian', blue: 'Azul', indigo: 'Índigo', magenta: 'Magenta', sand: 'Arena', slate: 'Pizarra' }
+  },
+
   cellMenu: {
     cells: (n: number) => n === 1 ? '1 celda' : `${n} celdas`,
     editable: (n: number) => ` · ${n} editables`,
