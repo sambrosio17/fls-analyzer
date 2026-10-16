@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { Access, ChangeItem, ChangeSetStatus, Operation, SkippedItem, WarningCode } from '@fls/core';
+import type { Access, AssignmentChange, ChangeItem, ChangeSetStatus, Operation, SkippedItem, WarningCode } from '@fls/core';
 
 /** Single tenant in the personal MVP; every table already carries tenant_id for the multi-client phase. */
 export const DEFAULT_TENANT = 'default';
@@ -58,6 +58,22 @@ CREATE TABLE IF NOT EXISTS change_items (
   error_message TEXT
 );
 CREATE INDEX IF NOT EXISTS change_items_cs ON change_items(change_set_id);
+CREATE TABLE IF NOT EXISTS assignment_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  change_set_id TEXT NOT NULL REFERENCES change_sets(id),
+  kind TEXT NOT NULL,
+  object TEXT NOT NULL,
+  profile TEXT NOT NULL,
+  profile_label TEXT NOT NULL,
+  record_type TEXT,
+  app TEXT,
+  before_value TEXT,
+  after_value TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  error_code TEXT,
+  error_message TEXT
+);
+CREATE INDEX IF NOT EXISTS assignment_items_cs ON assignment_items(change_set_id);
 CREATE TABLE IF NOT EXISTS audit_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tenant_id TEXT NOT NULL,
@@ -108,7 +124,11 @@ export interface ChangeSetRow {
   approved_at: string | null;
   started_at: string | null;
   finished_at: string | null;
+  /** 'fls' (field and Apex access) or 'assignments' (page layouts and Lightning pages). */
+  kind: ChangeSetKind;
 }
+
+export type ChangeSetKind = 'fls' | 'assignments';
 
 export type ItemStatus = 'pending' | 'ok' | 'error' | 'conflict';
 
@@ -128,6 +148,26 @@ export interface ItemRow {
   error_code: string | null;
   error_message: string | null;
 }
+
+export interface AssignmentRow {
+  id: number;
+  change_set_id: string;
+  kind: AssignmentChange['kind'];
+  object: string;
+  profile: string;
+  profile_label: string;
+  record_type: string | null;
+  app: string | null;
+  before_value: string | null;
+  after_value: string | null;
+  status: ItemStatus;
+  error_code: string | null;
+  error_message: string | null;
+}
+
+export const assignmentFromRow = (r: AssignmentRow): AssignmentChange => ({
+  kind: r.kind, object: r.object, profile: r.profile, profileLabel: r.profile_label, recordType: r.record_type, app: r.app, before: r.before_value, after: r.after_value
+});
 
 export const now = () => new Date().toISOString();
 
@@ -155,6 +195,8 @@ export class Db {
     const cols = (this.sql.prepare('PRAGMA table_info(orgs)').all() as { name: string }[]).map(c => c.name);
     if (!cols.includes('alias')) this.sql.exec('ALTER TABLE orgs ADD COLUMN alias TEXT');
     if (!cols.includes('accent')) this.sql.exec('ALTER TABLE orgs ADD COLUMN accent TEXT');
+    const csCols = (this.sql.prepare('PRAGMA table_info(change_sets)').all() as { name: string }[]).map(c => c.name);
+    if (!csCols.includes('kind')) this.sql.exec("ALTER TABLE change_sets ADD COLUMN kind TEXT NOT NULL DEFAULT 'fls'");
   }
 
   // ---- orgs
@@ -203,15 +245,21 @@ export class Db {
 
   // ---- change sets
   createChangeSet(cs: { id: string; tenant: string; orgId: string; author: string; description: string; rollbackOf: string | null; skipped: SkippedItem[] },
-    items: (ChangeItem & { parentLabel: string })[]): ChangeSetRow {
+    items: (ChangeItem & { parentLabel: string })[], assignments: AssignmentChange[] = []): ChangeSetRow {
     const insertItem = this.sql.prepare(`INSERT INTO change_items (change_set_id, parent_id, parent_label, field, sobject_type, before_access, after_access, record_id, op, warnings)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const insertAssignment = this.sql.prepare(`INSERT INTO assignment_items (change_set_id, kind, object, profile, profile_label, record_type, app, before_value, after_value)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const kind: ChangeSetKind = assignments.length && !items.length ? 'assignments' : 'fls';
     this.sql.exec('BEGIN');
     try {
       const { seq } = this.sql.prepare('SELECT COALESCE(MAX(seq), 0) + 1 AS seq FROM change_sets WHERE tenant_id = ?').get(cs.tenant) as { seq: number };
-      this.sql.prepare(`INSERT INTO change_sets (id, tenant_id, seq, org_id, author, description, status, skipped_json, rollback_of, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`)
-        .run(cs.id, cs.tenant, seq, cs.orgId, cs.author, cs.description, JSON.stringify(cs.skipped), cs.rollbackOf, now());
+      this.sql.prepare(`INSERT INTO change_sets (id, tenant_id, seq, org_id, author, description, status, skipped_json, rollback_of, created_at, kind)
+        VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`)
+        .run(cs.id, cs.tenant, seq, cs.orgId, cs.author, cs.description, JSON.stringify(cs.skipped), cs.rollbackOf, now(), kind);
+      for (const a of assignments) {
+        insertAssignment.run(cs.id, a.kind, a.object, a.profile, a.profileLabel, a.recordType, a.app, a.before, a.after);
+      }
       for (const i of items) {
         insertItem.run(cs.id, i.parentId, i.parentLabel, i.field, i.sobjectType, i.before, i.after, i.recordId, i.op, i.warnings.join(','));
       }
@@ -233,7 +281,9 @@ export class Db {
     return this.sql.prepare(`SELECT cs.*, COUNT(ci.id) AS total,
         SUM(CASE WHEN ci.status = 'ok' THEN 1 ELSE 0 END) AS ok,
         SUM(CASE WHEN ci.status IN ('error', 'conflict') THEN 1 ELSE 0 END) AS errors
-      FROM change_sets cs LEFT JOIN change_items ci ON ci.change_set_id = cs.id
+      FROM change_sets cs LEFT JOIN (
+        SELECT id, change_set_id, status FROM change_items UNION ALL SELECT id, change_set_id, status FROM assignment_items
+      ) ci ON ci.change_set_id = cs.id
       WHERE ${where} GROUP BY cs.id ORDER BY cs.seq DESC LIMIT 200`).all(...args) as never;
   }
 
@@ -252,6 +302,17 @@ export class Db {
     const keys = Object.keys(fields) as (keyof typeof fields)[];
     if (!keys.length) return;
     this.sql.prepare(`UPDATE change_items SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`)
+      .run(...keys.map(k => fields[k] ?? null), id);
+  }
+
+  listAssignments(changeSetId: string): AssignmentRow[] {
+    return this.sql.prepare('SELECT * FROM assignment_items WHERE change_set_id = ? ORDER BY kind, object, app, profile_label, record_type').all(changeSetId) as unknown as AssignmentRow[];
+  }
+
+  updateAssignment(id: number, fields: Partial<Pick<AssignmentRow, 'status' | 'error_code' | 'error_message'>>): void {
+    const keys = Object.keys(fields) as (keyof typeof fields)[];
+    if (!keys.length) return;
+    this.sql.prepare(`UPDATE assignment_items SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`)
       .run(...keys.map(k => fields[k] ?? null), id);
   }
 

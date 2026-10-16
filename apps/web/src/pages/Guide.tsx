@@ -61,6 +61,25 @@ export function ApexDemo() {
   );
 }
 
+/** Edit mode on Layouts and pages: a cell gets a new layout, turns purple, then "Go to preview". */
+export function LayoutEditDemo() {
+  const t = useT();
+  const rows = ['Sales', 'Service'];
+  const cols = ['Business', 'Partner'];
+  return (
+    <div className="h-demo g-lay" style={{ height: 150, width: 300 }} aria-hidden="true">
+      {cols.map((c, j) => <span key={c} className="h-col g-lay-col" style={{ left: 70 + j * 112, top: 2 }}>{c}</span>)}
+      {rows.map((r, i) => <span key={r} className="h-row" style={{ left: 0, top: 26 + i * 34 }}>{r}</span>)}
+      {rows.map((r, i) => cols.map((c, j) => i === 0 && j === 1 ? null : (
+        <span key={r + c} className="g-lay-cell" style={{ left: 70 + j * 112, top: 26 + i * 34 }}>Account Layout</span>
+      )))}
+      <span className="g-lay-cell g-lay-edit" style={{ left: 182, top: 26 }}><b>Account Layout</b><b>Partner Layout</b></span>
+      <span className="g-lay-bar" style={{ left: 70, top: 108 }}>{t.layouts.toPreview}</span>
+      <Cursor anim="h-move-click" from={px(150, 140)} to={px(236, 40)} />
+    </div>
+  );
+}
+
 /** An org card on the Orgs page: alias, environment, colour picker. */
 export function OrgDemo() {
   const t = useT();
@@ -83,7 +102,7 @@ type MatrixKey = typeof MATRIX_SECTIONS[number]['key'];
 const CHAPTERS: { group: keyof Messages['guide']['groups']; items: ({ guide: GuideKey; demo?: ReactNode } | { matrix: MatrixKey })[] }[] = [
   { group: 'start', items: [{ guide: 'orgs', demo: <OrgDemo /> }, { guide: 'tabs', demo: <TabsDemo /> }, { guide: 'notices', demo: <LoadDemo /> }] },
   { group: 'matrix', items: [{ matrix: 'read' }, { matrix: 'click' }, { matrix: 'drag' }, { matrix: 'right' }, { matrix: 'bulk' }, { matrix: 'filter' }] },
-  { group: 'tools', items: [{ guide: 'apex', demo: <ApexDemo /> }, { guide: 'layouts' }] },
+  { group: 'tools', items: [{ guide: 'apex', demo: <ApexDemo /> }, { guide: 'layouts', demo: <LayoutEditDemo /> }] },
   { group: 'apply', items: [{ guide: 'changesets', demo: <FlowDemo /> }, { guide: 'export', demo: <ExportDemo /> }, { guide: 'history' }] },
   { group: 'more', items: [{ guide: 'settings' }] }
 ];

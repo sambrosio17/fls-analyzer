@@ -61,7 +61,7 @@ export const es: Messages = {
       tabs: { title: 'Pestañas de trabajo', body: <>Las pestañas tienen tres niveles: las <b>orgs</b> abiertas, la <b>herramienta</b> de la org activa (Matriz FLS, Clases Apex, Formatos y páginas, Change sets) y los <b>objetos</b> abiertos en esa herramienta. Cada pestaña de objeto guarda sus filtros y cambios pendientes. <b>Arrastra</b> una pestaña para moverla, o usa <kbd>Ctrl</kbd>+<kbd>Mayús</kbd>+<kbd>←</kbd>/<kbd>→</kbd>. El punto de color de la pestaña de la org cambia su color, ↻ renueva la sesión, el clic central cierra una pestaña.</> },
       notices: { title: 'Cargas largas en segundo plano', body: <>Las cargas siguen aunque cambies de pestaña. Si dejas una pestaña mientras carga una matriz, formatos o ejecuta un change set, un panel abajo a la derecha la sigue y te avisa cuando está lista; <b>Abrir</b> te lleva de vuelta. Al volver a la pestaña el aviso desaparece.</> },
       apex: { title: 'Clases Apex', body: <>Qué perfiles y conjuntos de permisos pueden ejecutar cada clase Apex. Funciona como la matriz FLS con dos estados, activada o no: clic, arrastre, clic derecho y acciones en bloque, luego vista previa y aprobación. Las clases de paquetes gestionados se pueden ocultar con un filtro.</> },
-      layouts: { title: 'Formatos y páginas', body: <>Elige un objeto para ver, por cada perfil y tipo de registro, qué <b>formato de página</b> y qué <b>página Lightning</b> recibe (por app, tipo de registro y valor por defecto de la org), y los campos del formato que el perfil no puede leer. Por ahora esta sección es de solo lectura.</> },
+      layouts: { title: 'Formatos y páginas', body: <>Elige un objeto para ver, por cada perfil y tipo de registro, qué <b>formato de página</b> y qué <b>página Lightning</b> recibe (por app, tipo de registro y valor por defecto de la org), y los campos del formato que el perfil no puede leer. Con <b>Editar asignaciones</b> las cambias celda por celda, o toda una columna con <b>Toda la columna…</b>; las celdas cambiadas se vuelven moradas. <b>Ir a la vista previa</b> crea un change set, que se aplica como los de FLS. Para las páginas Lightning el cambio vale para la app elegida, y quitar una asignación específica devuelve el perfil a la predeterminada de la app o la org.</> },
       changesets: { title: 'Change sets', body: <>No se escribe nada hasta que confirmas. <b>Ir a la vista previa</b> convierte los cambios pendientes en un change set con lo que se añade, cambia y quita, y los avisos. En producción necesita aprobación y escribir el nombre de la org. La ejecución muestra el progreso y el resultado fila por fila.</> },
       export: { title: 'Exportar', body: <>El botón <b>Exportar</b> guarda lo que ves: la matriz en Excel, CSV o como metadatos de Salesforce (package.xml y un archivo por perfil y conjunto de permisos), los change sets en Excel, CSV o metadatos con los valores que fijan, y los formatos en Excel o CSV. Un panel abajo a la derecha muestra el progreso de los archivos grandes.</> },
       history: { title: 'Historial y deshacer', body: <>El <b>Historial</b> muestra cada change set con quién lo preparó y aprobó, y cuándo. Cada uno guarda los valores anteriores, así que <b>Deshacer estos cambios</b>, en el change set, crea un change set que los restaura.</> },
@@ -141,7 +141,14 @@ export const es: Messages = {
     rejected: 'Change set rechazado. Vuelve a la matriz para preparar uno nuevo.',
     allDone: 'Todos los cambios se aplicaron y se comprobaron leyendo de nuevo la org.',
     partial: (ok: number, failed: number) => `${ok} cambios aplicados, ${failed} sin aplicar.`,
-    rollback: 'Deshacer estos cambios'
+    rollback: 'Deshacer estos cambios',
+    assign: {
+      kind: { layout: 'Formato de página', page: 'Página Lightning' },
+      cols: ['Tipo', 'Objeto', 'App', 'Perfil', 'Tipo de registro', 'Antes', 'Después', 'Resultado'],
+      kpiCleared: 'Asignaciones de página eliminadas',
+      defaultPage: 'Predeterminada (app u org)',
+      master: 'Master'
+    }
   },
 
   pick: {
@@ -238,7 +245,7 @@ export const es: Messages = {
 
   layouts: {
     title: 'Formatos y páginas Lightning',
-    intro: 'Para cada objeto: qué formato de página y qué página Lightning ve cada perfil, por tipo de registro. En esta versión la sección es de solo lectura.',
+    intro: 'Para cada objeto: qué formato de página y qué página Lightning ve cada perfil, por tipo de registro. Con Editar asignaciones puedes cambiarlas: los cambios pasan por vista previa y aprobación, como los de FLS.',
     changeObject: 'Cambiar de objeto',
     chooseObject: 'Elige un objeto (p. ej. Account)',
     pageLayout: 'Formato de página',
@@ -278,7 +285,19 @@ export const es: Messages = {
     pageCols: ['Página', 'Componentes', 'Campos de Dynamic Forms', 'Dónde está asignada'],
     showPageProfiles: 'Mostrar los perfiles que ven esta página',
     pageUnassigned: 'Sin asignar',
-    noPages: 'No hay páginas de registro Lightning para este objeto.'
+    noPages: 'No hay páginas de registro Lightning para este objeto.',
+    edit: 'Editar asignaciones', editDone: 'Terminar',
+    finishFirst: 'Primero descarta los cambios o ve a la vista previa.',
+    setColumn: 'Toda la columna…',
+    noSpecific: '(ninguna: predeterminada de la app o la org)',
+    noFullName: 'Salesforce no devolvió el nombre de metadatos de este perfil, así que no se puede editar.',
+    layoutEditHint: 'Las celdas cambiadas están resaltadas. No se escribe nada hasta que confirmes la vista previa.',
+    pageEditHint: 'Los cambios valen para la app elegida. Quitar una asignación específica devuelve el perfil a la predeterminada de la app o la org.',
+    pending: (n: number) => n === 1 ? '1 asignación pendiente' : `${n} asignaciones pendientes`,
+    discard: 'Descartar', toPreview: 'Ir a la vista previa', preparing: 'Preparando…',
+    description: (n: number, object: string) => n === 1 ? `1 asignación en ${object}` : `${n} asignaciones en ${object}`,
+    sent: (n: string) => `Los cambios están en el change set ${n}. Cuando se aplique, recarga para ver las nuevas asignaciones.`,
+    reload: 'Recargar'
   },
 
   export: {

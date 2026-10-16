@@ -21,7 +21,11 @@ export interface SfApi {
   listMetadata(type: string): Promise<{ fullName: string; id: string }[]>;
   /** Metadata API readMetadata; components that do not exist are left out. */
   readMetadata(type: string, fullNames: string[]): Promise<MetadataRecord[]>;
+  /** Metadata API updateMetadata: one result per record, in order. */
+  updateMetadata(type: string, records: MetadataRecord[]): Promise<MetadataSaveResult[]>;
 }
+
+export interface MetadataSaveResult { fullName: string; success: boolean; errors: { statusCode: string; message: string }[] }
 
 export interface ClientOptions {
   instanceUrl: string;
@@ -79,13 +83,27 @@ export class SalesforceClient implements SfApi {
     return out;
   }
 
+  async updateMetadata(type: string, records: MetadataRecord[]): Promise<MetadataSaveResult[]> {
+    const out: MetadataSaveResult[] = [];
+    for (let i = 0; i < records.length; i += 10) {
+      const items = records.slice(i, i + 10).map(r => `<met:metadata xsi:type="met:${xmlEscape(type)}">${toXml(r)}</met:metadata>`).join('');
+      const res = await this.soap(`<met:updateMetadata>${items}</met:updateMetadata>`) as
+        { updateMetadataResponse?: { result?: { fullName?: string; success?: string; errors?: { statusCode?: string; message?: string } | { statusCode?: string; message?: string }[] }[] } };
+      for (const r of res.updateMetadataResponse?.result ?? []) {
+        const errors = (Array.isArray(r.errors) ? r.errors : r.errors ? [r.errors] : []).map(e => ({ statusCode: e.statusCode ?? 'ERROR', message: e.message ?? '' }));
+        out.push({ fullName: r.fullName ?? '', success: r.success === 'true', errors });
+      }
+    }
+    return out;
+  }
+
   /** Calls the Metadata SOAP API and returns the parsed Body; refreshes the token once on INVALID_SESSION_ID. */
   private async soap(operation: string): Promise<Record<string, unknown>> {
     if (!this.token) this.token = await this.opts.refresh();
     const send = () => fetch(`${this.opts.instanceUrl}/services/Soap/m/${this.apiVersion.slice(1)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'text/xml; charset=UTF-8', SOAPAction: '""' },
-      body: `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:met="http://soap.sforce.com/2006/04/metadata">`
+      body: `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:met="http://soap.sforce.com/2006/04/metadata">`
         + `<soapenv:Header><met:SessionHeader><met:sessionId>${xmlEscape(this.token!)}</met:sessionId></met:SessionHeader></soapenv:Header>`
         + `<soapenv:Body>${operation}</soapenv:Body></soapenv:Envelope>`
     });
@@ -124,10 +142,24 @@ export class SalesforceClient implements SfApi {
 
 const xmlEscape = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+/**
+ * Writes a metadata record as Metadata API elements, in the record's key order (which follows the
+ * order readMetadata returned). Lists repeat their element; empty values (nil) are left out.
+ */
+export function toXml(value: Record<string, unknown>): string {
+  const one = (key: string, v: unknown): string => {
+    if (v == null || v === '') return '';
+    if (Array.isArray(v)) return v.map(x => one(key, x)).join('');
+    const inner = typeof v === 'object' ? toXml(v as Record<string, unknown>) : xmlEscape(String(v));
+    return `<met:${key}>${inner}</met:${key}>`;
+  };
+  return Object.entries(value).map(([k, v]) => one(k, v)).join('');
+}
+
 /** Metadata elements that are lists even when the response holds a single one. */
 const LIST_ELEMENTS = new Set([
   'result', 'records', 'actionOverrides', 'profileActionOverrides', 'flexiPageRegions', 'itemInstances',
-  'componentInstanceProperties', 'layoutSections', 'layoutColumns', 'layoutItems', 'fields', 'recordTypes', 'tabs'
+  'componentInstanceProperties', 'layoutSections', 'layoutColumns', 'layoutItems', 'fields', 'recordTypes', 'tabs', 'errors'
 ]);
 const parser = new XMLParser({ ignoreAttributes: true, removeNSPrefix: true, parseTagValue: false, isArray: name => LIST_ELEMENTS.has(name) });
 export const parseXml = (xml: string): unknown => parser.parse(xml);

@@ -61,8 +61,8 @@ export const fr: Messages = {
       tabs: { title: 'Onglets de travail', body: <>Les onglets sont sur trois niveaux : les <b>orgs</b> ouvertes, l’<b>outil</b> de l’org active (Matrice FLS, Classes Apex, Présentations et pages, Change sets) et les <b>objets</b> ouverts dans cet outil. Chaque onglet d’objet garde ses filtres et ses changements en attente. <b>Faites glisser</b> un onglet pour le déplacer, ou utilisez <kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>←</kbd>/<kbd>→</kbd>. Le point coloré de l’onglet d’org change sa couleur, ↻ renouvelle la session, le clic du milieu ferme un onglet.</> },
       notices: { title: 'Chargements longs en arrière-plan', body: <>Les chargements continuent quand vous changez d’onglet. Si vous quittez un onglet pendant qu’il charge une matrice, des présentations ou exécute un change set, un panneau en bas à droite le suit et vous prévient quand c’est prêt ; <b>Ouvrir</b> vous y ramène. Revenir sur l’onglet efface l’avis.</> },
       apex: { title: 'Classes Apex', body: <>Quels profils et ensembles d’autorisations peuvent exécuter chaque classe Apex. Cela fonctionne comme la matrice FLS avec deux états, activée ou non : clic, glisser, clic droit et actions en masse, puis aperçu et approbation. Les classes de packages gérés peuvent être masquées par un filtre.</> },
-      layouts: { title: 'Présentations et pages', body: <>Choisissez un objet pour voir, pour chaque profil et type d’enregistrement, quelle <b>présentation de page</b> et quelle <b>page Lightning</b> il reçoit (par application, type d’enregistrement et valeur par défaut de l’org), et les champs de la présentation que le profil ne peut pas lire. Cette section est en lecture seule pour l’instant.</> },
-      changesets: { title: 'Change sets', body: <>Rien n’est écrit avant votre confirmation. <b>Aller à l’aperçu</b> transforme les changements en attente en change set avec ce qui est ajouté, modifié et retiré, et les avertissements. En production il faut une approbation et saisir le nom de l’org. L’exécution montre la progression et le résultat ligne par ligne.</> },
+      layouts: { title: 'Présentations et pages', body: <>Choisissez un objet pour voir, pour chaque profil et type d’enregistrement, quelle <b>présentation de page</b> et quelle <b>page Lightning</b> il reçoit (par application, type d’enregistrement et valeur par défaut de l’org), et les champs de la présentation que le profil ne peut pas lire. Avec <b>Modifier les attributions</b>, vous les changez cellule par cellule, ou toute une colonne avec <b>Toute la colonne…</b> ; les cellules modifiées passent en violet. <b>Voir l’aperçu</b> crée un change set, appliqué comme ceux de FLS. Pour les pages Lightning, la modification vaut pour l’app choisie, et supprimer une attribution spécifique renvoie le profil au défaut de l’app ou de l’org.</> },
+      changesets: { title: 'Change sets', body: <>Rien n’est écrit avant votre confirmation. <b>Voir l’aperçu</b> transforme les changements en attente en change set avec ce qui est ajouté, modifié et retiré, et les avertissements. En production il faut une approbation et saisir le nom de l’org. L’exécution montre la progression et le résultat ligne par ligne.</> },
       export: { title: 'Exporter', body: <>Le bouton <b>Exporter</b> enregistre ce que vous voyez : la matrice en Excel, en CSV ou en métadonnées Salesforce (package.xml et un fichier par profil et ensemble d’autorisations), les change sets en Excel, CSV ou métadonnées avec les valeurs qu’ils définissent, et les présentations en Excel ou CSV. Un panneau en bas à droite montre la progression des gros fichiers.</> },
       history: { title: 'Historique et annulation', body: <>L’<b>Historique</b> liste chaque change set avec qui l’a préparé et approuvé, et quand. Chacun garde les valeurs d’avant, donc <b>Annuler ces modifications</b>, dans le change set, crée un change set qui les restaure.</> },
       settings: { title: 'Langue et session', body: <>Choisissez English, Italiano, Français ou Español dans le menu avec les drapeaux. <b>Se déconnecter</b> ferme la session Orgsmith ; vos orgs restent connectées.</> }
@@ -141,7 +141,14 @@ export const fr: Messages = {
     rejected: 'Change set refusé. Revenez à la matrice pour en préparer un nouveau.',
     allDone: "Toutes les modifications ont été appliquées et vérifiées en relisant l'org.",
     partial: (ok: number, failed: number) => `${ok} modifications appliquées, ${failed} non appliquées.`,
-    rollback: 'Annuler ces modifications'
+    rollback: 'Annuler ces modifications',
+    assign: {
+      kind: { layout: 'Présentation de page', page: 'Page Lightning' },
+      cols: ['Type', 'Objet', 'App', 'Profil', "Type d'enregistrement", 'Avant', 'Après', 'Résultat'],
+      kpiCleared: 'Attributions de page supprimées',
+      defaultPage: "Par défaut (app ou org)",
+      master: 'Master'
+    }
   },
 
   pick: {
@@ -238,7 +245,7 @@ export const fr: Messages = {
 
   layouts: {
     title: 'Présentations et pages Lightning',
-    intro: "Pour chaque objet : quelle présentation de page et quelle page Lightning voit chaque profil, par type d'enregistrement. Dans cette version, la section est en lecture seule.",
+    intro: "Pour chaque objet : quelle présentation de page et quelle page Lightning voit chaque profil, par type d'enregistrement. Avec Modifier les attributions, vous pouvez les changer : les modifications passent par l'aperçu et l'approbation, comme celles de FLS.",
     changeObject: "Changer d'objet",
     chooseObject: 'Choisissez un objet (ex. Account)',
     pageLayout: 'Présentation de page',
@@ -278,7 +285,19 @@ export const fr: Messages = {
     pageCols: ['Page', 'Composants', 'Champs Dynamic Forms', 'Où elle est attribuée'],
     showPageProfiles: 'Afficher les profils qui voient cette page',
     pageUnassigned: 'Non attribuée',
-    noPages: "Aucune page d'enregistrement Lightning pour cet objet."
+    noPages: "Aucune page d'enregistrement Lightning pour cet objet.",
+    edit: 'Modifier les attributions', editDone: 'Terminer',
+    finishFirst: "Annulez d'abord les modifications ou passez à l'aperçu.",
+    setColumn: 'Toute la colonne…',
+    noSpecific: "(aucune : défaut de l'app ou de l'org)",
+    noFullName: "Salesforce n'a pas renvoyé le nom de métadonnées de ce profil : il ne peut pas être modifié.",
+    layoutEditHint: "Les cellules modifiées sont mises en évidence. Rien n'est écrit avant la confirmation de l'aperçu.",
+    pageEditHint: "Les modifications s'appliquent à l'app choisie. Supprimer une attribution spécifique renvoie le profil au défaut de l'app ou de l'org.",
+    pending: (n: number) => n === 1 ? '1 attribution en attente' : `${n} attributions en attente`,
+    discard: 'Annuler', toPreview: "Voir l'aperçu", preparing: 'Préparation…',
+    description: (n: number, object: string) => n === 1 ? `1 attribution sur ${object}` : `${n} attributions sur ${object}`,
+    sent: (n: string) => `Les modifications sont dans le change set ${n}. Une fois appliqué, rechargez pour voir les nouvelles attributions.`,
+    reload: 'Recharger'
   },
 
   export: {

@@ -4,3 +4,4 @@ export * from './plan.ts';
 export * from './batches.ts';
 export * from './approval.ts';
 export * from './pages.ts';
+export * from './assignments.ts';

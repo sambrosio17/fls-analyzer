@@ -5,13 +5,18 @@ import { trackLoad, useTabId } from '../loads.ts';
 import { useT } from '../i18n.tsx';
 import { ExportMenu, type ExportItem } from '../export/ExportMenu.tsx';
 import { CSV_TYPE, XLSX_TYPE, download, slug, stamp, toCsv, toXlsx, type Sheet } from '../export/table.ts';
-import { api, type LayoutAnalysis, type Org, type PageAnalysis, type RecordTypeInfo, type SObject } from '../api.ts';
+import { api, type AssignmentInput, type LayoutAnalysis, type Org, type PageAnalysis, type ProfileInfo, type RecordTypeInfo, type SObject } from '../api.ts';
 
 type Tab = 'layouts' | 'pages';
 
-interface Props { org: Org; initialObject?: string | null; initialTab?: Tab; onChange?: (object: string | null, tab: Tab) => void }
+interface Props {
+  org: Org; initialObject?: string | null; initialTab?: Tab; onChange?: (object: string | null, tab: Tab) => void;
+  /** Opens a change set created from the edited assignments. */
+  onChangeSet?: (id: string, number: string) => void;
+  onDirty?: (dirty: boolean) => void;
+}
 
-export function LayoutsPage({ org, initialObject = null, initialTab = 'layouts', onChange }: Props) {
+export function LayoutsPage({ org, initialObject = null, initialTab = 'layouts', onChange, onChangeSet, onDirty }: Props) {
   const t = useT();
   const [objects, setObjects] = useState<SObject[]>([]);
   const [object, setObject] = useState<string | null>(initialObject);
@@ -24,6 +29,16 @@ export function LayoutsPage({ org, initialObject = null, initialTab = 'layouts',
   const [loading, setLoading] = useState(false);
   const tabId = useTabId();
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  /** Saves edited assignments as a change set and opens it; the view then shows the org's values again. */
+  const submit = async (changes: AssignmentInput[]) => {
+    const cs = await api.createAssignments(org.id, { changes, description: t.layouts.description(changes.length, object ?? '') });
+    setSent(cs.number);
+    onChangeSet?.(cs.id, cs.number);
+  };
+  const reload = () => { setSent(null); setLayouts(null); setPages(null); setReloadKey(k => k + 1); };
 
   useEffect(() => { api.objects(org.id).then(setObjects).catch(e => setError(e.message)); }, [org.id]);
 
@@ -33,7 +48,7 @@ export function LayoutsPage({ org, initialObject = null, initialTab = 'layouts',
     setLoading(true); setError(null);
     const load = tab === 'layouts' ? api.layouts(org.id, object).then(setLayouts) : api.lightningPages(org.id, object).then(setPages);
     trackLoad(tabId, 'load', load).catch(e => setError((e as Error).message)).finally(() => setLoading(false));
-  }, [org.id, object, tab]);
+  }, [org.id, object, tab, reloadKey]);
 
   const matches = query.length < 2 ? [] : objects.filter(o =>
     o.label.toLowerCase().includes(query.toLowerCase()) || o.name.toLowerCase().includes(query.toLowerCase())).slice(0, 8);
@@ -68,9 +83,12 @@ export function LayoutsPage({ org, initialObject = null, initialTab = 'layouts',
       </section>
 
       {error && <div className="banner prod">{error}</div>}
+      {sent && <div className="banner info row">{t.layouts.sent(sent)}<span className="spacer" /><button className="btn sm" onClick={reload}>{t.layouts.reload}</button></div>}
       {loading && <p className="muted">{tab === 'layouts' ? t.layouts.loadingLayouts : t.layouts.loadingPages}</p>}
       {!object && <div className="panel empty">{t.layouts.empty}</div>}
-      {object && !loading && current?.object === object && (tab === 'layouts' ? <LayoutView data={layouts!} orgLabel={org.label} /> : <PageView data={pages!} orgLabel={org.label} />)}
+      {object && !loading && current?.object === object && (tab === 'layouts'
+        ? <LayoutView key={`${object}-${reloadKey}`} data={layouts!} orgLabel={org.label} onSubmit={submit} onDirty={onDirty} />
+        : <PageView key={`${object}-${reloadKey}`} data={pages!} orgLabel={org.label} onSubmit={submit} onDirty={onDirty} />)}
     </>
   );
 }
@@ -110,11 +128,64 @@ function exportItems(t: ReturnType<typeof useT>, base: string, sheets: () => She
   ];
 }
 
+interface EditProps { onSubmit: (changes: AssignmentInput[]) => Promise<void>; onDirty?: (dirty: boolean) => void }
+
+/** Edited cells by key, with the create-change-set call; pending edits mark the tab as dirty. */
+function useEdits(onSubmit: EditProps['onSubmit'], onDirty?: EditProps['onDirty']) {
+  const [pending, setPending] = useState<Map<string, string>>(new Map());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { onDirty?.(pending.size > 0); }, [pending.size > 0]);
+  useEffect(() => () => onDirty?.(false), []);
+  /** Sets `value` on `keys`; a value equal to the org's (`original`) clears the edit. */
+  const set = (entries: [key: string, value: string, original: string][]) => setPending(prev => {
+    const next = new Map(prev);
+    for (const [k, v, o] of entries) { if (v === o) next.delete(k); else next.set(k, v); }
+    return next;
+  });
+  const send = async (changes: AssignmentInput[]) => {
+    setBusy(true); setError(null);
+    try { await onSubmit(changes); setPending(new Map()); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  };
+  return { pending, set, discard: () => setPending(new Map()), send, busy, error };
+}
+
+/** Pending count, discard and "go to preview", under the assignment table while editing. */
+function EditBar({ count, busy, error, onDiscard, onSend, hint }: { count: number; busy: boolean; error: string | null; onDiscard: () => void; onSend: () => void; hint: string }) {
+  const t = useT();
+  return (
+    <>
+      {error && <div className="banner prod">{error}</div>}
+      <div className="selbar edit-bar">
+        <span className="muted small">{hint}</span>
+        <span className="spacer" />
+        <span className={count ? 'warn-text' : 'muted'}>{t.layouts.pending(count)}</span>
+        <button className="btn sm danger" disabled={!count} onClick={onDiscard}>{t.layouts.discard}</button>
+        <button className="btn sm primary" id="assign-preview" disabled={!count || busy} onClick={onSend}>{busy ? t.layouts.preparing : t.layouts.toPreview}</button>
+      </div>
+    </>
+  );
+}
+
+/** Edit-mode toggle in a panel header. */
+function EditToggle({ editing, onChange, pending }: { editing: boolean; onChange: (on: boolean) => void; pending: number }) {
+  const t = useT();
+  return (
+    <button className={`btn sm${editing ? ' on' : ''}`} id="assign-edit" aria-pressed={editing} disabled={editing && pending > 0} title={editing && pending ? t.layouts.finishFirst : undefined}
+      onClick={() => onChange(!editing)}>{editing ? t.layouts.editDone : t.layouts.edit}</button>
+  );
+}
+
+const editable = (p: ProfileInfo) => !!p.fullName;
+
 const dot = (i: number) => ({ background: `hsl(${(i * 67) % 360} 55% 55%)` });
 
-function LayoutView({ data, orgLabel }: { data: LayoutAnalysis; orgLabel: string }) {
+function LayoutView({ data, orgLabel, onSubmit, onDirty }: { data: LayoutAnalysis; orgLabel: string } & EditProps) {
   const t = useT();
   const [filter, setFilter] = useState(NO_FILTER);
+  const [editing, setEditing] = useState(false);
+  const edits = useEdits(onSubmit, onDirty);
+  const cellKey = (p: ProfileInfo, rt: RecordTypeInfo) => `${p.id}|${rtKey(rt)}`;
   const layoutIndex = useMemo(() => new Map(data.layouts.map((l, i) => [l.id, i])), [data]);
   const assignment = useMemo(() => new Map(data.assignments.map(a => [`${a.profileId}|${a.recordTypeId ?? ''}`, a.layoutId])), [data]);
   const gaps = useMemo(() => new Map(data.gaps.map(g => [`${g.profileId}|${g.layoutId}`, g.fields])), [data]);
@@ -123,7 +194,18 @@ function LayoutView({ data, orgLabel }: { data: LayoutAnalysis; orgLabel: string
   const unassigned = data.layouts.filter(l => assignedCount(l.id) === 0);
   const withGaps = new Set(data.gaps.map(g => g.profileId));
   const rts = data.recordTypes.filter(rt => !filter.recordType.length || filter.recordType.includes(rtKey(rt)));
-  const layoutOf = (profileId: string, rt: RecordTypeInfo) => assignment.get(`${profileId}|${rt.id ?? ''}`);
+  const orgLayoutOf = (profileId: string, rt: RecordTypeInfo) => assignment.get(`${profileId}|${rt.id ?? ''}`);
+  /** The layout a cell shows: the edited one, else the org's. */
+  const layoutOf = (profileId: string, rt: RecordTypeInfo) => edits.pending.get(`${profileId}|${rtKey(rt)}`) ?? orgLayoutOf(profileId, rt);
+  const setLayout = (ps: ProfileInfo[], rt: RecordTypeInfo, layoutId: string) =>
+    edits.set(ps.filter(editable).map(p => [cellKey(p, rt), layoutId, orgLayoutOf(p.id, rt) ?? '']));
+  const send = () => edits.send([...edits.pending].map(([k, layoutId]) => {
+    const [profileId, rk] = k.split('|') as [string, string];
+    const p = data.profiles.find(x => x.id === profileId)!;
+    const rt = data.recordTypes.find(r => rtKey(r) === rk)!;
+    const l = data.layouts[layoutIndex.get(layoutId)!]!;
+    return { kind: 'layout', object: data.object, profile: p.fullName!, profileLabel: p.name, recordType: rt.developerName, app: null, after: l.namespace ? `${l.namespace}__${l.name}` : l.name };
+  }));
   const profiles = data.profiles.filter(p =>
     (!filter.profile.length || filter.profile.includes(p.id))
     && (!filter.onlyIssues || rts.some(rt => { const l = layoutOf(p.id, rt); return !!l && gaps.has(`${p.id}|${l}`); }))
@@ -141,6 +223,8 @@ function LayoutView({ data, orgLabel }: { data: LayoutAnalysis; orgLabel: string
 
       <section className="panel" style={{ marginBottom: 16 }}>
         <div className="panel-h"><h2>{t.layouts.assignments}</h2>
+          <span className="spacer" />
+          <EditToggle editing={editing} onChange={setEditing} pending={edits.pending.size} />
           <ExportMenu note={t.export.rowsScope(profiles.length)} items={exportItems(t, `orgsmith-layouts-${slug(orgLabel)}-${data.object}-${stamp()}`, () => [
             {
               name: t.export.sheetAssignments,
@@ -160,7 +244,16 @@ function LayoutView({ data, orgLabel }: { data: LayoutAnalysis; orgLabel: string
             targets={data.layouts.map(l => ({ id: l.id, label: l.name }))} />
           <div className="tbl-wrap">
             <table className="dt assign">
-              <thead><tr><th>{t.layouts.profile}</th>{rts.map(rt => <th key={rt.id ?? 'master'}>{rt.label}{!rt.active && <span className="muted">{t.layouts.inactive}</span>}</th>)}</tr></thead>
+              <thead><tr><th>{t.layouts.profile}</th>{rts.map(rt => (
+                <th key={rt.id ?? 'master'}>{rt.label}{!rt.active && <span className="muted">{t.layouts.inactive}</span>}
+                  {editing && (
+                    <select className="input sm col-set" aria-label={t.layouts.setColumn} value="" onChange={e => setLayout(profiles, rt, e.target.value)}>
+                      <option value="">{t.layouts.setColumn}</option>
+                      {data.layouts.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  )}
+                </th>
+              ))}</tr></thead>
               <tbody>
                 {profiles.map(p => (
                   <tr key={p.id} className={noRead.has(p.id) ? 'dim' : ''}>
@@ -170,8 +263,16 @@ function LayoutView({ data, orgLabel }: { data: LayoutAnalysis; orgLabel: string
                       const layout = layoutId ? data.layouts[layoutIndex.get(layoutId)!] : undefined;
                       const missing = layoutId ? gaps.get(`${p.id}|${layoutId}`) : undefined;
                       return (
-                        <td key={rt.id ?? 'master'} className={filter.target.length && !filter.target.includes(layoutId ?? '') ? 'off' : ''}>
-                          {layout ? <span className="lay"><i style={dot(layoutIndex.get(layout.id)!)} />{layout.name}</span> : <span className="muted">—</span>}
+                        <td key={rt.id ?? 'master'} className={`${filter.target.length && !filter.target.includes(layoutId ?? '') ? 'off' : ''}${edits.pending.has(cellKey(p, rt)) ? ' pend' : ''}`}>
+                          {editing && editable(p)
+                            ? (
+                              <select className="input sm cell-set" aria-label={`${p.name} · ${rt.label}`} value={layoutId ?? ''} onChange={e => setLayout([p], rt, e.target.value)}>
+                                {!layoutId && <option value="">—</option>}
+                                {data.layouts.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                              </select>
+                            )
+                            : layout ? <span className="lay"><i style={dot(layoutIndex.get(layout.id)!)} />{layout.name}</span> : <span className="muted">—</span>}
+                          {editing && !editable(p) && <div className="muted small">{t.layouts.noFullName}</div>}
                           {missing && <div className="warn-text small" title={missing.join('\n')}>⚠ {t.layouts.unreadable(missing.length)}</div>}
                         </td>
                       );
@@ -182,6 +283,7 @@ function LayoutView({ data, orgLabel }: { data: LayoutAnalysis; orgLabel: string
               </tbody>
             </table>
           </div>
+          {editing && <EditBar count={edits.pending.size} busy={edits.busy} error={edits.error} onDiscard={edits.discard} onSend={send} hint={t.layouts.layoutEditHint} />}
           <p className="muted small">{t.layouts.gapNote}</p>
         </div>
       </section>
@@ -210,10 +312,32 @@ function LayoutView({ data, orgLabel }: { data: LayoutAnalysis; orgLabel: string
 
 const SOURCE_CLASS: Record<PageSource, string> = { 'app-profile': 'st-info', app: 'st-ok', org: '', system: 'st-part' };
 
-function PageView({ data, orgLabel }: { data: PageAnalysis; orgLabel: string }) {
+function PageView({ data, orgLabel, onSubmit, onDirty }: { data: PageAnalysis; orgLabel: string } & EditProps) {
   const t = useT();
   const [app, setApp] = useState(data.apps.find(a => a.name === 'standard__LightningSales')?.name ?? data.apps[0]?.name ?? '');
   const [filter, setFilter] = useState(NO_FILTER);
+  const [editing, setEditing] = useState(false);
+  const edits = useEdits(onSubmit, onDirty);
+  // Edited cells hold the page name, or '' to remove the app + record type + profile assignment.
+  const cellKey = (p: ProfileInfo, rt: RecordTypeInfo) => `${app}|${p.id}|${rtKey(rt)}`;
+  const orgSpecific = (p: ProfileInfo, rt: RecordTypeInfo) =>
+    data.assignments.find(a => a.app === app && a.profile === p.fullName && a.recordType === rt.developerName)?.page ?? '';
+  const specific = (p: ProfileInfo, rt: RecordTypeInfo) => edits.pending.get(cellKey(p, rt)) ?? orgSpecific(p, rt);
+  /** The page a profile sees with the edits applied. */
+  const shownPage = (p: ProfileInfo, rt: RecordTypeInfo): { page: string | null; source: PageSource } => {
+    if (!p.fullName) return { page: null, source: 'system' };
+    if (!edits.pending.has(cellKey(p, rt))) return effectivePage(data, app, p.fullName, rt.developerName);
+    const page = edits.pending.get(cellKey(p, rt))!;
+    return page ? { page, source: 'app-profile' } : effectivePage({ ...data, assignments: [] }, app, p.fullName, rt.developerName);
+  };
+  const setPage = (ps: ProfileInfo[], rt: RecordTypeInfo, page: string) =>
+    edits.set(ps.filter(editable).map(p => [cellKey(p, rt), page, orgSpecific(p, rt)]));
+  const send = () => edits.send([...edits.pending].map(([k, page]) => {
+    const [appName, profileId, rk] = k.split('|') as [string, string, string];
+    const p = data.profiles.find(x => x.id === profileId)!;
+    const rt = data.recordTypes.find(r => rtKey(r) === rk)!;
+    return { kind: 'page', object: data.object, profile: p.fullName!, profileLabel: p.name, recordType: rt.developerName, app: appName, after: page || null };
+  }));
   const label = useMemo(() => new Map(data.pages.map(p => [p.name, p.label])), [data]);
   const unassigned = new Set(unassignedPages(data, data.pages.map(p => p.name)));
   const appLabel = (name: string) => data.apps.find(a => a.name === name)?.label ?? name;
@@ -222,7 +346,7 @@ function PageView({ data, orgLabel }: { data: PageAnalysis; orgLabel: string }) 
   const rts = activeRts.filter(rt => !filter.recordType.length || filter.recordType.includes(rtKey(rt)));
   const rows = data.profiles
     .filter(p => !filter.profile.length || filter.profile.includes(p.id))
-    .map(p => ({ p, cells: rts.map(rt => p.fullName ? effectivePage(data, app, p.fullName, rt.developerName) : { page: null, source: 'system' as PageSource }) }))
+    .map(p => ({ p, cells: rts.map(rt => shownPage(p, rt)) }))
     .filter(r => (!filter.onlyIssues || r.cells.some(c => c.source === 'app-profile')) && (!filter.target.length || r.cells.some(c => filter.target.includes(c.page ?? ''))));
   const usage = (name: string) => [
     ...(data.orgDefault === name ? [t.layouts.orgDefault] : []),
@@ -243,6 +367,7 @@ function PageView({ data, orgLabel }: { data: PageAnalysis; orgLabel: string }) 
       <section className="panel" style={{ marginBottom: 16 }}>
         <div className="panel-h"><h2>{t.layouts.perProfile}</h2>
           <span className="spacer" />
+          <EditToggle editing={editing} onChange={setEditing} pending={edits.pending.size} />
           <ExportMenu note={t.export.rowsScope(rows.length)} items={exportItems(t, `orgsmith-pages-${slug(orgLabel)}-${data.object}-${slug(appLabel(app))}-${stamp()}`, () => [
             {
               name: t.export.sheetAssignments,
@@ -264,14 +389,33 @@ function PageView({ data, orgLabel }: { data: PageAnalysis; orgLabel: string }) 
             targets={data.pages.map(pg => ({ id: pg.name, label: pg.label }))} />
           <div className="tbl-wrap">
             <table className="dt assign">
-              <thead><tr><th>{t.layouts.profile}</th>{rts.map(rt => <th key={rt.id ?? 'master'}>{rt.label}</th>)}</tr></thead>
+              <thead><tr><th>{t.layouts.profile}</th>{rts.map(rt => (
+                <th key={rt.id ?? 'master'}>{rt.label}
+                  {editing && (
+                    <select className="input sm col-set" aria-label={t.layouts.setColumn} value="-" onChange={e => setPage(rows.map(r => r.p), rt, e.target.value)}>
+                      <option value="-" disabled>{t.layouts.setColumn}</option>
+                      <option value="">{t.layouts.noSpecific}</option>
+                      {data.pages.map(pg => <option key={pg.name} value={pg.name}>{pg.label}</option>)}
+                    </select>
+                  )}
+                </th>
+              ))}</tr></thead>
               <tbody>
                 {rows.map(({ p, cells }) => (
                   <tr key={p.id}>
                     <td>{p.name}</td>
                     {cells.map((c, i) => (
-                      <td key={rts[i]!.id ?? 'master'} className={filter.target.length && !filter.target.includes(c.page ?? '') ? 'off' : ''}>
-                        <div>{c.page ? label.get(c.page) ?? c.page : <span className="muted">{t.layouts.systemPage}</span>}</div>
+                      <td key={rts[i]!.id ?? 'master'} className={`${filter.target.length && !filter.target.includes(c.page ?? '') ? 'off' : ''}${edits.pending.has(cellKey(p, rts[i]!)) ? ' pend' : ''}`}>
+                        {editing && editable(p)
+                          ? (
+                            <select className="input sm cell-set" aria-label={`${p.name} · ${rts[i]!.label}`} value={specific(p, rts[i]!)} onChange={e => setPage([p], rts[i]!, e.target.value)}>
+                              <option value="">{t.layouts.noSpecific}</option>
+                              {data.pages.map(pg => <option key={pg.name} value={pg.name}>{pg.label}</option>)}
+                            </select>
+                          )
+                          : <div>{c.page ? label.get(c.page) ?? c.page : <span className="muted">{t.layouts.systemPage}</span>}</div>}
+                        {editing && !editable(p) && <div className="muted small">{t.layouts.noFullName}</div>}
+                        {editing && editable(p) && c.source !== 'app-profile' && <div className="muted small">{c.page ? label.get(c.page) ?? c.page : t.layouts.systemPage}</div>}
                         <span className={`pill ${SOURCE_CLASS[c.source]}`}>{t.layouts.source[c.source]}</span>
                       </td>
                     ))}
@@ -281,6 +425,7 @@ function PageView({ data, orgLabel }: { data: PageAnalysis; orgLabel: string }) 
               </tbody>
             </table>
           </div>
+          {editing && <EditBar count={edits.pending.size} busy={edits.busy} error={edits.error} onDiscard={edits.discard} onSend={send} hint={t.layouts.pageEditHint} />}
         </div>
       </section>
 

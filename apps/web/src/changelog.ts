@@ -4,7 +4,7 @@ import type { Lang } from './i18n.tsx';
  * What changed in Orgsmith, newest first. Every change users can see (above all UI and UX) gets an entry here
  * and an update to the guide, in all four languages. `guide` links to a guide section, `demo` shows its animation.
  */
-export type ChangeDemo = 'orgs' | 'tabs' | 'load' | 'apex' | 'drag' | 'filter' | 'export' | 'flow';
+export type ChangeDemo = 'orgs' | 'layouts' | 'tabs' | 'load' | 'apex' | 'drag' | 'filter' | 'export' | 'flow';
 export interface ChangeEntry {
   date: string;
   prs: number[];
@@ -14,6 +14,15 @@ export interface ChangeEntry {
 }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-10-16', prs: [27], guide: 'layouts', demo: 'layouts',
+    text: {
+      en: { title: 'Edit page layout and Lightning page assignments', body: 'In Layouts and pages, Edit assignments lets you pick the layout or Lightning page of each profile and record type, one cell or a whole column at a time. The changes become a change set with preview, approval in production, a check against the org before writing, and Undo.' },
+      it: { title: 'Modifica delle assegnazioni di page layout e Lightning page', body: 'In Layout e pagine, Modifica assegnazioni ti fa scegliere il layout o la Lightning page di ogni profilo e record type, una cella o tutta una colonna alla volta. Le modifiche diventano un change set con anteprima, approvazione in produzione, controllo sull’org prima di scrivere e annullamento.' },
+      fr: { title: 'Modifier les attributions de présentations et de pages Lightning', body: 'Dans Présentations et pages, Modifier les attributions permet de choisir la présentation ou la page Lightning de chaque profil et type d’enregistrement, une cellule ou toute une colonne à la fois. Les modifications deviennent un change set avec aperçu, approbation en production, vérification de l’org avant l’écriture et annulation.' },
+      es: { title: 'Editar asignaciones de formatos y páginas Lightning', body: 'En Formatos y páginas, Editar asignaciones te deja elegir el formato o la página Lightning de cada perfil y tipo de registro, una celda o toda una columna a la vez. Los cambios se convierten en un change set con vista previa, aprobación en producción, comprobación de la org antes de escribir y opción de deshacer.' }
+    }
+  },
   {
     date: '2026-10-16', prs: [26], guide: 'orgs',
     text: {

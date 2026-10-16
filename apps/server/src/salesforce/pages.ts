@@ -1,4 +1,4 @@
-import type { PageAssignments } from '@fls/core';
+import type { AssignmentChange, PageAssignments } from '@fls/core';
 import type { MetadataRecord, SfApi } from './client.ts';
 import { loadFieldPermissions, loadFields, loadObjectPermissions, tableId } from './metadata.ts';
 
@@ -58,6 +58,51 @@ export interface LayoutAnalysis {
   gaps: { profileId: string; layoutId: string; fields: string[] }[];
 }
 
+/** ProfileLayout gives Master as a special record type id (012000000000000AAA); the app uses null. */
+const recordTypeIdOf = (id: string | null | undefined) => !id || id.startsWith('012000000000000') ? null : id;
+
+/** Name the app uses for a layout: its name, with the namespace prefix for managed layouts. */
+export const layoutName = (l: { name: string; namespace: string | null }) => l.namespace ? `${l.namespace}__${l.name}` : l.name;
+
+/** Current layout per profile (metadata full name) and record type (developer name, '' for Master), keyed `profile|recordType`. */
+export async function currentLayouts(api: SfApi, object: string): Promise<Map<string, string>> {
+  const table = await tableId(api, object);
+  const [recordTypes, profiles, layoutRows, rows] = await Promise.all([
+    loadRecordTypes(api, object),
+    loadProfiles(api),
+    api.tooling<{ Id: string; Name: string; NamespacePrefix: string | null }>(
+      `SELECT Id, Name, NamespacePrefix FROM Layout WHERE TableEnumOrId = ${quote(table)} AND LayoutType = 'Standard' ORDER BY Name`),
+    api.tooling<{ ProfileId: string; LayoutId: string; RecordTypeId: string | null }>(
+      `SELECT ProfileId, LayoutId, RecordTypeId FROM ProfileLayout WHERE TableEnumOrId = ${quote(table)}`)
+  ]);
+  const profile = new Map(profiles.map(p => [p.id, p.fullName]));
+  const rt = new Map(recordTypes.map(r => [r.id, r.developerName]));
+  const layout = new Map(layoutRows.map(l => [l.Id, layoutName({ name: l.Name, namespace: l.NamespacePrefix })]));
+  const out = new Map<string, string>();
+  for (const r of rows) {
+    const p = profile.get(r.ProfileId);
+    const l = layout.get(r.LayoutId);
+    const id = recordTypeIdOf(r.RecordTypeId);
+    if (p && l && rt.has(id)) out.set(`${p}|${rt.get(id) ?? ''}`, l);
+  }
+  return out;
+}
+
+/**
+ * Metadata full names of the object's layouts by the app's layout name. Full names encode some
+ * characters (for example "(" as %28), so they come from listMetadata rather than being built.
+ */
+export async function layoutFullNames(api: SfApi, object: string): Promise<Map<string, string>> {
+  const prefix = `${object}-`;
+  const out = new Map<string, string>();
+  for (const f of await api.listMetadata('Layout')) {
+    let decoded = f.fullName;
+    try { decoded = decodeURIComponent(f.fullName); } catch { /* keep as is */ }
+    if (decoded.startsWith(prefix)) out.set(decoded.slice(prefix.length), f.fullName);
+  }
+  return out;
+}
+
 export async function loadLayoutAnalysis(api: SfApi, object: string): Promise<LayoutAnalysis> {
   const table = await tableId(api, object);
   const [recordTypes, profiles, layoutRows, assignmentRows, fields] = await Promise.all([
@@ -85,7 +130,7 @@ export async function loadLayoutAnalysis(api: SfApi, object: string): Promise<La
   const objectRead = new Set(objectPerms.filter(o => o.read).map(o => o.parentId));
   const permissionable = new Set(fields.filter(f => f.permissionable).map(f => f.name));
 
-  const assignments = assignmentRows.map(r => ({ profileId: r.ProfileId, recordTypeId: r.RecordTypeId ?? null, layoutId: r.LayoutId }));
+  const assignments = assignmentRows.map(r => ({ profileId: r.ProfileId, recordTypeId: recordTypeIdOf(r.RecordTypeId), layoutId: r.LayoutId }));
   const noObjectRead = profiles.filter(p => !objectRead.has(p.permSetId)).map(p => p.id);
   const gaps: LayoutAnalysis['gaps'] = [];
   const seen = new Set<string>();
@@ -139,9 +184,7 @@ export async function loadPageAnalysis(api: SfApi, object: string): Promise<Page
   const orgDefault = list<Override>((objects[0] as MetadataRecord | undefined)?.actionOverrides).find(isDesktopView)?.content ?? null;
   const appDefaults = apps.flatMap(a => list<Override>(a.actionOverrides)
     .filter(o => isDesktopView(o) && o.pageOrSobjectType === object).map(o => ({ app: a.fullName, page: o.content! })));
-  const assignments = apps.flatMap(a => list<Override>(a.profileActionOverrides)
-    .filter(o => isDesktopView(o) && o.pageOrSobjectType === object && o.profile)
-    .map(o => ({ app: a.fullName, profile: o.profile!, recordType: o.recordType ? o.recordType.slice(object.length + 1) : null, page: o.content! })));
+  const assignments = profilePages(apps, object);
 
   return {
     object, recordTypes, profiles, pages, orgDefault, appDefaults, assignments,
@@ -149,3 +192,20 @@ export async function loadPageAnalysis(api: SfApi, object: string): Promise<Page
   };
 }
 
+/** App + profile + record type page assignments of an object in the given CustomApplication records. */
+function profilePages(apps: MetadataRecord[], object: string): PageAssignments['assignments'] {
+  return apps.flatMap(a => list<Override>(a.profileActionOverrides)
+    .filter(o => isDesktopView(o) && o.pageOrSobjectType === object && o.profile)
+    .map(o => ({ app: a.fullName, profile: o.profile!, recordType: o.recordType ? o.recordType.slice(object.length + 1) : null, page: o.content! })));
+}
+
+/** Current page per app, profile and record type for the objects and apps of `changes`, keyed by assignmentKey. */
+export async function currentPages(api: SfApi, changes: Pick<AssignmentChange, 'object' | 'app'>[]): Promise<Map<string, string>> {
+  const appNames = [...new Set(changes.map(c => c.app).filter((a): a is string => !!a))];
+  const apps = appNames.length ? await api.readMetadata('CustomApplication', appNames) : [];
+  const out = new Map<string, string>();
+  for (const object of new Set(changes.map(c => c.object))) {
+    for (const a of profilePages(apps, object)) out.set(['page', object, a.app, a.profile, a.recordType ?? ''].join('|'), a.page);
+  }
+  return out;
+}
