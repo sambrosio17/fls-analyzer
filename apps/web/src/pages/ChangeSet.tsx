@@ -4,6 +4,9 @@ import { api, type ChangeSet, type Status } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { ExportMenu } from '../export/ExportMenu.tsx';
 import { CSV_TYPE, XLSX_TYPE, download, slug, toCsv, toXlsx, type Sheet } from '../export/table.ts';
+import { metadataBundle, type MetaFile } from '../export/metadata.ts';
+import { zip } from '../export/zip.ts';
+import { part, type Progress } from '../export/progress.ts';
 
 const STATUS_CLASS: Record<Status, string> = {
   draft: '', pending_approval: 'st-part', approved: 'st-info', rejected: 'st-err', running: 'st-info', done: 'st-ok', partial: 'st-part', failed: 'st-err'
@@ -70,6 +73,26 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
     ]
   });
   const fileName = (ext: string) => `orgsmith-${cs.number}-${slug(cs.org.label)}.${ext}`;
+  // The values this change set sets, as profile and permission set files ready to deploy or keep in Git.
+  const exportMetadata = async (p: Progress) => {
+    await p(0, 'collect');
+    const [sets, profileNames] = await Promise.all([api.permissionSets(cs.org.id), api.profileNames(cs.org.id)]);
+    const byId = new Map(sets.map(s => [s.id, s]));
+    const files = new Map<string, MetaFile>();
+    let noName = 0;
+    for (const i of items) {
+      const ps = byId.get(i.parentId);
+      const fullName = ps?.isProfile ? profileNames[i.parentId] : ps?.name;
+      if (!fullName) { noName++; continue; }
+      const kind = ps!.isProfile ? 'Profile' : 'PermissionSet';
+      const f = files.get(i.parentId) ?? files.set(i.parentId, { kind, fullName, entries: [] }).get(i.parentId)!;
+      f.entries.push({ name: i.field, access: i.after });
+    }
+    if (!files.size) return t.export.nothing;
+    await p(0.3, 'write');
+    download(fileName('zip'), await zip(metadataBundle([...files.values()]), part(p, 0.4, 1, 'compress')), 'application/zip');
+    return noName ? t.export.leftOutRows(noName) : undefined;
+  };
 
   return (
     <>
@@ -83,7 +106,8 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
         <div className="row">
           <ExportMenu note={t.export.rowsScope(shown.length)} items={[
             { id: 'xlsx', label: t.export.excel, run: async p => download(fileName('xlsx'), await toXlsx([sheet()], p), XLSX_TYPE) },
-            { id: 'csv', label: t.export.csv, run: async p => download(fileName('csv'), await toCsv(sheet().rows, t.locale, p), CSV_TYPE) }
+            { id: 'csv', label: t.export.csv, run: async p => download(fileName('csv'), await toCsv(sheet().rows, t.locale, p), CSV_TYPE) },
+            { id: 'metadata', label: t.export.metadata, hint: t.export.metadataChangeSetHint, run: exportMetadata }
           ]} />
           <button className="btn" onClick={onBack}>{t.common.close}</button>
         </div>

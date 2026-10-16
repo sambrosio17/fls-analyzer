@@ -271,6 +271,7 @@ export const es: Messages = {
     excel: 'Excel (.xlsx)', excelHint: 'Matriz y una fila por campo y perfil',
     csvGrid: 'CSV, como en pantalla', csvLong: 'CSV, una fila por campo y perfil',
     metadata: 'Metadatos de Salesforce (.zip)', metadataHint: 'Perfiles y conjuntos de permisos para desplegar con sf o guardar en Git',
+    metadataChangeSetHint: 'package.xml y el XML de cada perfil y conjunto de permisos, con los valores que fija este change set (todas sus filas)',
     csv: 'CSV',
     scope: (f: number, c: number) => `${f} campos × ${c} perfiles/conjuntos de permisos, con los filtros actuales.`,
     rowsScope: (n: number) => `${n} filas, con los filtros actuales.`,
@@ -279,6 +280,7 @@ export const es: Messages = {
       profiles ? `${profiles} perfiles excluidos: Salesforce no devolvió su nombre de metadatos.` : '',
       locked ? `${locked} conjuntos de permisos gestionados o de grupo excluidos: no se pueden desplegar.` : ''
     ].filter(Boolean).join(' '),
+    leftOutRows: (n: number) => `${n} filas excluidas: Salesforce no devolvió el nombre de metadatos de su perfil o conjunto de permisos.`,
     nothing: 'Nada que exportar con los filtros actuales.',
     sheetMatrix: 'Matriz', sheetDetails: 'Detalle', sheetAssignments: 'Asignaciones', sheetLayouts: 'Formatos', sheetPages: 'Páginas', sheetChanges: 'Cambios',
     object: 'Objeto', field: 'Campo', apiName: 'Nombre API', type: 'Tipo', kind: 'Perfil o conjunto de permisos', name: 'Nombre', read: 'Lectura', edit: 'Edición',

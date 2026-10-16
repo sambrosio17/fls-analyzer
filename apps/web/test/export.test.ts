@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { crc32, zip } from '../src/export/zip.ts';
 import { columnName, toCsv, toXlsx } from '../src/export/table.ts';
-import { fieldPermissionBundle } from '../src/export/metadata.ts';
+import { fieldPermissionBundle, metadataBundle } from '../src/export/metadata.ts';
 import { getExportState, runExport } from '../src/export/progress.ts';
 
 const unzipList = (data: Uint8Array) => {
@@ -101,5 +101,21 @@ describe('progress', () => {
     release();
     await first;
     expect(getExportState()).toMatchObject({ label: 'A', status: 'done', message: 'left out' });
+  });
+});
+
+describe('change set metadata', () => {
+  it('writes only each target\'s own rows, Apex classes before fields', () => {
+    const files = metadataBundle([
+      { kind: 'PermissionSet', fullName: 'Sales_Ops', entries: [{ name: 'Account.Rating', access: 0 }, { name: 'ApexClass.InvoiceBatch', access: 1 }] },
+      { kind: 'Profile', fullName: 'Admin', entries: [{ name: 'Contact.Email', access: 2 }] }
+    ]);
+    const byPath = Object.fromEntries(files.map(f => [f.path, String(f.content)]));
+    const ps = byPath['force-app/main/default/permissionsets/Sales_Ops.permissionset-meta.xml']!;
+    expect(ps.indexOf('<classAccesses>')).toBeLessThan(ps.indexOf('<fieldPermissions>'));
+    expect(ps).toContain('<field>Account.Rating</field>\n        <readable>false</readable>');
+    expect(ps).not.toContain('Contact.Email');
+    expect(byPath['force-app/main/default/profiles/Admin.profile-meta.xml']).not.toContain('Account.Rating');
+    expect(byPath['manifest/package.xml']).toContain('<members>Sales_Ops</members>\n        <name>PermissionSet</name>');
   });
 });
