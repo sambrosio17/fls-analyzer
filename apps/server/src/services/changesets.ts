@@ -6,7 +6,7 @@ import {
 } from '@fls/core';
 import type { SfApi } from '../salesforce/client.ts';
 import { loadApexClasses, loadFields, loadPermissionSets, loadSnapshot } from '../salesforce/metadata.ts';
-import { loadCurrentAssignments, writeAssignments } from './assignments.ts';
+import { loadCurrentAssignments, Timings, writeAssignments } from './assignments.ts';
 import { assignmentFromRow, itemFromRow, now, type ChangeSetRow, type Db, type OrgRow } from '../db.ts';
 
 export interface ServiceDeps {
@@ -214,17 +214,18 @@ export class ChangeSetService {
     const rows = this.d.db.listAssignments(cs.id).map(r => ({ row: r, change: assignmentFromRow(r) }));
     const rowIdOf = new Map(rows.map(x => [assignmentKey(x.change), x.row.id]));
 
-    const conflicts = new Set(assignmentConflicts(rows.map(x => x.change), await loadCurrentAssignments(api, rows.map(x => x.change))));
+    const timings = new Timings();
+    const conflicts = new Set(assignmentConflicts(rows.map(x => x.change), await timings.time('check org', () => loadCurrentAssignments(api, rows.map(x => x.change)))));
     for (const c of conflicts) this.d.db.updateAssignment(rowIdOf.get(assignmentKey(c))!, { status: 'conflict', error_code: 'CONFLICT', error_message: 'Changed in the org after the preview.' });
     const runnable = rows.map(x => x.change).filter(c => !conflicts.has(c));
 
-    const written = await writeAssignments(api, runnable);
+    const written = await writeAssignments(api, runnable, timings);
     for (const w of written.filter(w => !w.ok)) this.d.db.updateAssignment(rowIdOf.get(assignmentKey(w.change))!, { status: 'error', error_code: w.errorCode, error_message: w.errorMessage });
 
     let verified = 0;
     const ok = written.filter(w => w.ok).map(w => w.change);
     if (ok.length) {
-      const after = await loadCurrentAssignments(api, ok);
+      const after = await timings.time('verify', () => loadCurrentAssignments(api, ok));
       for (const c of ok) {
         const rowId = rowIdOf.get(assignmentKey(c))!;
         if (after(c) === c.after) { verified++; this.d.db.updateAssignment(rowId, { status: 'ok' }); }
@@ -233,7 +234,7 @@ export class ChangeSetService {
     }
 
     const outcome = verified === rows.length ? 'done' : verified > 0 ? 'partial' : 'failed';
-    this.d.db.updateChangeSet(cs.id, { status: this.move(this.changeSet(cs.id), 'finish', outcome), finished_at: now() });
+    this.d.db.updateChangeSet(cs.id, { status: this.move(this.changeSet(cs.id), 'finish', outcome), finished_at: now(), timings_json: JSON.stringify(timings.steps) });
     this.d.db.touchOrg(org.id);
     this.d.db.audit({ tenant: this.d.tenant, orgId: org.id, changeSetId: cs.id, actor: this.d.actor, action: 'change_set.finished', detail: `${outcome}: ${verified}/${rows.length}` });
   }

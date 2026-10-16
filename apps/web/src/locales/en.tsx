@@ -66,7 +66,7 @@ export const en = {
       apex: { title: 'Apex classes', body: <>Which profiles and permission sets can run each Apex class. It works like the FLS matrix with two states, enabled or not: click, drag, right click and bulk actions, then preview and approval. Managed package classes can be hidden with a filter.</> },
       views: { title: 'Four ways to see the matrix', body: <>The <b>View</b> menu at the top of the FLS matrix and of Apex classes, or the <b>Settings</b> page, switches between four views of the same data and pending changes. <b>Grid</b> is the classic table. <b>Focus</b> opens one profile or permission set (or one field) with <b>None</b>, <b>Read</b> and <b>Edit</b> buttons on every row; tick up to three others with <b>Compare</b> to see them alongside and copy their values. <b>Map</b> draws every cell as a small square, so far more profiles fit on screen: hover to read a cell, drag to select a block, then pick the access or press <kbd>N</kbd>, <kbd>R</kbd>, <kbd>E</kbd>. <b>Rules</b> writes the change as a sentence, such as "Grant edit on these fields to these permission sets", and shows how many cells change before you add it.</> },
       layoutViews: { title: 'Brush and board for assignments', body: <>Layouts and pages also has three views, chosen from <b>View</b> or <b>Settings</b>. <b>Table</b> is the list with one menu per cell. <b>Brush</b> gives every layout or Lightning page a colour: with <b>Edit assignments</b> on, pick one from the palette and click or drag over the cells, or click a profile or record type to paint the whole row or column; <kbd>Alt</kbd> + click picks the layout of a cell. <b>Board</b> has one column per layout or page and one card per profile, for one record type at a time: drag the cards, or click several and use <b>Move to…</b>. An empty column is a layout nobody uses.</> },
-      layouts: { title: 'Layouts and pages', body: <>Pick an object to see, for each profile and record type, which <b>page layout</b> and which <b>Lightning page</b> it gets (by app, record type and org default), and the layout fields the profile cannot read. With <b>Edit assignments</b> you change them cell by cell, or a whole column with <b>Whole column…</b>; edited cells turn purple. <b>Go to preview</b> makes a change set, applied like FLS changes. For Lightning pages the change applies to the chosen app, and removing a specific assignment sends the profile back to the app or org default.</> },
+      layouts: { title: 'Layouts and pages', body: <>Pick an object to see, for each profile and record type, which <b>page layout</b> and which <b>Lightning page</b> it gets (by app, record type and org default), and the layout fields the profile cannot read. With <b>Edit assignments</b> you change them cell by cell, or a whole column with <b>Whole column…</b>; edited cells turn purple. <b>Go to preview</b> makes a change set, applied like FLS changes. For Lightning pages the change applies to the chosen app, and removing a specific assignment sends the profile back to the app or org default. <b>Desktop</b> and <b>Phone</b> have separate assignments: switch between them next to the app, and while editing tick “Apply each change to desktop and phone” to change both. If Salesforce refuses some changes, the others still go through and the result shows the time each step took.</> },
       changesets: { title: 'Change sets', body: <>Nothing is written until you confirm. <b>Go to preview</b> turns pending changes into a change set with what is added, changed and removed, and warnings. In production it needs approval and the org name typed in. Running it shows progress and the result per row.</> },
       export: { title: 'Export', body: <>The <b>Export</b> button saves what you see: the matrix as Excel or CSV or as Salesforce metadata (package.xml and one file per profile and permission set), change sets as Excel, CSV or metadata with the values they set, and layouts as Excel or CSV. A panel at the bottom right shows the progress of big files.</> },
       history: { title: 'History and undo', body: <><b>History</b> lists every change set with who prepared and approved it and when. Each one keeps the values from before, so <b>Undo these changes</b>, in the change set, creates a change set that restores them.</> },
@@ -252,6 +252,12 @@ export const en = {
       kpiCleared: 'Page assignments removed',
       defaultPage: 'Default (app or org)',
       master: 'Master'
+    },
+    timing: {
+      title: 'Time per step',
+      steps: { 'check org': 'Check against the org', check: 'Check profiles, pages and record types', 'read app': 'Read the app', 'save app': 'Save the app', 'save profiles': 'Save the profiles', verify: 'Read back to verify' } as Record<string, string>,
+      times: (n: number) => n > 1 ? ` (${n} times)` : '',
+      note: 'Saving an app is Salesforce redeploying the whole app: with many overrides it takes a while. When Salesforce refuses some changes, the app is saved again to isolate them.'
     }
   },
 
@@ -379,7 +385,7 @@ export const en = {
     kpiPages: 'Lightning pages', kpiPagesUnassigned: 'Unassigned', kpiApps: 'Lightning apps',
     kpiAssignments: 'App, record type and profile assignments', kpiOrgDefault: 'Org default',
     systemPage: 'System page',
-    perProfile: 'Page each profile sees (desktop)',
+    perProfile: 'Page each profile sees',
     defaults: (app: ReactNode, org: ReactNode) => <>App default: <b>{app}</b>. Org default: <b>{org}</b>.</>,
     systemPageLower: 'system page',
     orgDefault: 'Org default',
@@ -394,6 +400,10 @@ export const en = {
     finishFirst: 'Discard the changes or go to the preview first.',
     setColumn: 'Whole column…',
     noSpecific: '(none: app or org default)',
+    device: 'Device',
+    formFactor: { Large: 'Desktop', Small: 'Phone' },
+    appNotOn: (app: string, device: string) => `${app} is not enabled on ${device}: these assignments have no effect there.`,
+    mirror: 'Apply each change to desktop and phone',
     noFullName: 'Salesforce did not return the metadata name of this profile, so it cannot be edited.',
     layoutEditHint: 'Changed cells are highlighted. Nothing is written until you confirm the preview.',
     pageEditHint: "Changes apply to the chosen app. Removing a specific assignment sends the profile back to the app or org default.",

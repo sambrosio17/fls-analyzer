@@ -1,4 +1,4 @@
-import type { AssignmentChange, PageAssignments } from '@fls/core';
+import { assignmentKey, FORM_FACTORS, type AssignmentChange, type FormFactor, type PageAssignments } from '@fls/core';
 import type { MetadataRecord, SfApi } from './client.ts';
 import { loadFieldPermissions, loadFields, loadObjectPermissions, tableId } from './metadata.ts';
 
@@ -148,16 +148,19 @@ export async function loadLayoutAnalysis(api: SfApi, object: string): Promise<La
 // ---- Lightning record pages
 
 export interface PageInfo { id: string; name: string; label: string; components: string[]; fields: string[] }
-export interface PageAnalysis extends PageAssignments {
+export interface PageAnalysis {
   object: string;
   recordTypes: RecordTypeInfo[];
   profiles: ProfileInfo[];
-  apps: { name: string; label: string }[];
+  /** Lightning apps; `formFactors` are the devices the app runs on (Large desktop, Small phone). */
+  apps: { name: string; label: string; formFactors: FormFactor[] }[];
   pages: PageInfo[];
+  /** Assignments per form factor: desktop and phone are set separately. */
+  forms: Record<FormFactor, PageAssignments>;
 }
 
 interface Override { actionName?: string; content?: string; formFactor?: string; pageOrSobjectType?: string; type?: string; profile?: string; recordType?: string }
-const isDesktopView = (o: Override) => o.actionName === 'View' && o.type === 'Flexipage' && (o.formFactor ?? 'Large') === 'Large' && !!o.content;
+const isView = (o: Override, ff: FormFactor) => o.actionName === 'View' && o.type === 'Flexipage' && (o.formFactor || 'Large') === ff && !!o.content;
 
 export async function loadPageAnalysis(api: SfApi, object: string): Promise<PageAnalysis> {
   const table = await tableId(api, object);
@@ -181,31 +184,39 @@ export async function loadPageAnalysis(api: SfApi, object: string): Promise<Page
     return { id: p.Id, name: p.NamespacePrefix ? `${p.NamespacePrefix}__${p.DeveloperName}` : p.DeveloperName, label: p.MasterLabel, components, fields };
   });
 
-  const orgDefault = list<Override>((objects[0] as MetadataRecord | undefined)?.actionOverrides).find(isDesktopView)?.content ?? null;
-  const appDefaults = apps.flatMap(a => list<Override>(a.actionOverrides)
-    .filter(o => isDesktopView(o) && o.pageOrSobjectType === object).map(o => ({ app: a.fullName, page: o.content! })));
-  const assignments = profilePages(apps, object);
+  const form = (ff: FormFactor): PageAssignments => ({
+    orgDefault: list<Override>((objects[0] as MetadataRecord | undefined)?.actionOverrides).find(o => isView(o, ff))?.content ?? null,
+    appDefaults: apps.flatMap(a => list<Override>(a.actionOverrides)
+      .filter(o => isView(o, ff) && o.pageOrSobjectType === object).map(o => ({ app: a.fullName, page: o.content! }))),
+    assignments: profilePages(apps, object, ff)
+  });
 
   return {
-    object, recordTypes, profiles, pages, orgDefault, appDefaults, assignments,
-    apps: apps.map(a => ({ name: a.fullName, label: String(a.label ?? a.fullName) })).sort((x, y) => x.label.localeCompare(y.label))
+    object, recordTypes, profiles, pages,
+    forms: { Large: form('Large'), Small: form('Small') },
+    apps: apps.map(a => {
+      const ffs = list<string>(a.formFactors).filter((f): f is FormFactor => f === 'Large' || f === 'Small');
+      return { name: a.fullName, label: String(a.label ?? a.fullName), formFactors: ffs.length ? ffs : ['Large' as FormFactor] };
+    }).sort((x, y) => x.label.localeCompare(y.label))
   };
 }
 
 /** App + profile + record type page assignments of an object in the given CustomApplication records. */
-function profilePages(apps: MetadataRecord[], object: string): PageAssignments['assignments'] {
+function profilePages(apps: MetadataRecord[], object: string, ff: FormFactor): PageAssignments['assignments'] {
   return apps.flatMap(a => list<Override>(a.profileActionOverrides)
-    .filter(o => isDesktopView(o) && o.pageOrSobjectType === object && o.profile)
+    .filter(o => isView(o, ff) && o.pageOrSobjectType === object && o.profile)
     .map(o => ({ app: a.fullName, profile: o.profile!, recordType: o.recordType ? o.recordType.slice(object.length + 1) : null, page: o.content! })));
 }
 
-/** Current page per app, profile and record type for the objects and apps of `changes`, keyed by assignmentKey. */
-export async function currentPages(api: SfApi, changes: Pick<AssignmentChange, 'object' | 'app'>[]): Promise<Map<string, string>> {
+/** Current page per app, profile, record type and form factor for the objects and apps of `changes`, keyed by assignmentKey. */
+export async function currentPages(api: SfApi, changes: Pick<AssignmentChange, 'object' | 'app'>[], apps?: MetadataRecord[]): Promise<Map<string, string>> {
   const appNames = [...new Set(changes.map(c => c.app).filter((a): a is string => !!a))];
-  const apps = appNames.length ? await api.readMetadata('CustomApplication', appNames) : [];
+  const records = apps ?? (appNames.length ? await api.readMetadata('CustomApplication', appNames) : []);
   const out = new Map<string, string>();
   for (const object of new Set(changes.map(c => c.object))) {
-    for (const a of profilePages(apps, object)) out.set(['page', object, a.app, a.profile, a.recordType ?? ''].join('|'), a.page);
+    for (const formFactor of FORM_FACTORS) {
+      for (const a of profilePages(records, object, formFactor)) out.set(assignmentKey({ kind: 'page', object, app: a.app, profile: a.profile, recordType: a.recordType, formFactor }), a.page);
+    }
   }
   return out;
 }

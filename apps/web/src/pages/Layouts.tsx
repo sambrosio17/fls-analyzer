@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { effectivePage, unassignedPages, type PageSource } from '@fls/core';
+import { effectivePage, profileKey, unassignedPages, type FormFactor, type PageSource } from '@fls/core';
 import { MultiPick } from '../MultiPick.tsx';
 import { trackLoad, useTabId } from '../loads.ts';
 import { useT } from '../i18n.tsx';
@@ -332,16 +332,26 @@ function LayoutView({ data, orgLabel, onSubmit, onDirty }: { data: LayoutAnalysi
 
 const SOURCE_CLASS: Record<PageSource, string> = { 'app-profile': 'st-info', app: 'st-ok', org: '', system: 'st-part' };
 
-function PageView({ data, orgLabel, onSubmit, onDirty }: { data: PageAnalysis; orgLabel: string } & EditProps) {
+function PageView({ data: analysis, orgLabel, onSubmit, onDirty }: { data: PageAnalysis; orgLabel: string } & EditProps) {
   const t = useT();
-  const [app, setApp] = useState(data.apps.find(a => a.name === 'standard__LightningSales')?.name ?? data.apps[0]?.name ?? '');
+  const [app, setApp] = useState(analysis.apps.find(a => a.name === 'standard__LightningSales')?.name ?? analysis.apps[0]?.name ?? '');
+  const [ff, setFf] = useState<FormFactor>('Large');
+  const radio = useId();
+  // Desktop and phone have their own assignments; the view shows one at a time.
+  const data = useMemo(() => ({ ...analysis, ...analysis.forms[ff] }), [analysis, ff]);
+  const appFormFactors = analysis.apps.find(a => a.name === app)?.formFactors ?? ['Large'];
+  const both = appFormFactors.length > 1;
+  const [mirror, setMirror] = useState(true);
   const [filter, setFilter] = useState(NO_FILTER);
   const [editing, setEditing] = useState(false);
   const edits = useEdits(onSubmit, onDirty);
   // Edited cells hold the page name, or '' to remove the app + record type + profile assignment.
-  const cellKey = (p: ProfileInfo, rt: RecordTypeInfo) => `${app}|${p.id}|${rtKey(rt)}`;
-  const orgSpecific = (p: ProfileInfo, rt: RecordTypeInfo) =>
-    data.assignments.find(a => a.app === app && a.profile === p.fullName && a.recordType === rt.developerName)?.page ?? '';
+  const keyFor = (form: FormFactor, p: ProfileInfo, rt: RecordTypeInfo) => `${form}|${app}|${p.id}|${rtKey(rt)}`;
+  const cellKey = (p: ProfileInfo, rt: RecordTypeInfo) => keyFor(ff, p, rt);
+  const specificIn = (form: FormFactor, p: ProfileInfo, rt: RecordTypeInfo) => p.fullName
+    ? analysis.forms[form].assignments.find(a => a.app === app && profileKey(a.profile) === profileKey(p.fullName!) && a.recordType === rt.developerName)?.page ?? ''
+    : '';
+  const orgSpecific = (p: ProfileInfo, rt: RecordTypeInfo) => specificIn(ff, p, rt);
   const specific = (p: ProfileInfo, rt: RecordTypeInfo) => edits.pending.get(cellKey(p, rt)) ?? orgSpecific(p, rt);
   /** The page a profile sees with the edits applied. */
   const shownPage = (p: ProfileInfo, rt: RecordTypeInfo): { page: string | null; source: PageSource } => {
@@ -350,16 +360,20 @@ function PageView({ data, orgLabel, onSubmit, onDirty }: { data: PageAnalysis; o
     const page = edits.pending.get(cellKey(p, rt))!;
     return page ? { page, source: 'app-profile' } : effectivePage({ ...data, assignments: [] }, app, p.fullName, rt.developerName);
   };
-  const setPage = (ps: ProfileInfo[], rt: RecordTypeInfo, page: string) =>
-    edits.set(ps.filter(editable).map(p => [cellKey(p, rt), page, orgSpecific(p, rt)]));
+  /** Sets a page on cells; with "desktop and phone" ticked, on the same cells of the other form factor too. */
+  const setPage = (ps: ProfileInfo[], rt: RecordTypeInfo, page: string) => {
+    const forms: FormFactor[] = both && mirror ? appFormFactors : [ff];
+    edits.set(ps.filter(editable).flatMap(p => forms.map(form => [keyFor(form, p, rt), page, specificIn(form, p, rt)] as [string, string, string])));
+  };
   const send = () => edits.send([...edits.pending].map(([k, page]) => {
-    const [appName, profileId, rk] = k.split('|') as [string, string, string];
+    const [form, appName, profileId, rk] = k.split('|') as [FormFactor, string, string, string];
     const p = data.profiles.find(x => x.id === profileId)!;
     const rt = data.recordTypes.find(r => rtKey(r) === rk)!;
-    return { kind: 'page', object: data.object, profile: p.fullName!, profileLabel: p.name, recordType: rt.developerName, app: appName, after: page || null };
+    return { kind: 'page', object: data.object, profile: p.fullName!, profileLabel: p.name, recordType: rt.developerName, app: appName, formFactor: form, after: page || null };
   }));
   const label = useMemo(() => new Map(data.pages.map(p => [p.name, p.label])), [data]);
-  const unassigned = new Set(unassignedPages(data, data.pages.map(p => p.name)));
+  // A page is unused only if neither desktop nor phone uses it.
+  const unassigned = new Set(unassignedPages(analysis.forms.Large, unassignedPages(analysis.forms.Small, data.pages.map(p => p.name))));
   const appLabel = (name: string) => data.apps.find(a => a.name === name)?.label ?? name;
   const appDefault = data.appDefaults.find(a => a.app === app)?.page ?? null;
   const activeRts = data.recordTypes.filter(rt => rt.active);
@@ -386,7 +400,7 @@ function PageView({ data, orgLabel, onSubmit, onDirty }: { data: PageAnalysis; o
       </div>
 
       <section className="panel" style={{ marginBottom: 16 }}>
-        <div className="panel-h"><h2>{t.layouts.perProfile}</h2>
+        <div className="panel-h"><h2>{t.layouts.perProfile} · {t.layouts.formFactor[ff].toLowerCase()}</h2>
           <span className="spacer" />
           <EditToggle editing={editing} onChange={setEditing} pending={edits.pending.size} />
           <ExportMenu note={t.export.rowsScope(rows.length)} items={exportItems(t, `orgsmith-pages-${slug(orgLabel)}-${data.object}-${slug(appLabel(app))}-${stamp()}`, () => [
@@ -400,11 +414,19 @@ function PageView({ data, orgLabel, onSubmit, onDirty }: { data: PageAnalysis; o
               rows: [t.layouts.pageCols, ...data.pages.map(p => [p.label, p.components.length, p.fields.length, unassigned.has(p.name) ? t.layouts.pageUnassigned : usage(p.name).join('; ')])]
             }
           ])} />
+          <div className="seg" role="tablist" aria-label={t.layouts.device}>
+            <label><input type="radio" name={radio} id="ff-large" checked={ff === 'Large'} onChange={() => setFf('Large')} />{t.layouts.formFactor.Large}</label>
+            <label><input type="radio" name={radio} id="ff-small" checked={ff === 'Small'} onChange={() => setFf('Small')} />{t.layouts.formFactor.Small}</label>
+          </div>
           <select className="input" id="app-select" value={app} onChange={e => setApp(e.target.value)} style={{ maxWidth: 280 }}>
             {data.apps.map(a => <option key={a.name} value={a.name}>{a.label}</option>)}
           </select>
         </div>
         <div className="panel-b">
+          {!appFormFactors.includes(ff) && <div className="banner info">{t.layouts.appNotOn(appLabel(app), t.layouts.formFactor[ff].toLowerCase())}</div>}
+          {editing && both && (
+            <label className="check" style={{ marginBottom: 8 }}><input type="checkbox" id="ff-mirror" checked={mirror} onChange={e => setMirror(e.target.checked)} />{t.layouts.mirror}</label>
+          )}
           <p className="muted small">{t.layouts.defaults(appDefault ? label.get(appDefault) ?? appDefault : t.common.none, data.orgDefault ? label.get(data.orgDefault) ?? data.orgDefault : t.layouts.systemPageLower)}</p>
           <Filters value={filter} onChange={setFilter} profiles={data.profiles} recordTypes={activeRts} targetLabel={t.layouts.lightningPage} issuesLabel={t.layouts.onlySpecific}
             targets={data.pages.map(pg => ({ id: pg.name, label: pg.label }))} />

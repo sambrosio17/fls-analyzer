@@ -1,3 +1,5 @@
+import { profileKey, type FormFactor } from './pages.ts';
+
 /** Page layout and Lightning record page assignments, and the pure edits that change them in metadata. */
 
 export type AssignmentKind = 'layout' | 'page';
@@ -17,13 +19,15 @@ export interface AssignmentChange {
   recordType: string | null;
   /** Lightning app full name; null for layouts. */
   app: string | null;
+  /** Pages only: desktop (Large) or phone (Small); null for layouts. */
+  formFactor?: FormFactor | null;
   before: string | null;
   after: string | null;
 }
 
 /** Identifies the assignment a change is about (not its values). */
-export const assignmentKey = (c: Pick<AssignmentChange, 'kind' | 'object' | 'app' | 'profile' | 'recordType'>) =>
-  [c.kind, c.object, c.app ?? '', c.profile, c.recordType ?? ''].join('|');
+export const assignmentKey = (c: Pick<AssignmentChange, 'kind' | 'object' | 'app' | 'profile' | 'recordType' | 'formFactor'>) =>
+  [c.kind, c.object, c.app ?? '', profileKey(c.profile), c.recordType ?? '', c.kind === 'page' ? c.formFactor ?? 'Large' : ''].join('|');
 
 /** Keeps the last change per assignment and drops the ones that change nothing. */
 export function normalizeAssignments(changes: AssignmentChange[]): AssignmentChange[] {
@@ -58,22 +62,39 @@ export function setInOrder(record: Rec, key: string, value: unknown, before: str
 /** CustomApplication elements that come after profileActionOverrides. */
 const AFTER_PROFILE_OVERRIDES = ['setupExperience', 'subscriberControlledNavItems', 'tabs', 'uiType', 'utilityBar', 'workspaceConfig'];
 
-const isDesktopView = (o: Rec) => o.actionName === 'View' && o.type === 'Flexipage' && (o.formFactor ?? 'Large') === 'Large';
+const isView = (o: Rec, formFactor: FormFactor) => o.actionName === 'View' && o.type === 'Flexipage' && (o.formFactor || 'Large') === formFactor;
+
+/**
+ * How the app already writes this profile in its overrides (plain or encoded), so a new override
+ * uses the same form; with no override for it yet, the Metadata API full name.
+ */
+export function profileAsInApp(list: Rec[], profile: string): string {
+  const key = profileKey(profile);
+  const seen = list.map(o => o.profile).find(p => typeof p === 'string' && profileKey(p) === key) as string | undefined;
+  if (seen) return seen;
+  const plainStyle = list.some(o => typeof o.profile === 'string' && /[():]/.test(o.profile));
+  return plainStyle ? key : profile;
+}
 
 /**
  * Applies page changes to a CustomApplication record read with readMetadata: each change sets,
- * replaces or (page null) removes the desktop record page override for its profile and record type.
+ * replaces or (page null) removes the record page override for its profile, record type and form factor.
+ * `profileName` overrides how a profile is written (default: profileAsInApp).
  */
-export function applyPageChanges(app: Rec, changes: Pick<AssignmentChange, 'object' | 'profile' | 'recordType' | 'after'>[]): Rec {
-  let list = asList(app.profileActionOverrides).map(o => ({ ...o }));
+export function applyPageChanges(app: Rec, changes: Pick<AssignmentChange, 'object' | 'profile' | 'recordType' | 'after' | 'formFactor'>[],
+  profileName?: (profile: string) => string): Rec {
+  const original = asList(app.profileActionOverrides);
+  let list = original.map(o => ({ ...o }));
   for (const c of changes) {
     const rt = c.recordType ? `${c.object}.${c.recordType}` : undefined;
-    const matches = (o: Rec) => isDesktopView(o) && o.pageOrSobjectType === c.object && o.profile === c.profile && (o.recordType || undefined) === rt;
+    const ff = c.formFactor ?? 'Large';
+    const key = profileKey(c.profile);
+    const matches = (o: Rec) => isView(o, ff) && o.pageOrSobjectType === c.object && typeof o.profile === 'string' && profileKey(o.profile) === key && (o.recordType || undefined) === rt;
     list = list.filter(o => !matches(o));
     if (c.after) {
       list.push({
-        actionName: 'View', content: c.after, formFactor: 'Large', pageOrSobjectType: c.object,
-        ...(rt ? { recordType: rt } : {}), type: 'Flexipage', profile: c.profile
+        actionName: 'View', content: c.after, formFactor: ff, pageOrSobjectType: c.object,
+        ...(rt ? { recordType: rt } : {}), type: 'Flexipage', profile: profileName?.(c.profile) ?? profileAsInApp(original, c.profile)
       });
     }
   }

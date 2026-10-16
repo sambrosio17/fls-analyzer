@@ -63,7 +63,7 @@ export const es: Messages = {
       apex: { title: 'Clases Apex', body: <>Qué perfiles y conjuntos de permisos pueden ejecutar cada clase Apex. Funciona como la matriz FLS con dos estados, activada o no: clic, arrastre, clic derecho y acciones en bloque, luego vista previa y aprobación. Las clases de paquetes gestionados se pueden ocultar con un filtro.</> },
       views: { title: 'Cuatro formas de ver la matriz', body: <>El menú <b>Vista</b> arriba en la matriz FLS y en las clases Apex, o la página <b>Ajustes</b>, cambia entre cuatro vistas de los mismos datos y de los mismos cambios pendientes. <b>Cuadrícula</b> es la tabla clásica. <b>Foco</b> abre un perfil o conjunto de permisos (o un campo) con los botones <b>Ninguno</b>, <b>Lectura</b> y <b>Edición</b> en cada fila; con <b>comparar</b> pones al lado hasta otros tres para copiar sus valores. <b>Mapa</b> dibuja cada celda como un cuadradito, así caben muchos más perfiles: pasa el ratón para leer una celda, arrastra para seleccionar un bloque y elige el acceso o pulsa <kbd>N</kbd>, <kbd>L</kbd>, <kbd>E</kbd>. <b>Reglas</b> escribe el cambio como una frase, por ejemplo «Conceder edición en estos campos a estos conjuntos de permisos», y muestra cuántas celdas cambian antes de añadirlo.</> },
       layoutViews: { title: 'Pincel y tablero para las asignaciones', body: <>Formatos y páginas también tiene tres vistas, desde <b>Vista</b> o <b>Ajustes</b>. <b>Tabla</b> es la lista con un menú por celda. <b>Pincel</b> da a cada formato o página Lightning un color: con <b>Editar asignaciones</b> activo, elige uno de la paleta y haz clic o arrastra sobre las celdas, o haz clic en un perfil o tipo de registro para pintar toda la fila o la columna; <kbd>Alt</kbd> + clic toma el formato de una celda. <b>Tablero</b> tiene una columna por formato o página y una tarjeta por perfil, un tipo de registro a la vez: arrastra las tarjetas, o haz clic en varias y usa <b>Mover a…</b>. Una columna vacía es un formato que nadie usa.</> },
-      layouts: { title: 'Formatos y páginas', body: <>Elige un objeto para ver, por cada perfil y tipo de registro, qué <b>formato de página</b> y qué <b>página Lightning</b> recibe (por app, tipo de registro y valor por defecto de la org), y los campos del formato que el perfil no puede leer. Con <b>Editar asignaciones</b> las cambias celda por celda, o toda una columna con <b>Toda la columna…</b>; las celdas cambiadas se vuelven moradas. <b>Ir a la vista previa</b> crea un change set, que se aplica como los de FLS. Para las páginas Lightning el cambio vale para la app elegida, y quitar una asignación específica devuelve el perfil a la predeterminada de la app o la org.</> },
+      layouts: { title: 'Formatos y páginas', body: <>Elige un objeto para ver, por cada perfil y tipo de registro, qué <b>formato de página</b> y qué <b>página Lightning</b> recibe (por app, tipo de registro y valor por defecto de la org), y los campos del formato que el perfil no puede leer. Con <b>Editar asignaciones</b> las cambias celda por celda, o toda una columna con <b>Toda la columna…</b>; las celdas cambiadas se vuelven moradas. <b>Ir a la vista previa</b> crea un change set, que se aplica como los de FLS. Para las páginas Lightning el cambio vale para la app elegida, y quitar una asignación específica devuelve el perfil a la predeterminada de la app o la org. <b>Escritorio</b> y <b>Teléfono</b> tienen asignaciones separadas: se cambia entre ellos junto a la app, y al editar “Aplicar cada cambio a escritorio y teléfono” cambia ambos. Si Salesforce rechaza algunos cambios, los demás pasan igualmente y el resultado muestra cuánto tardó cada paso.</> },
       changesets: { title: 'Change sets', body: <>No se escribe nada hasta que confirmas. <b>Ir a la vista previa</b> convierte los cambios pendientes en un change set con lo que se añade, cambia y quita, y los avisos. En producción necesita aprobación y escribir el nombre de la org. La ejecución muestra el progreso y el resultado fila por fila.</> },
       export: { title: 'Exportar', body: <>El botón <b>Exportar</b> guarda lo que ves: la matriz en Excel, CSV o como metadatos de Salesforce (package.xml y un archivo por perfil y conjunto de permisos), los change sets en Excel, CSV o metadatos con los valores que fijan, y los formatos en Excel o CSV. Un panel abajo a la derecha muestra el progreso de los archivos grandes.</> },
       history: { title: 'Historial y deshacer', body: <>El <b>Historial</b> muestra cada change set con quién lo preparó y aprobó, y cuándo. Cada uno guarda los valores anteriores, así que <b>Deshacer estos cambios</b>, en el change set, crea un change set que los restaura.</> },
@@ -249,6 +249,12 @@ export const es: Messages = {
       kpiCleared: 'Asignaciones de página eliminadas',
       defaultPage: 'Predeterminada (app u org)',
       master: 'Master'
+    },
+    timing: {
+      title: 'Tiempo por paso',
+      steps: { 'check org': 'Comprobación en la org', check: 'Comprobación de perfiles, páginas y tipos', 'read app': 'Lectura de la app', 'save app': 'Guardado de la app', 'save profiles': 'Guardado de los perfiles', verify: 'Relectura de verificación' } as Record<string, string>,
+      times: (n: number) => n > 1 ? ` (${n} veces)` : '',
+      note: 'Guardar una app es Salesforce volviendo a desplegar toda la app: con muchas asignaciones tarda. Si Salesforce rechaza algunos cambios, la app se guarda de nuevo para aislarlos.'
     }
   },
 
@@ -376,7 +382,7 @@ export const es: Messages = {
     kpiPages: 'Páginas Lightning', kpiPagesUnassigned: 'Sin asignar', kpiApps: 'Apps Lightning',
     kpiAssignments: 'Asignaciones de app, tipo de registro y perfil', kpiOrgDefault: 'Predeterminada de la org',
     systemPage: 'Página del sistema',
-    perProfile: 'Página que ve cada perfil (escritorio)',
+    perProfile: 'Página que ve cada perfil',
     defaults: (app: ReactNode, org: ReactNode) => <>Predeterminada de la app: <b>{app}</b>. Predeterminada de la org: <b>{org}</b>.</>,
     systemPageLower: 'página del sistema',
     orgDefault: 'Predeterminada de la org',
@@ -391,6 +397,10 @@ export const es: Messages = {
     finishFirst: 'Primero descarta los cambios o ve a la vista previa.',
     setColumn: 'Toda la columna…',
     noSpecific: '(ninguna: predeterminada de la app o la org)',
+    device: 'Dispositivo',
+    formFactor: { Large: 'Escritorio', Small: 'Teléfono' },
+    appNotOn: (app: string, device: string) => `${app} no está activada en ${device}: estas asignaciones no tienen efecto allí.`,
+    mirror: 'Aplicar cada cambio a escritorio y teléfono',
     noFullName: 'Salesforce no devolvió el nombre de metadatos de este perfil, así que no se puede editar.',
     layoutEditHint: 'Las celdas cambiadas están resaltadas. No se escribe nada hasta que confirmes la vista previa.',
     pageEditHint: 'Los cambios valen para la app elegida. Quitar una asignación específica devuelve el perfil a la predeterminada de la app o la org.',

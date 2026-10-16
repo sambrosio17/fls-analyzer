@@ -133,7 +133,7 @@ function demoPages(permissionSets: MemPermSet[]): MemPages {
     ],
     apps: [
       {
-        fullName: 'standard__LightningSales', label: 'Sales', uiType: 'Lightning',
+        fullName: 'standard__LightningSales', label: 'Sales', uiType: 'Lightning', formFactors: ['Large', 'Small'],
         actionOverrides: [view('Account_Sales_Page', { pageOrSobjectType: 'Account' })],
         profileActionOverrides: ['Sales User', 'Partner Community User'].map(profile =>
           view('Account_Partner_Page', { pageOrSobjectType: 'Account', recordType: 'Account.Partner', profile }))

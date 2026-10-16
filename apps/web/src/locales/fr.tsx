@@ -63,7 +63,7 @@ export const fr: Messages = {
       apex: { title: 'Classes Apex', body: <>Quels profils et ensembles d’autorisations peuvent exécuter chaque classe Apex. Cela fonctionne comme la matrice FLS avec deux états, activée ou non : clic, glisser, clic droit et actions en masse, puis aperçu et approbation. Les classes de packages gérés peuvent être masquées par un filtre.</> },
       views: { title: 'Quatre façons de voir la matrice', body: <>Le menu <b>Vue</b> en haut de la matrice FLS et des classes Apex, ou la page <b>Paramètres</b>, passe d’une vue à l’autre des mêmes données et des mêmes modifications en attente. <b>Grille</b> est le tableau classique. <b>Focus</b> ouvre un profil ou ensemble d’autorisations (ou un champ) avec les boutons <b>Aucun</b>, <b>Lecture</b> et <b>Modification</b> sur chaque ligne ; avec <b>comparer</b>, affichez jusqu’à trois autres à côté pour copier leurs valeurs. <b>Carte</b> dessine chaque cellule comme un petit carré, ce qui affiche bien plus de profils : survolez pour lire une cellule, faites glisser pour sélectionner un bloc, puis choisissez l’accès ou appuyez sur <kbd>N</kbd>, <kbd>L</kbd>, <kbd>M</kbd>. <b>Règles</b> écrit la modification comme une phrase, par exemple « Accorder la modification sur ces champs à ces ensembles d’autorisations », et montre combien de cellules changent avant de l’ajouter.</> },
       layoutViews: { title: 'Pinceau et tableau pour les attributions', body: <>Présentations et pages a aussi trois vues, depuis <b>Vue</b> ou <b>Paramètres</b>. <b>Tableau</b> est la liste avec un menu par cellule. <b>Pinceau</b> donne une couleur à chaque présentation ou page Lightning : avec <b>Modifier les attributions</b> actif, choisissez-en une dans la palette et cliquez ou faites glisser sur les cellules, ou cliquez un profil ou un type d’enregistrement pour peindre toute la ligne ou la colonne ; <kbd>Alt</kbd> + clic reprend la présentation d’une cellule. <b>Colonnes</b> affiche une colonne par présentation ou page et une carte par profil, un type d’enregistrement à la fois : faites glisser les cartes, ou cliquez-en plusieurs et utilisez <b>Déplacer vers…</b>. Une colonne vide est une présentation que personne n’utilise.</> },
-      layouts: { title: 'Présentations et pages', body: <>Choisissez un objet pour voir, pour chaque profil et type d’enregistrement, quelle <b>présentation de page</b> et quelle <b>page Lightning</b> il reçoit (par application, type d’enregistrement et valeur par défaut de l’org), et les champs de la présentation que le profil ne peut pas lire. Avec <b>Modifier les attributions</b>, vous les changez cellule par cellule, ou toute une colonne avec <b>Toute la colonne…</b> ; les cellules modifiées passent en violet. <b>Voir l’aperçu</b> crée un change set, appliqué comme ceux de FLS. Pour les pages Lightning, la modification vaut pour l’app choisie, et supprimer une attribution spécifique renvoie le profil au défaut de l’app ou de l’org.</> },
+      layouts: { title: 'Présentations et pages', body: <>Choisissez un objet pour voir, pour chaque profil et type d’enregistrement, quelle <b>présentation de page</b> et quelle <b>page Lightning</b> il reçoit (par application, type d’enregistrement et valeur par défaut de l’org), et les champs de la présentation que le profil ne peut pas lire. Avec <b>Modifier les attributions</b>, vous les changez cellule par cellule, ou toute une colonne avec <b>Toute la colonne…</b> ; les cellules modifiées passent en violet. <b>Voir l’aperçu</b> crée un change set, appliqué comme ceux de FLS. Pour les pages Lightning, la modification vaut pour l’app choisie, et supprimer une attribution spécifique renvoie le profil au défaut de l’app ou de l’org. <b>Ordinateur</b> et <b>Téléphone</b> ont des attributions séparées : on passe de l’un à l’autre à côté de l’app, et en modification « Appliquer chaque modification à l’ordinateur et au téléphone » change les deux. Si Salesforce refuse certaines modifications, les autres passent quand même et le résultat indique le temps de chaque étape.</> },
       changesets: { title: 'Change sets', body: <>Rien n’est écrit avant votre confirmation. <b>Voir l’aperçu</b> transforme les changements en attente en change set avec ce qui est ajouté, modifié et retiré, et les avertissements. En production il faut une approbation et saisir le nom de l’org. L’exécution montre la progression et le résultat ligne par ligne.</> },
       export: { title: 'Exporter', body: <>Le bouton <b>Exporter</b> enregistre ce que vous voyez : la matrice en Excel, en CSV ou en métadonnées Salesforce (package.xml et un fichier par profil et ensemble d’autorisations), les change sets en Excel, CSV ou métadonnées avec les valeurs qu’ils définissent, et les présentations en Excel ou CSV. Un panneau en bas à droite montre la progression des gros fichiers.</> },
       history: { title: 'Historique et annulation', body: <>L’<b>Historique</b> liste chaque change set avec qui l’a préparé et approuvé, et quand. Chacun garde les valeurs d’avant, donc <b>Annuler ces modifications</b>, dans le change set, crée un change set qui les restaure.</> },
@@ -249,6 +249,12 @@ export const fr: Messages = {
       kpiCleared: 'Attributions de page supprimées',
       defaultPage: "Par défaut (app ou org)",
       master: 'Master'
+    },
+    timing: {
+      title: 'Temps par étape',
+      steps: { 'check org': "Vérification de l'org", check: 'Vérification des profils, pages et types', 'read app': "Lecture de l'app", 'save app': "Enregistrement de l'app", 'save profiles': 'Enregistrement des profils', verify: 'Relecture de vérification' } as Record<string, string>,
+      times: (n: number) => n > 1 ? ` (${n} fois)` : '',
+      note: "Enregistrer une app, c'est Salesforce qui redéploie toute l'app : avec beaucoup d'attributions, cela prend du temps. Si Salesforce refuse certaines modifications, l'app est enregistrée à nouveau pour les isoler."
     }
   },
 
@@ -376,7 +382,7 @@ export const fr: Messages = {
     kpiPages: 'Pages Lightning', kpiPagesUnassigned: 'Non attribuées', kpiApps: 'Apps Lightning',
     kpiAssignments: "Attributions app, type d'enregistrement et profil", kpiOrgDefault: "Par défaut de l'org",
     systemPage: 'Page système',
-    perProfile: 'Page vue par chaque profil (ordinateur)',
+    perProfile: 'Page vue par chaque profil',
     defaults: (app: ReactNode, org: ReactNode) => <>Par défaut de l'app : <b>{app}</b>. Par défaut de l'org : <b>{org}</b>.</>,
     systemPageLower: 'page système',
     orgDefault: "Par défaut de l'org",
@@ -391,6 +397,10 @@ export const fr: Messages = {
     finishFirst: "Annulez d'abord les modifications ou passez à l'aperçu.",
     setColumn: 'Toute la colonne…',
     noSpecific: "(aucune : défaut de l'app ou de l'org)",
+    device: 'Appareil',
+    formFactor: { Large: 'Ordinateur', Small: 'Téléphone' },
+    appNotOn: (app: string, device: string) => `${app} n'est pas activée sur ${device} : ces attributions n'y ont aucun effet.`,
+    mirror: 'Appliquer chaque modification à l’ordinateur et au téléphone',
     noFullName: "Salesforce n'a pas renvoyé le nom de métadonnées de ce profil : il ne peut pas être modifié.",
     layoutEditHint: "Les cellules modifiées sont mises en évidence. Rien n'est écrit avant la confirmation de l'aperçu.",
     pageEditHint: "Les modifications s'appliquent à l'app choisie. Supprimer une attribution spécifique renvoie le profil au défaut de l'app ou de l'org.",

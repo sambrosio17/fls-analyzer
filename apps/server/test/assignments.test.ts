@@ -73,7 +73,7 @@ describe('assignment change sets', () => {
     const sales = layouts.profiles.find(p => p.name === 'Sales User')!;
     expect(layouts.assignments.find(a => a.profileId === sales.id && a.recordTypeId === '0120000000000B1')!.layoutId).toBe('00h0000000000L3');
     const pages = await loadPageAnalysis(org, 'Account');
-    expect(pages.assignments).toEqual([
+    expect(pages.forms.Large.assignments).toEqual([
       { app: 'standard__LightningSales', profile: 'Partner Community User', recordType: 'Partner', page: 'Account_Partner_Page' },
       { app: 'standard__LightningSales', profile: 'Admin', recordType: 'Partner', page: 'Account_Sales_Page' }
     ]);
@@ -86,7 +86,7 @@ describe('assignment change sets', () => {
       ['Account (Marketing) Layout', 'Account Layout'], ['Account_Sales_Page', null], [null, 'Account_Partner_Page']
     ]);
     expect((await run(rb.body.id)).status).toBe('done');
-    expect((await loadPageAnalysis(org, 'Account')).assignments).toEqual([
+    expect((await loadPageAnalysis(org, 'Account')).forms.Large.assignments).toEqual([
       { app: 'standard__LightningSales', profile: 'Partner Community User', recordType: 'Partner', page: 'Account_Partner_Page' },
       { app: 'standard__LightningSales', profile: 'Sales User', recordType: 'Partner', page: 'Account_Partner_Page' }
     ]);
@@ -103,10 +103,46 @@ describe('assignment change sets', () => {
     org.data.pages!.profileLayouts.find(l => l.ProfileId === salesId && l.RecordTypeId === '0120000000000B1')!.LayoutId = '00h0000000000L3';
 
     const done = await run(cs.id);
-    expect(done.status).toBe('failed');
+    expect(done.status).toBe('partial');
+    // The unknown page is refused before writing, so the other change in the same app still goes through.
     expect(done.assignments.map((a: { status: string; errorCode: string | null }) => [a.status, a.errorCode])).toEqual([
-      ['conflict', 'CONFLICT'], ['error', 'FIELD_INTEGRITY_EXCEPTION'], ['error', 'FIELD_INTEGRITY_EXCEPTION']
+      ['conflict', 'CONFLICT'], ['error', 'UNKNOWN_PAGE'], ['ok', null]
     ]);
+    expect(done.timings.map((t: { step: string }) => t.step)).toContain('save app');
+  });
+
+  it('finds the change Salesforce refuses and retries a profile name in its plain form', async () => {
+    current = await setup();
+    const { call, run, org } = current;
+    const names = org.data.pages!.profileFullNames;
+    const csId = Object.entries(names).find(([, n]) => n === 'Customer Service')![0];
+    names[csId] = 'Customer %28EU%29 Service';
+    // This org accepts only the plain name of that profile, and refuses any override for Admin.
+    org.rejectAppProfiles = new Set(['Customer %28EU%29 Service', 'Admin']);
+    const cs = (await call('POST', '/api/orgs/org1/assignment-change-sets', {
+      changes: [page('Customer %28EU%29 Service', 'Business', 'Account_Partner_Page'), page('Admin', 'Business', 'Account_Partner_Page'), page('Sales User', 'Business', 'Account_Partner_Page')]
+    })).body;
+    const done = await run(cs.id);
+    expect(done.status).toBe('partial');
+    expect(done.assignments.map((a: { profile: string; status: string; errorCode: string | null }) => [a.profile, a.status, a.errorCode])).toEqual([
+      ['Admin', 'error', 'INVALID_CROSS_REFERENCE_KEY'], ['Customer %28EU%29 Service', 'ok', null], ['Sales User', 'ok', null]
+    ]);
+    const app = org.data.pages!.apps.find(a => a.fullName === 'standard__LightningSales')!;
+    expect((app.profileActionOverrides as { profile: string }[]).map(o => o.profile)).toContain('Customer (EU) Service');
+  });
+
+  it('keeps desktop and phone assignments apart', async () => {
+    current = await setup();
+    const { call, run, org } = current;
+    const cs = (await call('POST', '/api/orgs/org1/assignment-change-sets', {
+      changes: [{ ...page('Admin', 'Partner', 'Account_Partner_Page'), formFactor: 'Small' }]
+    })).body;
+    expect(cs.assignments[0]).toMatchObject({ formFactor: 'Small', before: null });
+    expect((await run(cs.id)).status).toBe('done');
+    const r = await loadPageAnalysis(org, 'Account');
+    expect(r.forms.Small.assignments).toEqual([{ app: 'standard__LightningSales', profile: 'Admin', recordType: 'Partner', page: 'Account_Partner_Page' }]);
+    expect(r.forms.Large.assignments.some(a => a.profile === 'Admin')).toBe(false);
+    expect(r.apps.find(a => a.name === 'standard__LightningSales')!.formFactors).toEqual(['Large', 'Small']);
   });
 
   it('refuses a change set that changes nothing', async () => {
