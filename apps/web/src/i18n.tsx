@@ -1,12 +1,13 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { en, type Messages } from './locales/en.tsx';
 import { it } from './locales/it.tsx';
 import { fr } from './locales/fr.tsx';
 import { es } from './locales/es.tsx';
 
 export type Lang = 'en' | 'it' | 'fr' | 'es';
-export const LANGS: { code: Lang; label: string }[] = [
-  { code: 'en', label: 'English' }, { code: 'it', label: 'Italiano' }, { code: 'fr', label: 'Français' }, { code: 'es', label: 'Español' }
+export const LANGS: { code: Lang; label: string; flag: string }[] = [
+  { code: 'en', label: 'English', flag: '🇬🇧' }, { code: 'it', label: 'Italiano', flag: '🇮🇹' },
+  { code: 'fr', label: 'Français', flag: '🇫🇷' }, { code: 'es', label: 'Español', flag: '🇪🇸' }
 ];
 export const MESSAGES: Record<Lang, Messages> = { en, it, fr, es };
 
@@ -39,11 +40,37 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 export const useT = () => useContext(Ctx).t;
 export const useLang = () => useContext(Ctx);
 
+/** Language menu with flags; a custom list because native select options can't be styled on the dark bar. */
 export function LangPicker() {
   const { lang, t, setLang } = useLang();
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const current = LANGS.find(l => l.code === lang)!;
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
+  }, [open]);
   return (
-    <select className="input lang-pick" id="lang" aria-label={t.language} value={lang} onChange={e => setLang(e.target.value as Lang)}>
-      {LANGS.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-    </select>
+    <div className="lang-pick" ref={box}>
+      <button type="button" id="lang" className="btn sm lang-btn" aria-label={t.language} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className="flag" aria-hidden="true">{current.flag}</span>{current.label}<span className="caret" aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <ul className="lang-menu" role="listbox" aria-label={t.language}>
+          {LANGS.map(l => (
+            <li key={l.code} role="option" aria-selected={l.code === lang}>
+              <button type="button" lang={l.code} onClick={() => { setLang(l.code); setOpen(false); }}>
+                <span className="flag" aria-hidden="true">{l.flag}</span>{l.label}{l.code === lang && <span className="check-mark" aria-hidden="true">✓</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
