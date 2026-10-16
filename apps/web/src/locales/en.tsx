@@ -201,6 +201,11 @@ export const en = {
     sheet: 'Apex classes'
   },
 
+  loads: {
+    open: 'Open',
+    load: { running: 'Loading…', done: 'Loaded, ready to view', error: 'Loading failed' },
+    run: { running: 'Applying changes…', done: 'Run finished, see the result', error: 'Run failed' }
+  },
   accent: {
     color: 'Color', label: 'Org color', change: 'Change the org color',
     names: { ember: 'Ember', amber: 'Amber', olive: 'Olive', emerald: 'Emerald', cyan: 'Cyan', blue: 'Blue', indigo: 'Indigo', magenta: 'Magenta', sand: 'Sand', slate: 'Slate' }

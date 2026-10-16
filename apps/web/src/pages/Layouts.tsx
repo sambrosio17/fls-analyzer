@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { effectivePage, unassignedPages, type PageSource } from '@fls/core';
 import { MultiPick } from '../MultiPick.tsx';
+import { trackLoad, useTabId } from '../loads.ts';
 import { useT } from '../i18n.tsx';
 import { ExportMenu, type ExportItem } from '../export/ExportMenu.tsx';
 import { CSV_TYPE, XLSX_TYPE, download, slug, stamp, toCsv, toXlsx, type Sheet } from '../export/table.ts';
@@ -21,6 +22,7 @@ export function LayoutsPage({ org, initialObject = null, initialTab = 'layouts',
   const [layouts, setLayouts] = useState<LayoutAnalysis | null>(null);
   const [pages, setPages] = useState<PageAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
+  const tabId = useTabId();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { api.objects(org.id).then(setObjects).catch(e => setError(e.message)); }, [org.id]);
@@ -30,7 +32,7 @@ export function LayoutsPage({ org, initialObject = null, initialTab = 'layouts',
     if (tab === 'layouts' ? layouts?.object === object : pages?.object === object) return;
     setLoading(true); setError(null);
     const load = tab === 'layouts' ? api.layouts(org.id, object).then(setLayouts) : api.lightningPages(org.id, object).then(setPages);
-    load.catch(e => setError((e as Error).message)).finally(() => setLoading(false));
+    trackLoad(tabId, 'load', load).catch(e => setError((e as Error).message)).finally(() => setLoading(false));
   }, [org.id, object, tab]);
 
   const matches = query.length < 2 ? [] : objects.filter(o =>

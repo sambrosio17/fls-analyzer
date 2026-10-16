@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { beginLoad, useTabId } from '../loads.ts';
 import { api, type ChangeSet, type Status } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { ExportMenu } from '../export/ExportMenu.tsx';
@@ -22,6 +23,14 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
   const [confirmName, setConfirmName] = useState('');
   const [opFilter, setOpFilter] = useState<'all' | 'insert' | 'update' | 'delete' | 'warn' | 'failed'>('all');
   const [notice, setNotice] = useState<string | null>(null);
+  const tabId = useTabId();
+  const running = cs?.status === 'running';
+  // A change set keeps running on the server; if the user leaves the tab, a notice says when it ends.
+  useEffect(() => {
+    if (!running || !tabId) return;
+    const end = beginLoad(tabId, 'run');
+    return () => end();
+  }, [running, tabId]);
   const [limit, setLimit] = useState(PAGE);
 
   useEffect(() => { api.changeSet(id).then(setCs).catch(e => setError(e.message)); }, [id]);

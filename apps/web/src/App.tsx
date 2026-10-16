@@ -10,6 +10,8 @@ import { Brand } from './Brand.tsx';
 import { TokenTabButton } from './TokenButton.tsx';
 import { LangPicker, useT } from './i18n.tsx';
 import { ExportProgress } from './export/ExportMenu.tsx';
+import { LoadNotices } from './LoadNotices.tsx';
+import { TabContext, forgetTab, setVisibleTab } from './loads.ts';
 import { AccentPicker } from './AccentPicker.tsx';
 import { ACCENT_COLORS, accentCss, accentOf, type Accent } from './accents.ts';
 import {
@@ -41,6 +43,7 @@ export function App() {
 
   useEffect(() => { api.session().then(s => setSession(s.authenticated)).catch(() => setSession(false)); }, []);
   useEffect(() => { saveWorkspace(storage, ws); }, [ws]);
+  useEffect(() => { setVisibleTab(shown?.id ?? null); }, [shown?.id]);
   useEffect(() => { if (shown && !mounted.has(shown.id)) setMounted(new Set(mounted).add(shown.id)); }, [shown?.id]);
   useEffect(() => {
     if (!orgMenu) return;
@@ -95,7 +98,8 @@ export function App() {
 
   const orgById = (id: string | null) => orgs.find(o => o.id === id) ?? null;
   const go = (next: Workspace) => { setWs(next); setView('work'); setOrgMenu(false); };
-  const forget = (ids: string[]) => setDirty(d => { const n = new Set(d); ids.forEach(id => n.delete(id)); return n; });
+  const forget = (ids: string[]) => { ids.forEach(forgetTab); forgetDirty(ids); };
+  const forgetDirty = (ids: string[]) => setDirty(d => { const n = new Set(d); ids.forEach(id => n.delete(id)); return n; });
   const markDirty = (id: string, on: boolean) => setDirty(d => {
     if (d.has(id) === on) return d;
     const n = new Set(d); if (on) n.add(id); else n.delete(id); return n;
@@ -228,16 +232,21 @@ export function App() {
           const org = orgById(tab.orgId);
           return org && (
             <div key={tab.id} hidden={tab.id !== shown?.id}>
-              <TabBody tab={tab} org={org}
-                onPatch={p => setWs(w => updateTab(w, tab.id, p))}
-                onClose={() => closeObject(tab)}
-                onChangeSet={(id, number) => showChangeSet(tab.orgId, id, number)}
-                onDirty={on => markDirty(tab.id, on)} />
+              <TabContext.Provider value={tab.id}>
+                <TabBody tab={tab} org={org}
+                  onPatch={p => setWs(w => updateTab(w, tab.id, p))}
+                  onClose={() => closeObject(tab)}
+                  onChangeSet={(id, number) => showChangeSet(tab.orgId, id, number)}
+                  onDirty={on => markDirty(tab.id, on)} />
+              </TabContext.Provider>
             </div>
           );
         })}
       </main>
-      <ExportProgress />
+      <div className="toasts">
+        <LoadNotices tabs={ws.tabs} orgs={orgs} visibleId={shown?.id ?? null} onOpen={id => go(selectTab(ws, id))} />
+        <ExportProgress />
+      </div>
       <style>{ACCENT_STYLE}</style>
     </>
   );
