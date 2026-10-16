@@ -33,7 +33,7 @@ export const en = {
     UNKNOWN_PERMISSION_SET: 'Profiles or permission sets not found',
     NO_CHANGE: 'Already set to the requested value'
   } as Record<string, string>,
-  tools: { matrix: 'FLS matrix', layouts: 'Layouts and pages', changeset: 'Change sets' },
+  tools: { matrix: 'FLS matrix', apex: 'Apex classes', layouts: 'Layouts and pages', changeset: 'Change sets' },
 
   app: {
     orgs: 'Orgs', history: 'History', logout: 'Log out',
@@ -44,6 +44,7 @@ export const en = {
     noOrgs: 'No connected orgs.',
     manageOrgs: 'Connect or manage orgs…',
     newObject: 'New object',
+    apexTab: 'Apex classes',
     changeSet: 'Change set',
     noOrgOpen: (orgsButton: ReactNode) => <>No org is open. Open one with <b>+</b> above or from the {orgsButton} page.</>,
     noChangeSetOpen: 'No change set is open. They open here when you send the matrix changes to preview, or from History.',
@@ -179,6 +180,25 @@ export const en = {
     was: (v: string) => `was ${v}`,
     tooMany: (n: string, max: string) => `Too many changes for one change set (${n}, at most ${max}). Split them into several change sets, for example by filtering the profiles.`,
     description: (fields: number, ps: number) => `${fields} fields on ${ps} profiles/permission sets`
+  },
+
+  apex: {
+    matrix: {
+      title: 'Apex class access',
+      intro: "Which profiles and permission sets can run each Apex class. Click a cell to enable or disable it, drag over several cells, or tick rows and columns to do it in bulk. As in the FLS matrix, nothing is written until you confirm the preview.",
+      loading: 'Reading Apex classes, profiles and access…',
+      fields: 'Classes',
+      quick: { all: 'All', none: 'Enabled for no one', editall: 'Enabled for all', custom: 'Without package classes', pending: 'With changes' },
+      selected: (rows: number, cols: number) => <><b>{rows}</b> classes · <b>{cols}</b> profiles/permission sets selected</>,
+      size: (f: number, c: number) => `${f} classes × ${c} profiles/permission sets`,
+      field: 'Class',
+      counts: (r: number, _e: number) => `${r} enabled`,
+      description: (fields: number, ps: number) => `Access to ${fields} Apex classes on ${ps} profiles/permission sets`
+    },
+    access: { short: ['—', '✓', '✓'], long: ['Disabled', 'Enabled', 'Enabled'] },
+    bulk: { enable: 'Enable', disable: 'Disable' },
+    managed: 'Package',
+    sheet: 'Apex classes'
   },
 
   cellMenu: {

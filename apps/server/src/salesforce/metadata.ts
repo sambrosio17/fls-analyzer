@@ -1,4 +1,4 @@
-import { FlsSnapshot, type FieldMeta, type FieldPermRecord, type ObjectPermRecord, type PermSetMeta } from '@fls/core';
+import { APEX_CLASS, FlsSnapshot, isApex, type FieldMeta, type FieldPermRecord, type ObjectPermRecord, type PermSetMeta } from '@fls/core';
 import type { SfApi } from './client.ts';
 
 const SKIP_FIELD_TYPES = new Set(['address', 'location']);
@@ -78,6 +78,21 @@ async function hiddenCustomFields(api: SfApi, object: string, known: Set<string>
   return out;
 }
 
+/** Apex classes as rows of the pseudo-object ApexClass (see APEX_CLASS in core). */
+export async function loadApexClasses(api: SfApi): Promise<FieldMeta[]> {
+  const rows = await api.query<{ Id: string; Name: string; NamespacePrefix: string | null }>('SELECT Id, Name, NamespacePrefix FROM ApexClass');
+  return rows
+    .map(r => {
+      const full = r.NamespacePrefix ? `${r.NamespacePrefix}__${r.Name}` : r.Name;
+      return {
+        object: APEX_CLASS, name: `${APEX_CLASS}.${full}`, label: full, type: r.NamespacePrefix ? 'managed' : 'apex',
+        // Enabled or not: "calculated" keeps the matrix to two states.
+        permissionable: true, calculated: true, custom: !r.NamespacePrefix, encrypted: false, entityId: r.Id
+      };
+    })
+    .sort((a, b) => Number(!a.custom) - Number(!b.custom) || a.label.localeCompare(b.label));
+}
+
 interface ParticleRow { QualifiedApiName: string; Label: string; DataType: string; IsPermissionable: boolean; IsCalculated: boolean; IsCompound: boolean }
 
 /**
@@ -88,6 +103,7 @@ interface ParticleRow { QualifiedApiName: string; Label: string; DataType: strin
 export async function loadFields(api: SfApi, objects: string[], log?: (msg: string) => void): Promise<FieldMeta[]> {
   const out: FieldMeta[] = [];
   for (const object of objects) {
+    if (isApex(object)) { out.push(...await loadApexClasses(api)); continue; }
     if (!API_NAME.test(object)) throw new Error(`Invalid object name: ${object}`);
     const [d, particles] = await Promise.all([
       api.request<{ fields: DescribeField[] }>('GET', `/services/data/${api.apiVersion}/sobjects/${object}/describe`),
@@ -148,15 +164,33 @@ export async function loadPermissionSets(api: SfApi): Promise<PermSetMeta[]> {
     .sort((a, b) => Number(b.isProfile) - Number(a.isProfile) || a.label.localeCompare(b.label));
 }
 
-export async function loadFieldPermissions(api: SfApi, objects: string[], parentIds: string[]): Promise<FieldPermRecord[]> {
+/** Enabled Apex classes as FieldPermRecords of the ApexClass pseudo-object; the record id is the SetupEntityAccess id. */
+export async function loadApexAccess(api: SfApi, parentIds: string[]): Promise<FieldPermRecord[]> {
+  const nameOf = new Map((await loadApexClasses(api)).map(c => [c.entityId!, c.name]));
   return perChunk(parentIds, async ids => {
-    const rows = await api.query<{ Id: string; ParentId: string; SobjectType: string; Field: string; PermissionsRead: boolean; PermissionsEdit: boolean }>(
-      `SELECT Id, ParentId, SobjectType, Field, PermissionsRead, PermissionsEdit FROM FieldPermissions WHERE SobjectType IN ${inList(objects)} AND ParentId IN ${inList(ids)}`);
-    return rows.map(r => ({ id: r.Id, parentId: r.ParentId, sobjectType: r.SobjectType, field: r.Field, read: r.PermissionsRead, edit: r.PermissionsEdit }));
+    const rows = await api.query<{ Id: string; ParentId: string; SetupEntityId: string }>(
+      `SELECT Id, ParentId, SetupEntityId FROM SetupEntityAccess WHERE SetupEntityType = 'ApexClass' AND ParentId IN ${inList(ids)}`);
+    return rows.flatMap(r => {
+      const field = nameOf.get(r.SetupEntityId);
+      return field ? [{ id: r.Id, parentId: r.ParentId, sobjectType: APEX_CLASS, field, read: true, edit: false }] : [];
+    });
   });
 }
 
-export async function loadObjectPermissions(api: SfApi, objects: string[], parentIds: string[]): Promise<ObjectPermRecord[]> {
+export async function loadFieldPermissions(api: SfApi, allObjects: string[], parentIds: string[]): Promise<FieldPermRecord[]> {
+  const objects = allObjects.filter(o => !isApex(o));
+  const apex = objects.length < allObjects.length ? await loadApexAccess(api, parentIds) : [];
+  if (!objects.length) return apex;
+  return apex.concat(await perChunk(parentIds, async ids => {
+    const rows = await api.query<{ Id: string; ParentId: string; SobjectType: string; Field: string; PermissionsRead: boolean; PermissionsEdit: boolean }>(
+      `SELECT Id, ParentId, SobjectType, Field, PermissionsRead, PermissionsEdit FROM FieldPermissions WHERE SobjectType IN ${inList(objects)} AND ParentId IN ${inList(ids)}`);
+    return rows.map(r => ({ id: r.Id, parentId: r.ParentId, sobjectType: r.SobjectType, field: r.Field, read: r.PermissionsRead, edit: r.PermissionsEdit }));
+  }));
+}
+
+export async function loadObjectPermissions(api: SfApi, allObjects: string[], parentIds: string[]): Promise<ObjectPermRecord[]> {
+  const objects = allObjects.filter(o => !isApex(o));
+  if (!objects.length) return [];
   return perChunk(parentIds, async ids => {
     const rows = await api.query<{ ParentId: string; SobjectType: string; PermissionsRead: boolean }>(
       `SELECT ParentId, SobjectType, PermissionsRead FROM ObjectPermissions WHERE SobjectType IN ${inList(objects)} AND ParentId IN ${inList(ids)}`);

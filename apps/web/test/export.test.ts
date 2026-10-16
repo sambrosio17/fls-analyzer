@@ -67,6 +67,17 @@ describe('metadata bundle', () => {
   });
 });
 
+describe('apex metadata bundle', () => {
+  it('writes classAccesses with the class names, namespace included', () => {
+    const files = fieldPermissionBundle([{ kind: 'PermissionSet', fullName: 'Sales_Ops', access: [1, 0] }],
+      ['ApexClass.AccountController', 'ApexClass.SBQQ__QuoteCalculator'], 'apex');
+    const ps = String(files.find(f => f.path.endsWith('Sales_Ops.permissionset-meta.xml'))!.content);
+    expect(ps).toContain('<classAccesses>\n        <apexClass>AccountController</apexClass>\n        <enabled>true</enabled>\n    </classAccesses>');
+    expect(ps).toContain('<apexClass>SBQQ__QuoteCalculator</apexClass>\n        <enabled>false</enabled>');
+    expect(ps).not.toContain('fieldPermissions');
+  });
+});
+
 describe('progress', () => {
   it('reports rising progress up to 1 while writing a big workbook', async () => {
     const seen: number[] = [];

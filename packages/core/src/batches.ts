@@ -1,4 +1,4 @@
-import { EDIT, NONE, type ChangeItem, type Operation } from './types.ts';
+import { EDIT, NONE, isApex, type ChangeItem, type Operation } from './types.ts';
 
 export const MAX_RECORDS_PER_CALL = 200;
 
@@ -42,11 +42,13 @@ export function buildRequests(items: ChangeItem[], apiVersion: string): Collecti
       op: 'insert', method: 'POST', path: base, items: group,
       body: {
         allOrNone: false,
-        records: group.map(i => ({
-          attributes: { type: 'FieldPermissions' },
-          ParentId: i.parentId, SobjectType: i.sobjectType, Field: i.field,
-          PermissionsRead: i.after !== NONE, PermissionsEdit: i.after === EDIT
-        }))
+        records: group.map(i => isApex(i.sobjectType)
+          ? { attributes: { type: 'SetupEntityAccess' }, ParentId: i.parentId, SetupEntityId: i.entityId }
+          : {
+            attributes: { type: 'FieldPermissions' },
+            ParentId: i.parentId, SobjectType: i.sobjectType, Field: i.field,
+            PermissionsRead: i.after !== NONE, PermissionsEdit: i.after === EDIT
+          })
       }
     });
   }

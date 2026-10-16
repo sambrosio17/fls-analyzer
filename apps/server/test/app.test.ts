@@ -108,6 +108,45 @@ describe('API', () => {
     expect(fake.fieldPerms.map(p => [p.ParentId, p.Field, p.PermissionsRead, p.PermissionsEdit])).toEqual([[SALES, 'Account.Industry', true, false]]);
   });
 
+  it('reads Apex class access as a matrix of enabled classes', async () => {
+    current = await setup();
+    const { body } = await current.call('GET', '/api/orgs/org1/matrix?objects=ApexClass');
+    expect(body.fields.map((f: { name: string; custom: boolean }) => [f.name, f.custom])).toEqual([
+      ['ApexClass.AccountController', true], ['ApexClass.InvoiceBatch', true], ['ApexClass.SBQQ__QuoteCalculator', false]
+    ]);
+    expect(body.access).toEqual({ [SALES]: '100' });
+    expect(body.objectRead).toEqual([]);
+  });
+
+  it('enables and disables Apex classes through SetupEntityAccess, then rolls it back', async () => {
+    current = await setup();
+    const { call, waitDone, fake } = current;
+    const created = await call('POST', '/api/orgs/org1/change-sets', {
+      changes: [
+        { parentId: SALES, field: 'ApexClass.AccountController', access: 0 },
+        { parentId: FIN, field: 'ApexClass.InvoiceBatch', access: 2 },
+        { parentId: FIN, field: 'ApexClass.SBQQ__QuoteCalculator', access: 1 },
+        { parentId: CPQ, field: 'ApexClass.InvoiceBatch', access: 1 }
+      ]
+    });
+    const cs = created.body;
+    expect(cs.items.map((i: { parentLabel: string; field: string; op: string; after: number; warnings: string[] }) => `${i.parentLabel}|${i.field}|${i.op}|${i.after}|${i.warnings.join()}`)).toEqual([
+      'Finance Access|ApexClass.InvoiceBatch|insert|1|', 'Finance Access|ApexClass.SBQQ__QuoteCalculator|insert|1|', 'Sales User|ApexClass.AccountController|delete|0|'
+    ]);
+    expect(cs.skipped.map((s: { reason: string }) => s.reason)).toEqual(['MANAGED_PERMISSION_SET']);
+
+    await call('POST', `/api/change-sets/${cs.id}/execute`, {});
+    const done = await waitDone(cs.id);
+    expect(done.status).toBe('done');
+    expect(fake.entityAccess.map(a => [a.ParentId, a.SetupEntityId]).sort()).toEqual([[FIN, '01p000000000002'], [FIN, '01p000000000003']]);
+
+    const rb = await call('POST', `/api/change-sets/${cs.id}/rollback`);
+    expect(rb.body.items.map((i: { op: string }) => i.op).sort()).toEqual(['delete', 'delete', 'insert']);
+    await call('POST', `/api/change-sets/${rb.body.id}/execute`, {});
+    expect((await waitDone(rb.body.id)).status).toBe('done');
+    expect(fake.entityAccess.map(a => [a.ParentId, a.SetupEntityId])).toEqual([[SALES, '01p000000000001']]);
+  });
+
   it('reports per-row errors and conflicts as a partial result', async () => {
     current = await setup();
     const { call, waitDone, fake } = current;

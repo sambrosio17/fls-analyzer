@@ -9,8 +9,15 @@ describe('workspace tabs', () => {
     const ws = openOrg(EMPTY, 'a');
     expect(ws.orgs).toEqual(['a']);
     expect(toolOf(ws, 'a')).toBe('matrix');
-    expect(tabTitle(visibleTab(ws)!, { changeSet: 'Change set', newObject: 'New object' })).toBe('New object');
+    expect(tabTitle(visibleTab(ws)!, { changeSet: 'Change set', newObject: 'New object', apexTab: 'Apex classes' })).toBe('New object');
     expect(openOrg(ws, 'a').tabs).toHaveLength(1);
+  });
+
+  it('opens the Apex tool on the ApexClass pseudo-object, with its own title', () => {
+    const ws = selectTool(openOrg(EMPTY, 'a'), 'a', 'apex');
+    expect(visibleTab(ws)!.objects).toEqual(['ApexClass']);
+    expect(tabTitle(visibleTab(ws)!, { changeSet: 'Change set', newObject: 'New object', apexTab: 'Apex classes' })).toBe('Apex classes');
+    expect(visibleTab(newObjectTab(ws, 'a', 'apex'))!.objects).toEqual(['ApexClass']);
   });
 
   it('keeps the active tool and object tab of each org', () => {

@@ -48,11 +48,15 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
   const finished = ['done', 'partial', 'failed'].includes(cs.status);
   const prod = cs.requiresApproval;
   const canRun = reviewed && (!prod || confirmName.trim() === cs.org.label);
+  // Apex class rows: enabled or disabled, named without the pseudo-object prefix.
+  const isApex = (i: { sobjectType: string }) => i.sobjectType === 'ApexClass';
+  const acc = (i: { sobjectType: string }) => isApex(i) ? t.apex.access : t.access;
+  const name = (i: { field: string; sobjectType: string }) => isApex(i) ? i.field.slice('ApexClass.'.length) : i.field;
   const sheet = (): Sheet => ({
     name: t.export.sheetChanges,
     rows: [
       [...t.changeSet.cols, t.export.warnings, t.export.error],
-      ...shown.map(i => [i.parentLabel, i.field, t.access.long[i.before]!, t.access.long[i.after]!, i.op, t.changeSet.item[i.status] ?? i.status,
+      ...shown.map(i => [i.parentLabel, name(i), acc(i).long[i.before]!, acc(i).long[i.after]!, i.op, t.changeSet.item[i.status] ?? i.status,
         i.warnings.map(w => t.warning[w] ?? w).join(' '), i.errorMessage ? `${i.errorCode ?? ''} ${i.errorMessage}`.trim() : null])
     ]
   });
@@ -104,12 +108,12 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
                 {shown.slice(0, limit).map(i => (
                   <tr key={i.id}>
                     <td>{i.parentLabel}</td>
-                    <td><span className="mono">{i.field}</span>
+                    <td>{isApex(i) && <span className="tag">Apex</span>} <span className="mono">{name(i)}</span>
                       {i.warnings.map(w => <div className="warn-text" key={w}>⚠ {t.warning[w] ?? w}</div>)}
                       {i.errorMessage && <div className="err-text"><span className="mono">{i.errorCode}</span> {i.errorMessage}</div>}
                     </td>
-                    <td className="mono">{t.access.short[i.before]}</td>
-                    <td className="mono"><b>{t.access.short[i.after]}</b></td>
+                    <td className="mono">{acc(i).short[i.before]}</td>
+                    <td className="mono"><b>{acc(i).short[i.after]}</b></td>
                     <td><span className={`pill op-${i.op}`}>{i.op}</span></td>
                     <td><span className={`pill ${i.status === 'ok' ? 'st-ok' : i.status === 'pending' ? '' : 'st-err'}`}>{t.changeSet.item[i.status]}</span></td>
                   </tr>

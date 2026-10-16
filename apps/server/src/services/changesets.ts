@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import {
-  buildRequests, expandBulk, findConflicts, objectOf, parseResults, planChanges, rollbackDesired, transition,
+  buildRequests, expandBulk, findConflicts, isApex, objectOf, parseResults, planChanges, rollbackDesired, transition,
   type BulkAction, type ChangeSetEvent, type ChangeSetStatus, type Desired, type SaveResult
 } from '@fls/core';
 import type { SfApi } from '../salesforce/client.ts';
-import { loadFields, loadPermissionSets, loadSnapshot } from '../salesforce/metadata.ts';
+import { loadApexClasses, loadFields, loadPermissionSets, loadSnapshot } from '../salesforce/metadata.ts';
 import { itemFromRow, now, type ChangeSetRow, type Db, type OrgRow } from '../db.ts';
 
 export interface ServiceDeps {
@@ -129,6 +129,8 @@ export class ChangeSetService {
     const { snapshot: fresh } = await loadSnapshot(api, objects, parentIds);
     const items = rows.map(r => ({ row: r, item: itemFromRow(r) }));
     const conflicts = new Set(findConflicts(items.map(x => x.item), fresh));
+    // Inserting Apex class access needs the class id, which the stored rows don't keep.
+    const classIds = rows.some(r => isApex(r.sobject_type)) ? new Map((await loadApexClasses(api)).map(c => [c.name, c.entityId!])) : new Map<string, string>();
     const runnable = [];
     for (const x of items) {
       if (conflicts.has(x.item)) {
@@ -138,6 +140,14 @@ export class ChangeSetService {
       // Use the record id the org has now; the operation follows from it.
       const recordId = fresh.get(x.item.parentId, x.item.field).recordId;
       const op = recordId === null ? 'insert' : x.item.after === 0 ? 'delete' : 'update';
+      if (isApex(x.item.sobjectType) && op === 'insert') {
+        const entityId = classIds.get(x.item.field);
+        if (!entityId) {
+          this.d.db.updateItem(x.row.id, { status: 'error', error_code: 'UNKNOWN_CLASS', error_message: 'The Apex class no longer exists in the org.' });
+          continue;
+        }
+        x.item.entityId = entityId;
+      }
       Object.assign(x.item, { recordId, op });
       this.d.db.updateItem(x.row.id, { record_id: recordId, op });
       runnable.push(x);

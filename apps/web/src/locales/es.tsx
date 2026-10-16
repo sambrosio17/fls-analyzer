@@ -30,7 +30,7 @@ export const es: Messages = {
     UNKNOWN_PERMISSION_SET: 'Perfiles o conjuntos de permisos no encontrados',
     NO_CHANGE: 'Ya tienen el valor solicitado'
   },
-  tools: { matrix: 'Matriz FLS', layouts: 'Formatos y páginas', changeset: 'Change sets' },
+  tools: { matrix: 'Matriz FLS', apex: 'Clases Apex', layouts: 'Formatos y páginas', changeset: 'Change sets' },
 
   app: {
     orgs: 'Orgs', history: 'Historial', logout: 'Salir',
@@ -41,6 +41,7 @@ export const es: Messages = {
     noOrgs: 'No hay orgs conectadas.',
     manageOrgs: 'Conectar o gestionar orgs…',
     newObject: 'Nuevo objeto',
+    apexTab: 'Clases Apex',
     changeSet: 'Change set',
     noOrgOpen: (orgsButton: ReactNode) => <>No hay ninguna org abierta. Abre una con <b>+</b> arriba o desde la página {orgsButton}</>,
     noChangeSetOpen: 'No hay ningún change set abierto. Se abren aquí cuando envías a vista previa los cambios de la matriz, o desde el Historial.',
@@ -176,6 +177,25 @@ export const es: Messages = {
     was: (v: string) => `era ${v}`,
     tooMany: (n: string, max: string) => `Demasiados cambios para un solo change set (${n}, máximo ${max}). Repártelos en varios change sets, por ejemplo filtrando los perfiles.`,
     description: (fields: number, ps: number) => `${fields} campos en ${ps} perfiles/conjuntos de permisos`
+  },
+
+  apex: {
+    matrix: {
+      title: 'Acceso a las clases Apex',
+      intro: "Qué perfiles y conjuntos de permisos pueden ejecutar cada clase Apex. Haz clic en una celda para activarla o desactivarla, arrastra sobre varias celdas o marca filas y columnas para hacerlo en bloque. Como en la matriz FLS, no se escribe nada hasta que confirmes la vista previa.",
+      loading: 'Leyendo clases Apex, perfiles y accesos…',
+      fields: 'Clases',
+      quick: { all: 'Todas', none: 'Activadas para nadie', editall: 'Activadas para todos', custom: 'Sin las clases de paquetes', pending: 'Con cambios' },
+      selected: (rows: number, cols: number) => <><b>{rows}</b> clases · <b>{cols}</b> perfiles/conjuntos de permisos seleccionados</>,
+      size: (f: number, c: number) => `${f} clases × ${c} perfiles/conjuntos de permisos`,
+      field: 'Clase',
+      counts: (r: number, _e: number) => `${r} activadas`,
+      description: (fields: number, ps: number) => `Acceso a ${fields} clases Apex en ${ps} perfiles/conjuntos de permisos`
+    },
+    access: { short: ['—', '✓', '✓'], long: ['Desactivada', 'Activada', 'Activada'] },
+    bulk: { enable: 'Activar', disable: 'Desactivar' },
+    managed: 'Paquete',
+    sheet: 'Clases Apex'
   },
 
   cellMenu: {

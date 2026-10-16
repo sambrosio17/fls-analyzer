@@ -24,10 +24,14 @@ const MAX_CHANGES = 200_000; // same limit as the server
 
 type DisplayRow = { kind: 'obj'; object: string } | { kind: 'field'; i: number };
 
-interface Props { org: Org; onChangeSet: (id: string, number: string) => void; initialObjects?: string[]; onObjectsChange?: (objects: string[]) => void; onDirtyChange?: (dirty: boolean) => void }
+interface Props { org: Org; mode?: 'fls' | 'apex'; onChangeSet: (id: string, number: string) => void; initialObjects?: string[]; onObjectsChange?: (objects: string[]) => void; onDirtyChange?: (dirty: boolean) => void }
 
-export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsChange, onDirtyChange }: Props) {
+export function MatrixPage({ org, mode = 'fls', onChangeSet, initialObjects = [], onObjectsChange, onDirtyChange }: Props) {
   const t = useT();
+  // The Apex view is this matrix on the ApexClass pseudo-object: two states (enabled or not) and its own wording.
+  const apex = mode === 'apex';
+  const m = apex ? { ...t.matrix, ...t.apex.matrix } : t.matrix;
+  const A = apex ? t.apex.access : t.access;
   const [objects, setObjects] = useState<SObject[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [objectQuery, setObjectQuery] = useState('');
@@ -54,7 +58,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const drag = useRef<{ active: boolean; moved: boolean; i: number; j: number; x: number; y: number }>({ active: false, moved: false, i: 0, j: 0, x: 0, y: 0 });
 
-  useEffect(() => { api.objects(org.id).then(setObjects).catch(e => setError(e.message)); }, [org.id]);
+  useEffect(() => { if (!apex) api.objects(org.id).then(setObjects).catch(e => setError(e.message)); }, [org.id]);
   useEffect(() => { onDirtyChange?.(pending.size > 0); }, [rev > 0 && pending.size > 0]);
   // Reopens the objects a restored tab had.
   useEffect(() => { if (initialObjects.length) void load(initialObjects); }, []);
@@ -123,7 +127,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
     let last = '';
     for (const i of fields) {
       const f = allFields[i]!;
-      if (f.object !== last) { last = f.object; out.push({ kind: 'obj', object: f.object }); }
+      if (f.object !== last && !apex) { last = f.object; out.push({ kind: 'obj', object: f.object }); }
       out.push({ kind: 'field', i });
     }
     return out;
@@ -298,7 +302,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
     setCreating(true); setError(null);
     try {
       const changes = [...pending].map(([idx, access]) => ({ parentId: allPs[Math.floor(idx / F)]!.id, field: allFields[idx % F]!.name, access }));
-      const cs = await api.createChangeSet(org.id, { changes, description: t.matrix.description(new Set(changes.map(c => c.field)).size, new Set(changes.map(c => c.parentId)).size) });
+      const cs = await api.createChangeSet(org.id, { changes, description: m.description(new Set(changes.map(c => c.field)).size, new Set(changes.map(c => c.parentId)).size) });
       // The tab stays open next to the change set: the changes now live there, so the grid goes back to the org's values.
       discard(); setSent(cs.number); setCreating(false);
       onChangeSet(cs.id, cs.number);
@@ -350,27 +354,29 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   const permissionableVisible = fields.filter(i => allFields[i]!.permissionable);
 
   // ---- export: what is on screen (filters and pending changes included)
-  const exportName = (ext: string, kind = 'fls') => `orgsmith-${kind}-${slug(org.label)}-${slug(selected.join('-'))}-${stamp()}.${ext}`;
+  const exportName = (ext: string, kind = apex ? 'apex' : 'fls') => `orgsmith-${kind}-${slug(org.label)}${apex ? '' : `-${slug(selected.join('-'))}`}-${stamp()}.${ext}`;
   const psKindLabel = (p: PermSet) => p.isProfile ? t.export.profile : t.export.permSet;
   const gridSheet = async (p: Progress): Promise<Sheet> => ({
-    name: t.export.sheetMatrix,
+    name: apex ? t.apex.sheet : t.export.sheetMatrix,
     rows: [
-      [t.export.object, t.export.field, t.export.apiName, t.export.type, ...columns.map(j => `${allPs[j]!.label} (${psKindLabel(allPs[j]!)})`)],
+      [...(apex ? [m.field] : [t.export.object, t.export.field, t.export.apiName, t.export.type]), ...columns.map(j => `${allPs[j]!.label} (${psKindLabel(allPs[j]!)})`)],
       ...await mapWithProgress(fields, i => {
         const f = allFields[i]!;
-        return [f.object, f.label, f.name, f.type, ...columns.map(j => f.permissionable ? t.access.long[cur(j * F + i)]! : t.matrix.always)];
+        return [...(apex ? [f.label] : [f.object, f.label, f.name, f.type]), ...columns.map(j => f.permissionable ? A.long[cur(j * F + i)]! : m.always)];
       }, part(p, 0, 1, 'collect'), Math.max(1, Math.floor(20000 / Math.max(1, columns.length))))
     ]
   });
   const longSheet = async (p: Progress): Promise<Sheet> => ({
     name: t.export.sheetDetails,
     rows: [
-      [t.export.object, t.export.field, t.export.apiName, t.export.kind, t.export.name, t.export.apiName, t.export.read, t.export.edit],
+      apex ? [m.field, t.export.kind, t.export.name, t.export.apiName, A.long[1]!]
+        : [t.export.object, t.export.field, t.export.apiName, t.export.kind, t.export.name, t.export.apiName, t.export.read, t.export.edit],
       ...(await mapWithProgress(permissionableVisible, i => {
         const f = allFields[i]!;
         return columns.map(j => {
           const ps = allPs[j]!, v = cur(j * F + i);
-          return [f.object, f.label, f.name, psKindLabel(ps), ps.label, ps.isProfile ? null : ps.name, v > 0, v === 2];
+          return apex ? [f.label, psKindLabel(ps), ps.label, ps.isProfile ? null : ps.name, v > 0]
+            : [f.object, f.label, f.name, psKindLabel(ps), ps.label, ps.isProfile ? null : ps.name, v > 0, v === 2];
         });
       }, part(p, 0, 1, 'collect'), Math.max(1, Math.floor(20000 / Math.max(1, columns.length))))).flat()
     ]
@@ -390,14 +396,14 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
     }
     if (!targets.length || !permissionableVisible.length) return t.export.nothing;
     await p(0.3, 'write');
-    const files = fieldPermissionBundle(targets, permissionableVisible.map(i => allFields[i]!.name));
-    download(exportName('zip', 'fls-metadata'), await zip(files, part(p, 0.5, 1, 'compress')), 'application/zip');
+    const files = fieldPermissionBundle(targets, permissionableVisible.map(i => allFields[i]!.name), apex ? 'apex' : 'field');
+    download(exportName('zip', apex ? 'apex-metadata' : 'fls-metadata'), await zip(files, part(p, 0.5, 1, 'compress')), 'application/zip');
     return t.export.leftOut(noName, lockedCount) || undefined;
   };
   const exportItems: ExportItem[] = [
     { id: 'xlsx', label: t.export.excel, hint: t.export.excelHint, run: async p => download(exportName('xlsx'), await toXlsx([await gridSheet(part(p, 0, 0.15)), await longSheet(part(p, 0.15, 0.3))], part(p, 0.3, 1)), XLSX_TYPE) },
     { id: 'csv', label: t.export.csvGrid, run: async p => download(exportName('csv'), await toCsv((await gridSheet(part(p, 0, 0.4))).rows, t.locale, part(p, 0.4, 1)), CSV_TYPE) },
-    { id: 'csv-long', label: t.export.csvLong, run: async p => download(exportName('csv', 'fls-rows'), await toCsv((await longSheet(part(p, 0, 0.4))).rows, t.locale, part(p, 0.4, 1)), CSV_TYPE) },
+    { id: 'csv-long', label: t.export.csvLong, run: async p => download(exportName('csv', apex ? 'apex-rows' : 'fls-rows'), await toCsv((await longSheet(part(p, 0, 0.4))).rows, t.locale, part(p, 0.4, 1)), CSV_TYPE) },
     { id: 'metadata', label: t.export.metadata, hint: t.export.metadataHint, run: exportMetadata }
   ];
   const objectMatches = objectQuery.length < 2 ? [] : objects.filter(o =>
@@ -406,18 +412,18 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   return (
     <>
       <div className="view-head">
-        <div><div className="eyebrow">{org.label}</div><h1>{t.matrix.title}</h1>
-          <p>{t.matrix.intro}</p></div>
+        <div><div className="eyebrow">{org.label}</div><h1>{m.title}</h1>
+          <p>{m.intro}</p></div>
         <span className="spacer" />
         <div className="row">
           {matrix && !loading && <ExportMenu items={exportItems}
             note={[t.export.scope(fields.length, columns.length), pending.size ? t.export.pending(pending.size) : ''].filter(Boolean).join(' ')} />}
-          <button className="btn" onClick={() => setHelp(true)}>{t.matrix.guide}</button>
+          {!apex && <button className="btn" onClick={() => setHelp(true)}>{t.matrix.guide}</button>}
         </div>
       </div>
-      <MatrixHelp open={help} onClose={() => setHelp(false)} />
+      {!apex && <MatrixHelp open={help} onClose={() => setHelp(false)} />}
 
-      <section className="panel panel-b object-picker">
+      {!apex && <section className="panel panel-b object-picker">
         <div className="row">
           {selected.map(o => (
             <span className="chip on" key={o}>{o}<button aria-label={t.matrix.removeObject(o)} onClick={() => load(selected.filter(x => x !== o))}>×</button></span>
@@ -433,34 +439,36 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
             )}
           </div>
         </div>
-      </section>
+      </section>}
 
       {error && <div className="banner prod">{error}</div>}
       {sent && <div className="banner info">{t.matrix.sent(sent)} <button className="btn sm" onClick={() => load(selected)}>{t.matrix.reload}</button></div>}
       {matrix?.warnings?.length ? (
         <div className="banner info">{t.matrix.hiddenWarning} <span className="mono">{matrix.warnings.join(' · ')}</span></div>
       ) : null}
-      {loading && <p className="muted">{t.matrix.loading}</p>}
-      {!matrix && !loading && <div className="panel empty">{t.matrix.empty}</div>}
+      {loading && <p className="muted">{m.loading}</p>}
+      {!matrix && !loading && !apex && <div className="panel empty">{t.matrix.empty}</div>}
 
       {matrix && !loading && (
         <>
           <div className="toolbar">
-            <MultiPick id="field-pick" label={t.matrix.fields} options={fieldOptions} selected={fieldPick} onChange={setFieldPick} />
+            <MultiPick id="field-pick" label={m.fields} options={fieldOptions} selected={fieldPick} onChange={setFieldPick} />
             <MultiPick id="ps-pick" label={t.matrix.profilesAndPs} options={psOptions} selected={psPick} onChange={setPsPick} />
             <select className="input" id="ps-kind" value={psKind} onChange={e => setPsKind(e.target.value as PsKind)}>
               <option value="all">{t.matrix.kind.all}</option><option value="profiles">{t.matrix.kind.profiles}</option><option value="permsets">{t.matrix.kind.permsets}</option>
             </select>
-            {(['all', 'none', 'editall', 'custom', 'pending'] as const).map(f => (
-              <button key={f} className="chip" aria-pressed={filter === f} onClick={() => setFilter(f)}>{t.matrix.quick[f]}</button>
+            {(['all', 'none', 'editall', 'custom', 'pending'] as const).filter(f => !apex || f !== 'editall').map(f => (
+              <button key={f} className="chip" aria-pressed={filter === f} onClick={() => setFilter(f)}>{m.quick[f]}</button>
             ))}
           </div>
 
           <div className="selbar">
-            <span>{t.matrix.selected(rows.size, cols.size)}</span>
+            <span>{m.selected(rows.size, cols.size)}</span>
             <select className="input" id="bulk-action" value={bulkAction} onChange={e => setBulkAction(e.target.value as BulkAction)}>
-              <option value="read">{t.matrix.bulk.read}</option><option value="edit">{t.matrix.bulk.edit}</option>
-              <option value="removeEdit">{t.matrix.bulk.removeEdit}</option><option value="none">{t.matrix.bulk.none}</option>
+              {apex ? <><option value="read">{t.apex.bulk.enable}</option><option value="none">{t.apex.bulk.disable}</option></> : <>
+                <option value="read">{t.matrix.bulk.read}</option><option value="edit">{t.matrix.bulk.edit}</option>
+                <option value="removeEdit">{t.matrix.bulk.removeEdit}</option><option value="none">{t.matrix.bulk.none}</option>
+              </>}
             </select>
             <button className="btn sm" disabled={!rows.size || !cols.size} onClick={applyBulk}>{t.matrix.applyToSelection}</button>
             <button className="btn sm" disabled={!rows.size && !cols.size} onClick={() => { setRows(new Set()); setCols(new Set()); }}>{t.matrix.deselect}</button>
@@ -470,7 +478,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
             <button className="btn sm primary" disabled={!pending.size || creating} onClick={createChangeSet}>{creating ? t.matrix.preparing : t.matrix.toPreview}</button>
           </div>
 
-          <p className="muted mx-size">{t.matrix.size(fields.length, columns.length)}</p>
+          <p className="muted mx-size">{m.size(fields.length, columns.length)}</p>
 
           <div className="scroller" ref={scroller} onScroll={onScroll}>
             <table className="mx" style={{ width: view.fcolW + columns.length * COL_W }}>
@@ -479,7 +487,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
                   <th className="fcol" ref={fcol}>
                     <label className="check"><input type="checkbox" id="all-rows"
                       checked={permissionableVisible.length > 0 && permissionableVisible.every(i => rows.has(i))}
-                      onChange={e => setRows(e.target.checked ? new Set(permissionableVisible) : new Set())} />{t.matrix.field}</label>
+                      onChange={e => setRows(e.target.checked ? new Set(permissionableVisible) : new Set())} />{m.field}</label>
                     {columns.length > 0 && (
                       <label className="check"><input type="checkbox" id="all-cols"
                         checked={columns.every(j => lockedPs(allPs[j]!) || cols.has(j))}
@@ -493,7 +501,7 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
                       <th key={p.id} className="pcol"><div className="ps-h">
                         <span className="kind">{p.isProfile ? t.matrix.profile : t.matrix.permSet}</span>
                         <span className="nm" title={`${p.label} (${p.name})`}>{p.namespace ? '🔒 ' : ''}{p.label}</span>
-                        <span className="ct">{t.matrix.counts(counts.read[j]!, counts.edit[j]!)}</span>
+                        <span className="ct">{m.counts(counts.read[j]!, counts.edit[j]!)}</span>
                         <label><input type="checkbox" disabled={lockedPs(p)} checked={cols.has(j)} onChange={() => toggle(cols, j, setCols)} />{t.matrix.select}</label>
                       </div></th>
                     );
@@ -519,8 +527,8 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
                       <th><div className="fh">
                         <input type="checkbox" id={`r-${f.name}`} disabled={!f.permissionable} checked={rows.has(i)} onChange={() => toggle(rows, i, setRows)} />
                         <label htmlFor={`r-${f.name}`} title={f.label}>{f.label}</label>
-                        <span className="api" title={f.name}>{f.name}</span>
-                        <span className="tags">{f.hiddenFromUser && <span className="tag" title={t.matrix.hiddenTagTitle}>{t.matrix.hiddenTag}</span>}<span className="tag">{f.type}</span>{!f.permissionable && <span className="tag">{t.matrix.noFls}</span>}{f.calculated && <span className="tag">{t.matrix.readOnly}</span>}{f.encrypted && <span className="tag sens">{t.matrix.encrypted}</span>}</span>
+                        {!apex && <span className="api" title={f.name}>{f.name}</span>}
+                        {apex ? <span className="tags">{!f.custom && <span className="tag">{t.apex.managed}</span>}</span> : <span className="tags">{f.hiddenFromUser && <span className="tag" title={t.matrix.hiddenTagTitle}>{t.matrix.hiddenTag}</span>}<span className="tag">{f.type}</span>{!f.permissionable && <span className="tag">{t.matrix.noFls}</span>}{f.calculated && <span className="tag">{t.matrix.readOnly}</span>}{f.encrypted && <span className="tag sens">{t.matrix.encrypted}</span>}</span>}
                       </div></th>
                       {padCells(leftPad, 'lp')}
                       {visCols.map(j => {
@@ -538,8 +546,8 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
                           <td key={j} data-i={i} data-j={j} className={`c v${v}${isPending ? ' pend' : ''}${locked(f, p) ? ' locked' : ''}${cols.has(j) ? ' colsel' : ''}${picked ? ' rsel' : ''}`}
                             onMouseDown={e => onCellMouseDown(e, i, j)} onContextMenu={e => onCellContextMenu(e, i, j)}>
                             {/* Mouse clicks are handled on mousedown/up (they may start a drag); this onClick is for the keyboard. */}
-                            <button onClick={e => { if (e.detail === 0) clickCell(i, j); }} title={`${p.label} · ${f.name}: ${t.access.long[v]}${isPending ? t.matrix.before(t.access.long[b]!) : ''}`}>
-                              <span className="v">{t.access.short[v]}</span>{isPending && <span className="was">{t.matrix.was(t.access.short[b]!)}</span>}
+                            <button onClick={e => { if (e.detail === 0) clickCell(i, j); }} title={`${p.label} · ${f.label}: ${A.long[v]}${isPending ? t.matrix.before(A.long[b]!) : ''}`}>
+                              <span className="v">{A.short[v]}</span>{isPending && <span className="was">{t.matrix.was(A.short[b]!)}</span>}
                             </button>
                           </td>
                         );
@@ -553,10 +561,10 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
             </table>
           </div>
           {menu && range && (
-            <CellMenu x={menu.x} y={menu.y} stats={rangeStats} onPick={applyRange} onClose={() => { setMenu(null); setRange(null); }} />
+            <CellMenu apex={apex} x={menu.x} y={menu.y} stats={rangeStats} onPick={applyRange} onClose={() => { setMenu(null); setRange(null); }} />
           )}
           <div className="legend">
-            <AccessLegend />
+            <AccessLegend apex={apex} />
           </div>
         </>
       )}
@@ -567,8 +575,8 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
 const MENU_W = 240, MENU_H = 290;
 
 /** Access choices for the cells picked by dragging. */
-function CellMenu({ x, y, stats, onPick, onClose }: {
-  x: number; y: number; stats: { cells: number; editable: number; pending: number };
+function CellMenu({ apex, x, y, stats, onPick, onClose }: {
+  apex: boolean; x: number; y: number; stats: { cells: number; editable: number; pending: number };
   onPick: (action: BulkAction | 'revert') => void; onClose: () => void;
 }) {
   const t = useT();
@@ -578,10 +586,15 @@ function CellMenu({ x, y, stats, onPick, onClose }: {
   return (
     <div className="cell-menu" role="menu" style={pos} onContextMenu={e => e.preventDefault()}>
       <div className="cell-menu-h">{t.cellMenu.cells(stats.cells)}{stats.editable !== stats.cells && t.cellMenu.editable(stats.editable)}</div>
-      <button role="menuitem" disabled={none} onClick={() => onPick('none')}><span className="box">{none0}</span>{t.access.long[0]}</button>
-      <button role="menuitem" disabled={none} onClick={() => onPick('read')}><span className="box b1">{read}</span>{t.access.long[1]}</button>
-      <button role="menuitem" disabled={none} onClick={() => onPick('edit')}><span className="box b2">{edit}</span>{t.access.long[2]}</button>
-      <button role="menuitem" disabled={none} onClick={() => onPick('removeEdit')}><span className="box b1">{read}</span>{t.cellMenu.removeEditOnly}</button>
+      {apex ? <>
+        <button role="menuitem" disabled={none} onClick={() => onPick('read')}><span className="box b1">{t.apex.access.short[1]}</span>{t.apex.bulk.enable}</button>
+        <button role="menuitem" disabled={none} onClick={() => onPick('none')}><span className="box">{t.apex.access.short[0]}</span>{t.apex.bulk.disable}</button>
+      </> : <>
+        <button role="menuitem" disabled={none} onClick={() => onPick('none')}><span className="box">{none0}</span>{t.access.long[0]}</button>
+        <button role="menuitem" disabled={none} onClick={() => onPick('read')}><span className="box b1">{read}</span>{t.access.long[1]}</button>
+        <button role="menuitem" disabled={none} onClick={() => onPick('edit')}><span className="box b2">{edit}</span>{t.access.long[2]}</button>
+        <button role="menuitem" disabled={none} onClick={() => onPick('removeEdit')}><span className="box b1">{read}</span>{t.cellMenu.removeEditOnly}</button>
+      </>}
       <hr />
       <button role="menuitem" disabled={!stats.pending} onClick={() => onPick('revert')}><span className="box bp" />{t.cellMenu.revert}{stats.pending ? ` (${stats.pending})` : ''}</button>
       <button role="menuitem" onClick={onClose}><span className="box" />{t.cellMenu.clear}</button>

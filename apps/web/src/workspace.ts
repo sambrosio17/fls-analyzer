@@ -3,10 +3,14 @@
  * open in that tool. Each object tab is one page with its own objects, filters and pending changes.
  */
 
-export type Tool = 'matrix' | 'layouts' | 'changeset';
+export type Tool = 'matrix' | 'apex' | 'layouts' | 'changeset';
 export type LayoutMode = 'layouts' | 'pages';
 
-export const TOOLS: Tool[] = ['matrix', 'layouts', 'changeset'];
+export const TOOLS: Tool[] = ['matrix', 'apex', 'layouts', 'changeset'];
+
+/** The Apex class view is the matrix on this pseudo-object (APEX_CLASS in core). */
+export const APEX_OBJECT = 'ApexClass';
+const startObjects = (tool: Tool) => tool === 'apex' ? [APEX_OBJECT] : [];
 
 export interface WorkTab {
   id: string;
@@ -49,8 +53,9 @@ export function visibleTab(ws: Workspace): WorkTab | null {
 }
 
 /** `labels` are the localized fallbacks for a change set tab with no number and an empty object tab. */
-export function tabTitle(tab: WorkTab, labels: { changeSet: string; newObject: string }): string {
+export function tabTitle(tab: WorkTab, labels: { changeSet: string; newObject: string; apexTab: string }): string {
   if (tab.tool === 'changeset') return tab.label ?? labels.changeSet;
+  if (tab.tool === 'apex') return labels.apexTab;
   return tab.objects.length ? tab.objects.join(', ') : labels.newObject;
 }
 
@@ -66,7 +71,7 @@ function addTab(ws: Workspace, tab: Omit<WorkTab, 'id'>): Workspace {
 /** Matrix and layouts always have a tab to show, so an empty tool opens on the object picker. */
 function ensureTab(ws: Workspace, orgId: string, tool: Tool): Workspace {
   if (tool === 'changeset' || groupTabs(ws, orgId, tool).length) return ws;
-  return addTab(ws, { orgId, tool, objects: [] });
+  return addTab(ws, { orgId, tool, objects: startObjects(tool) });
 }
 
 export function openOrg(ws: Workspace, orgId: string): Workspace {
@@ -85,7 +90,7 @@ export function selectTab(ws: Workspace, id: string): Workspace {
 }
 
 export function newObjectTab(ws: Workspace, orgId: string, tool: Exclude<Tool, 'changeset'>): Workspace {
-  return addTab({ ...ws, activeOrg: orgId, tool: { ...ws.tool, [orgId]: tool } }, { orgId, tool, objects: [] });
+  return addTab({ ...ws, activeOrg: orgId, tool: { ...ws.tool, [orgId]: tool } }, { orgId, tool, objects: startObjects(tool) });
 }
 
 export function openChangeSet(ws: Workspace, orgId: string, changeSetId: string, label?: string): Workspace {

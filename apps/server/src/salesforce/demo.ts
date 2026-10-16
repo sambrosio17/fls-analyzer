@@ -32,6 +32,12 @@ const DESCRIBES = {
   ] }
 };
 
+const APEX_CLASSES = [
+  'AccountController', 'AccountTriggerHandler', 'CreditCheckService', 'InvoiceBatch', 'LeadScoring', 'OpportunityPdfController',
+  'PartnerPortalController', 'QuoteSyncQueueable', 'TestDataFactory'
+].map((Name, k) => ({ Id: `01p00000000000${String.fromCharCode(65 + k)}`, Name, NamespacePrefix: null as string | null }))
+  .concat([{ Id: '01p0000000000S1', Name: 'QuoteCalculator', NamespacePrefix: 'SBQQ' }, { Id: '01p0000000000S2', Name: 'ProductSearchController', NamespacePrefix: 'SBQQ' }]);
+
 /** `large` adds hundreds of fields and over a thousand permission sets, to try the matrix at scale (DEMO_LARGE=true). */
 export function demoOrg(large = false): MemoryOrg {
   const permissionSets = [
@@ -50,7 +56,7 @@ export function demoOrg(large = false): MemoryOrg {
   const noObject: Record<string, string[]> = { '0PS0000000000B1': ['Contact'], '0PS0000000000B3': ['Opportunity'], '0PS0000000000A5': ['Contact'] };
   const objectPerms = permissionSets.flatMap(p => Object.keys(describes)
     .filter(o => !(noObject[p.Id] ?? []).includes(o)).map(o => ({ ParentId: p.Id, SobjectType: o, PermissionsRead: true })));
-  const org = new MemoryOrg({ name: 'Demo (sample data)', isSandbox: true, permissionSets, objectPerms, describes, pages: demoPages(permissionSets) });
+  const org = new MemoryOrg({ name: 'Demo (sample data)', isSandbox: true, permissionSets, objectPerms, describes, pages: demoPages(permissionSets), apexClasses: APEX_CLASSES });
   // Inserting encrypted fields fails, to show per-row errors in the result.
   org.rejectFields = new Set(['Account.Billing_IBAN__c', 'Contact.Fiscal_Code__c']);
 
@@ -67,6 +73,13 @@ export function demoOrg(large = false): MemoryOrg {
         const edit = r >= 7 && !field.calculated && !field.autoNumber;
         org.addPerm(p.Id, `${obj}.${field.name}`, true, edit);
       }
+    }
+  }
+  // Class access: admins get every class, the others a deterministic sample.
+  for (const p of permissionSets) {
+    for (const c of APEX_CLASSES) {
+      const admin = p.Profile?.Name === 'System Administrator';
+      if (admin || rnd() >= 6) org.addClassAccess(p.Id, c.Id);
     }
   }
   return org;

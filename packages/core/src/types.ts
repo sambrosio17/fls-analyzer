@@ -4,6 +4,14 @@ export const NONE: Access = 0;
 export const READ: Access = 1;
 export const EDIT: Access = 2;
 
+/**
+ * Apex class access rides the same pipeline as FLS: classes are "fields" of this pseudo-object, named
+ * `ApexClass.<Name>` (with the namespace prefix for managed classes), and "read" means enabled.
+ * In Salesforce they are SetupEntityAccess records instead of FieldPermissions.
+ */
+export const APEX_CLASS = 'ApexClass';
+export const isApex = (sobjectType: string) => sobjectType === APEX_CLASS;
+
 export interface FieldMeta {
   /** Object API name, e.g. "Account". */
   object: string;
@@ -19,6 +27,8 @@ export interface FieldMeta {
   encrypted: boolean;
   /** Not visible to the connected user (so missing from describe), found through EntityParticle. */
   hiddenFromUser?: boolean;
+  /** Record id of the Apex class, for SetupEntityAccess.SetupEntityId. */
+  entityId?: string;
 }
 
 export interface PermSetMeta {
@@ -80,6 +90,8 @@ export interface ChangeItem {
   recordId: string | null;
   op: Operation;
   warnings: WarningCode[];
+  /** Apex class id, needed to insert its SetupEntityAccess. */
+  entityId?: string;
 }
 
 export interface SkippedItem {

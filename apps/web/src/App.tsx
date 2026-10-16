@@ -12,7 +12,7 @@ import { LangPicker, useT } from './i18n.tsx';
 import { ExportProgress } from './export/ExportMenu.tsx';
 import {
   TOOLS, closeOrg, closeTab, groupTabs, loadWorkspace, newObjectTab, openChangeSet, openOrg, pruneOrgs, saveWorkspace,
-  selectTab, selectTool, tabTitle, toolOf, updateTab, visibleTab, type WorkTab, type Workspace
+  APEX_OBJECT, selectTab, selectTool, tabTitle, toolOf, updateTab, visibleTab, type WorkTab, type Workspace
 } from './workspace.ts';
 
 type View = 'orgs' | 'history' | 'work';
@@ -185,7 +185,7 @@ export function App() {
           <div className="panel empty">
             {tool === 'changeset'
               ? t.app.noChangeSetOpen
-              : <>{t.app.noObjectOpen} <button className="btn sm primary" onClick={() => go(newObjectTab(ws, activeOrg.id, tool === 'layouts' ? 'layouts' : 'matrix'))}>{t.app.openObject}</button></>}
+              : <>{t.app.noObjectOpen} <button className="btn sm primary" onClick={() => go(newObjectTab(ws, activeOrg.id, tool ?? 'matrix'))}>{t.app.openObject}</button></>}
           </div>
         )}
         {ws.tabs.filter(tab => mounted.has(tab.id) || tab.id === shown?.id).map(tab => {
@@ -213,6 +213,8 @@ function TabBody({ tab, org, onPatch, onClose, onChangeSet, onDirty }: {
   switch (tab.tool) {
     case 'matrix':
       return <MatrixPage org={org} onChangeSet={onChangeSet} initialObjects={tab.objects} onObjectsChange={objects => onPatch({ objects })} onDirtyChange={onDirty} />;
+    case 'apex':
+      return <MatrixPage mode="apex" org={org} onChangeSet={onChangeSet} initialObjects={[APEX_OBJECT]} onDirtyChange={onDirty} />;
     case 'layouts':
       return <LayoutsPage org={org} initialObject={tab.objects[0] ?? null} initialTab={tab.layoutMode}
         onChange={(object, layoutMode) => onPatch({ objects: object ? [object] : [], layoutMode })} />;

@@ -30,7 +30,7 @@ export const it: Messages = {
     UNKNOWN_PERMISSION_SET: 'Profili o permission set non trovati',
     NO_CHANGE: 'Già con il valore richiesto'
   },
-  tools: { matrix: 'Matrice FLS', layouts: 'Layout e pagine', changeset: 'Change set' },
+  tools: { matrix: 'Matrice FLS', apex: 'Classi Apex', layouts: 'Layout e pagine', changeset: 'Change set' },
 
   app: {
     orgs: 'Org', history: 'Storico', logout: 'Esci',
@@ -41,6 +41,7 @@ export const it: Messages = {
     noOrgs: 'Nessuna org collegata.',
     manageOrgs: 'Collega o gestisci org…',
     newObject: 'Nuovo oggetto',
+    apexTab: 'Classi Apex',
     changeSet: 'Change set',
     noOrgOpen: (orgsButton: ReactNode) => <>Nessuna org aperta. Aprine una con <b>+</b> qui sopra o dalla pagina {orgsButton}</>,
     noChangeSetOpen: 'Nessun change set aperto. Si aprono qui quando mandi in anteprima le modifiche della matrice, o dallo Storico.',
@@ -176,6 +177,25 @@ export const it: Messages = {
     was: (v: string) => `da ${v}`,
     tooMany: (n: string, max: string) => `Troppe modifiche per un solo change set (${n}, massimo ${max}). Dividile in più change set, per esempio filtrando i profili.`,
     description: (fields: number, ps: number) => `${fields} campi su ${ps} profili/permission set`
+  },
+
+  apex: {
+    matrix: {
+      title: 'Accesso alle classi Apex',
+      intro: "Quali profili e permission set possono eseguire ogni classe Apex. Clicca una cella per abilitarla o disabilitarla, trascina su più celle o seleziona righe e colonne per farlo in blocco. Come nella matrice FLS, niente viene scritto finché non confermi l'anteprima.",
+      loading: 'Lettura di classi Apex, profili e accessi…',
+      fields: 'Classi',
+      quick: { all: 'Tutte', none: 'Abilitate per nessuno', editall: 'Abilitate per tutti', custom: 'Senza le classi dei pacchetti', pending: 'Con modifiche' },
+      selected: (rows: number, cols: number) => <><b>{rows}</b> classi · <b>{cols}</b> profili/permission set selezionati</>,
+      size: (f: number, c: number) => `${f} classi × ${c} profili/permission set`,
+      field: 'Classe',
+      counts: (r: number, _e: number) => `${r} abilitate`,
+      description: (fields: number, ps: number) => `Accesso a ${fields} classi Apex su ${ps} profili/permission set`
+    },
+    access: { short: ['—', '✓', '✓'], long: ['Disabilitata', 'Abilitata', 'Abilitata'] },
+    bulk: { enable: 'Abilita', disable: 'Disabilita' },
+    managed: 'Pacchetto',
+    sheet: 'Classi Apex'
   },
 
   cellMenu: {
