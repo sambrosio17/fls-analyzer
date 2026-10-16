@@ -271,6 +271,7 @@ export const fr: Messages = {
     excel: 'Excel (.xlsx)', excelHint: 'Matrice et une ligne par champ et profil',
     csvGrid: "CSV, comme à l'écran", csvLong: 'CSV, une ligne par champ et profil',
     metadata: 'Métadonnées Salesforce (.zip)', metadataHint: 'Profils et ensembles d’autorisations à déployer avec sf ou à garder dans Git',
+    metadataChangeSetHint: 'package.xml et le XML de chaque profil et ensemble d’autorisations, avec les valeurs définies par ce change set (toutes ses lignes)',
     csv: 'CSV',
     scope: (f: number, c: number) => `${f} champs × ${c} profils/ensembles d’autorisations, avec les filtres actuels.`,
     rowsScope: (n: number) => `${n} lignes, avec les filtres actuels.`,
@@ -279,6 +280,7 @@ export const fr: Messages = {
       profiles ? `${profiles} profils exclus : Salesforce n'a pas renvoyé leur nom de métadonnées.` : '',
       locked ? `${locked} ensembles d’autorisations gérés ou de groupe exclus : ils ne peuvent pas être déployés.` : ''
     ].filter(Boolean).join(' '),
+    leftOutRows: (n: number) => `${n} lignes exclues : Salesforce n’a pas renvoyé le nom de métadonnées de leur profil ou ensemble d’autorisations.`,
     nothing: 'Rien à exporter avec les filtres actuels.',
     sheetMatrix: 'Matrice', sheetDetails: 'Détail', sheetAssignments: 'Attributions', sheetLayouts: 'Présentations', sheetPages: 'Pages', sheetChanges: 'Modifications',
     object: 'Objet', field: 'Champ', apiName: 'Nom API', type: 'Type', kind: 'Profil ou ensemble d’autorisations', name: 'Nom', read: 'Lecture', edit: 'Modification',

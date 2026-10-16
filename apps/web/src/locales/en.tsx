@@ -274,6 +274,7 @@ export const en = {
     excel: 'Excel (.xlsx)', excelHint: 'Matrix and one row per field and profile',
     csvGrid: 'CSV, as shown', csvLong: 'CSV, one row per field and profile',
     metadata: 'Salesforce metadata (.zip)', metadataHint: 'Profiles and permission sets to deploy with sf or keep in Git',
+    metadataChangeSetHint: 'package.xml and the XML of each profile and permission set, with the values this change set sets (all its rows)',
     csv: 'CSV',
     scope: (f: number, c: number) => `${f} fields × ${c} profiles/permission sets, with the current filters.`,
     rowsScope: (n: number) => `${n} rows, with the current filters.`,
@@ -282,6 +283,7 @@ export const en = {
       profiles ? `${profiles} profiles left out: Salesforce did not return their metadata name.` : '',
       locked ? `${locked} managed or group permission sets left out: they can't be deployed.` : ''
     ].filter(Boolean).join(' '),
+    leftOutRows: (n: number) => `${n} rows left out: Salesforce did not return the metadata name of their profile or permission set.`,
     nothing: 'Nothing to export with the current filters.',
     sheetMatrix: 'Matrix', sheetDetails: 'Details', sheetAssignments: 'Assignments', sheetLayouts: 'Layouts', sheetPages: 'Pages', sheetChanges: 'Changes',
     object: 'Object', field: 'Field', apiName: 'API name', type: 'Type', kind: 'Profile or permission set', name: 'Name', read: 'Read', edit: 'Edit',

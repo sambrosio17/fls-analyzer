@@ -73,6 +73,7 @@ export const api = {
   /** Gets a new access token; fails with status 409 when the org must be logged in again. */
   refreshToken: (id: string) => call<{ refreshedAt: string }>('POST', `/api/orgs/${id}/token`),
   /** Profile metadata names by profile-owned permission set id. */
+  permissionSets: (orgId: string) => call<PermSet[]>('GET', `/api/orgs/${orgId}/permission-sets`),
   profileNames: (orgId: string) => call<Record<string, string>>('GET', `/api/orgs/${orgId}/profile-names`),
   objects: (orgId: string) => call<SObject[]>('GET', `/api/orgs/${orgId}/objects`),
   layouts: (orgId: string, object: string) => call<LayoutAnalysis>('GET', `/api/orgs/${orgId}/layouts?object=${encodeURIComponent(object)}`),
