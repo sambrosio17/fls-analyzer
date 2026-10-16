@@ -86,14 +86,24 @@ function BulkDemo() {
   );
 }
 
-/** Search narrows the rows; the filter chips work the same way. */
+/** Search "sales" in the profile filter: only matches stay, two get ticked, and only those become columns. */
 function FilterDemo() {
+  const rows = ['Service', 'Sales Manager', 'Partner', 'Sales Rep', 'Sales Ops'];
+  let kept = 0;
   return (
-    <div className="h-demo h-filter" style={{ height: 150, width: 260 }} aria-hidden="true">
-      <span className="h-search"><span className="h-typed">rat</span><span className="h-caret" /></span>
-      {['Phone', 'Rating', 'Revenue', 'Website'].map((r, i) => (
-        <span key={r} className={`h-frow${r === 'Rating' ? ' h-keep' : ' h-drop'}`} style={vars({ top: 44 + i * 24, '--to': `${44 - i * 24}px` })}>{r}</span>
-      ))}
+    <div className="h-demo h-filter" style={{ height: 196, width: 260 }} aria-hidden="true">
+      <span className="h-search"><span className="h-typed" style={vars({ '--chars': '5ch' })}>sales</span><span className="h-caret" /></span>
+      {rows.map((r, i) => {
+        const keep = r.startsWith('Sales');
+        const tick = keep && r !== 'Sales Ops' ? ++kept : 0;
+        const to = 44 + rows.slice(0, i).filter(x => x.startsWith('Sales')).length * 24;
+        return (
+          <span key={r} className={`h-frow${keep ? ' h-keep' : ' h-drop'}`} style={vars({ top: 44 + i * 24, '--to': `${to - (44 + i * 24)}px` })}>
+            <span className={`h-cb${tick ? ` h-cb${tick}` : ''}`} />{r}
+          </span>
+        );
+      })}
+      <span className="h-pickpill">Profili: 2 scelti</span>
     </div>
   );
 }
@@ -145,7 +155,7 @@ const SECTIONS: { title: string; demo: ReactNode; body: ReactNode }[] = [
   {
     title: 'Cercare e filtrare',
     demo: <FilterDemo />,
-    body: <>Cerca un campo per etichetta o nome API, filtra i profili per nome o tipo, e usa i filtri rapidi: campi non visibili a nessuno, modificabili da tutti, solo custom, o con modifiche in sospeso. I conteggi in testa alle colonne seguono i filtri.</>
+    body: <>I filtri <b>Campi</b> e <b>Profili e permission set</b> si aprono con un clic: cerca, poi spunta solo i risultati che ti servono. Se cerchi "sales" e trovi tre profili, puoi tenerne due. <b>Spunta i risultati</b> li prende tutti, <b>Svuota</b> o la × tolgono il filtro, e nessuna spunta vuol dire tutti. Ci sono anche i filtri rapidi: campi non visibili a nessuno, modificabili da tutti, solo custom, o con modifiche in sospeso. I conteggi in testa alle colonne seguono i filtri.</>
   },
   {
     title: "Dall'anteprima a Salesforce",
