@@ -37,7 +37,7 @@ export const en = {
 
   app: {
     guide: 'Guide', news: 'What’s new', newsUnread: 'New changes to read',
-    orgs: 'Orgs', history: 'History', logout: 'Log out',
+    orgs: 'Orgs', history: 'History', logout: 'Log out', settings: 'Settings',
     openOrgs: 'Open orgs', toolsLabel: 'Tools', openObjects: 'Open objects', openChangeSets: 'Open change sets',
     closeX: (name: string) => `Close ${name}`,
     openOrg: 'Open an org',
@@ -64,11 +64,112 @@ export const en = {
       tabs: { title: 'Work tabs', body: <>Tabs go on three levels: the open <b>orgs</b>, the <b>tool</b> of the active org (FLS matrix, Apex classes, Layouts and pages, Change sets) and the <b>objects</b> open in that tool. Each object tab keeps its filters and pending changes. <b>Drag</b> a tab to move it, or use <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd>. The coloured dot on an org tab changes its colour, ↻ renews its session, a middle click closes a tab.</> },
       notices: { title: 'Slow loads in the background', body: <>Loads keep going when you change tab. If you leave a tab while it loads a matrix, layouts or runs a change set, a panel at the bottom right follows it and says when it is ready; <b>Open</b> takes you back. Coming back to the tab clears the notice.</> },
       apex: { title: 'Apex classes', body: <>Which profiles and permission sets can run each Apex class. It works like the FLS matrix with two states, enabled or not: click, drag, right click and bulk actions, then preview and approval. Managed package classes can be hidden with a filter.</> },
+      views: { title: 'Four ways to see the matrix', body: <>The <b>View</b> menu at the top of the FLS matrix and of Apex classes, or the <b>Settings</b> page, switches between four views of the same data and pending changes. <b>Grid</b> is the classic table. <b>Focus</b> opens one profile or permission set (or one field) with <b>None</b>, <b>Read</b> and <b>Edit</b> buttons on every row; tick up to three others with <b>Compare</b> to see them alongside and copy their values. <b>Map</b> draws every cell as a small square, so far more profiles fit on screen: hover to read a cell, drag to select a block, then pick the access or press <kbd>N</kbd>, <kbd>R</kbd>, <kbd>E</kbd>. <b>Rules</b> writes the change as a sentence, such as "Grant edit on these fields to these permission sets", and shows how many cells change before you add it.</> },
+      layoutViews: { title: 'Brush and board for assignments', body: <>Layouts and pages also has three views, chosen from <b>View</b> or <b>Settings</b>. <b>Table</b> is the list with one menu per cell. <b>Brush</b> gives every layout or Lightning page a colour: with <b>Edit assignments</b> on, pick one from the palette and click or drag over the cells, or click a profile or record type to paint the whole row or column; <kbd>Alt</kbd> + click picks the layout of a cell. <b>Board</b> has one column per layout or page and one card per profile, for one record type at a time: drag the cards, or click several and use <b>Move to…</b>. An empty column is a layout nobody uses.</> },
       layouts: { title: 'Layouts and pages', body: <>Pick an object to see, for each profile and record type, which <b>page layout</b> and which <b>Lightning page</b> it gets (by app, record type and org default), and the layout fields the profile cannot read. With <b>Edit assignments</b> you change them cell by cell, or a whole column with <b>Whole column…</b>; edited cells turn purple. <b>Go to preview</b> makes a change set, applied like FLS changes. For Lightning pages the change applies to the chosen app, and removing a specific assignment sends the profile back to the app or org default.</> },
       changesets: { title: 'Change sets', body: <>Nothing is written until you confirm. <b>Go to preview</b> turns pending changes into a change set with what is added, changed and removed, and warnings. In production it needs approval and the org name typed in. Running it shows progress and the result per row.</> },
       export: { title: 'Export', body: <>The <b>Export</b> button saves what you see: the matrix as Excel or CSV or as Salesforce metadata (package.xml and one file per profile and permission set), change sets as Excel, CSV or metadata with the values they set, and layouts as Excel or CSV. A panel at the bottom right shows the progress of big files.</> },
       history: { title: 'History and undo', body: <><b>History</b> lists every change set with who prepared and approved it and when. Each one keeps the values from before, so <b>Undo these changes</b>, in the change set, creates a change set that restores them.</> },
       settings: { title: 'Language and session', body: <>Pick English, Italiano, Français or Español from the menu with the flags. <b>Log out</b> ends the Orgsmith session; your orgs stay connected.</> }
+    }
+  },
+
+  settings: {
+    title: 'Settings',
+    intro: 'Choose how Orgsmith shows the matrices. The choice is saved in this browser, and the View menu at the top of each tool changes it too.',
+    matrix: 'Permission matrices (FLS and Apex classes)',
+    layouts: 'Page layout and Lightning page assignments',
+    current: 'In use',
+    language: 'The language is chosen from the menu with the flags at the top.'
+  },
+
+  views: {
+    label: 'View',
+    matrix: {
+      grid: { name: 'Grid', desc: 'Every field against every profile and permission set. Click a cell, drag over several, or tick rows and columns.' },
+      focus: { name: 'Focus', desc: 'One profile or permission set at a time, or one field, with None, Read and Edit buttons on every row. Compare up to three others and copy their values.' },
+      dense: { name: 'Map', desc: 'Every cell as a small coloured square: four to five times more columns on screen. Hover to read, drag to select, set with the keyboard.' },
+      rules: { name: 'Rules', desc: 'Write the change as a sentence: grant edit on these fields to these permission sets. You see how many cells change before adding it.' }
+    },
+    layouts: {
+      table: { name: 'Table', desc: 'One row per profile, one column per record type, with a menu in each cell while editing.' },
+      paint: { name: 'Brush', desc: 'Each layout has a colour. Pick one from the palette and paint cells, whole rows or whole columns.' },
+      board: { name: 'Board', desc: 'One column per layout, one card per profile. Drag profiles from one layout to another, one record type at a time.' }
+    },
+    levels: ['None', 'Read', 'Edit'],
+    focus: {
+      byPs: 'By profile', byField: 'By field', byClass: 'By class',
+      searchPs: 'Search profiles and permission sets', searchField: 'Search fields', searchClass: 'Search classes',
+      profiles: 'Profiles', permSets: 'Permission sets',
+      compare: 'compare', comparing: 'comparing',
+      uncompare: (name: string) => `Stop comparing ${name}`,
+      pick: 'Choose a profile or permission set on the left.',
+      pickField: 'Choose a field on the left.',
+      stats: (r: number, e: number, hidden: number) => `${r} readable · ${e} editable · ${hidden} hidden`,
+      statsApex: (on: number, off: number) => `${on} enabled · ${off} disabled`,
+      copyAll: (from: string) => `Copy everything from ${from}`,
+      copyOne: (v: string, from: string) => `Copy “${v}” from ${from}`,
+      lockedPs: 'Permission set from a managed package, a group or muting: it can only be read.',
+      selected: (n: number) => n === 1 ? '1 selected' : `${n} selected`,
+      set: 'Set:',
+      selectAll: 'Select all',
+      access: 'Access',
+      only: { all: 'All', diff: 'Differences only', none: 'No access only', pending: 'With changes' },
+      noFls: 'Always visible (no FLS)',
+      more: (n: number) => `Show ${n} more`
+    },
+    dense: {
+      size: 'Size',
+      keys: { none: 'n', read: 'r', edit: 'e' },
+      help: (keys: string[]) => <>Click or drag to select · click a name for the whole row or column · {keys.map(k => <kbd key={k}>{k}</kbd>)} set · <kbd>Space</kbd> cycles · <kbd>Shift</kbd>+arrows extends · <kbd>Esc</kbd> clears</>
+    },
+    rules: {
+      action: 'Action', from: 'Choose whose access to copy',
+      actions: { edit: 'Grant edit', read: 'Grant read', removeEdit: 'Remove edit only', none: 'Remove all access', copy: 'Copy the access of' },
+      onWord: 'on', toWord: 'to', forWord: 'for', toWordCopy: 'into',
+      allFields: (n: number, apex: boolean) => apex ? `all ${n} classes` : `all ${n} fields`,
+      someFields: (n: number, apex: boolean) => apex ? (n === 1 ? '1 class' : `${n} classes`) : (n === 1 ? '1 field' : `${n} fields`),
+      allPs: (n: number) => `all ${n} profiles and permission sets`,
+      somePs: (n: number) => n === 1 ? '1 profile or permission set' : `${n} profiles and permission sets`,
+      reads: (what: string, fields: string, ps: string) => `${what} on ${fields} for ${ps}. Empty filters mean everything the matrix shows.`,
+      sentence: (what: string, fields: string, ps: string) => `${what} · ${fields} · ${ps}`,
+      recipes: 'Shortcuts:',
+      recipeClone: 'Same access as another profile',
+      recipeEncrypted: 'No edit on encrypted fields',
+      recipeCustom: 'Read on custom fields',
+      recipePackage: 'Disable package classes',
+      changes: 'cells change', more: 'more access', less: 'less access',
+      skipped: (n: number) => `${n} locked cells left out`,
+      add: 'Add to pending changes',
+      cols: ['Field', 'Profile / permission set', 'Now', 'After'],
+      pickFrom: 'Choose whose access to copy.',
+      nothing: 'Nothing changes: the access is already like this.',
+      andMore: (n: number) => `and ${n} more`,
+      queue: 'Rules added',
+      queueEmpty: 'None yet. Write a rule and add it.',
+      queueNote: 'Added rules are already in the pending changes; Go to preview turns them into a change set. Remove takes back the last one.',
+      cells: (n: number) => n === 1 ? '1 cell' : `${n} cells`,
+      remove: 'Remove'
+    },
+    paint: {
+      brush: 'Brush:',
+      none: 'App or org default',
+      unused: 'never used',
+      hint: 'Click a cell or drag over several. Click a profile or record type to paint the whole row or column. Alt + click picks the layout of a cell.',
+      readOnly: 'Turn on Edit assignments to paint.',
+      row: 'Paint the whole row', col: 'Paint the whole column',
+      was: (v: string) => `was ${v}`
+    },
+    board: {
+      recordType: 'Record type:',
+      hint: 'Drag profiles to another column, or click several and use Move to…',
+      readOnly: 'Turn on Edit assignments to move profiles.',
+      moveTo: 'Move to…',
+      selected: (n: number) => n === 1 ? '1 profile selected' : `${n} profiles selected`,
+      clear: 'Clear selection',
+      empty: 'No profile',
+      unused: 'Not used with this record type',
+      before: (v: string) => `before: ${v}`
     }
   },
 

@@ -8,6 +8,7 @@ import { History } from './pages/History.tsx';
 import { LayoutsPage } from './pages/Layouts.tsx';
 import { Guide } from './pages/Guide.tsx';
 import { News } from './pages/News.tsx';
+import { Settings } from './pages/Settings.tsx';
 import { LATEST } from './changelog.ts';
 import { Brand } from './Brand.tsx';
 import { TokenTabButton } from './TokenButton.tsx';
@@ -23,7 +24,7 @@ import {
   APEX_OBJECT, moveOrg, moveTab, selectTab, selectTool, tabTitle, toolOf, updateTab, visibleTab, type WorkTab, type Workspace
 } from './workspace.ts';
 
-type View = 'orgs' | 'history' | 'work' | 'guide' | 'news';
+type View = 'orgs' | 'history' | 'work' | 'guide' | 'news' | 'settings';
 
 const ACCENT_STYLE = accentCss();
 const storage = (() => { try { return window.localStorage; } catch { return null; } })();
@@ -154,6 +155,7 @@ export function App() {
             <button className="tab" aria-current={view === 'news' ? 'page' : undefined} onClick={() => setView('news')}>
               {t.app.news}{newsSeen !== LATEST && <span className="news-dot" role="img" aria-label={t.app.newsUnread} title={t.app.newsUnread} />}
             </button>
+            <button className="tab" aria-current={view === 'settings' ? 'page' : undefined} onClick={() => setView('settings')}>{t.app.settings}</button>
           </nav>
           <span className="spacer" />
           <LangPicker />
@@ -240,6 +242,7 @@ export function App() {
             onRenamed={updated => setOrgs(orgs.map(o => o.id === updated.id ? updated : o))} />
         )}
         {view === 'guide' && <Guide focus={guideFocus} />}
+        {view === 'settings' && <Settings />}
         {view === 'news' && <News onGuide={section => { setGuideFocus(section); setView('guide'); }} />}
         {view === 'history' && <History orgs={orgs} onOpen={(id, orgId, number) => showChangeSet(orgId, id, number)} />}
         {view === 'work' && !activeOrg && (
