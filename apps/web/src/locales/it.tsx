@@ -232,7 +232,12 @@ export const it: Messages = {
   },
 
   export: {
-    button: 'Esporta', preparing: 'Preparo…',
+    button: 'Esporta', preparing: 'Genero…',
+    generating: (what: string) => `Genero ${what}`,
+    ready: (what: string) => `${what} pronto, il download è partito`,
+    failed: (what: string) => `Non sono riuscito a generare ${what}`,
+    stage: { collect: 'Raccolgo i dati', write: 'Scrivo il file', compress: 'Impacchetto il file' },
+    keepOpen: 'Puoi continuare a lavorare, basta non chiudere la pagina.',
     excel: 'Excel (.xlsx)', excelHint: 'Matrice e una riga per campo e profilo',
     csvGrid: 'CSV, come a schermo', csvLong: 'CSV, una riga per campo e profilo',
     metadata: 'Metadata Salesforce (.zip)', metadataHint: 'Profili e permission set da distribuire con sf o da tenere in Git',

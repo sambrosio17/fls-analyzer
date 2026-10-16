@@ -235,7 +235,12 @@ export const en = {
   },
 
   export: {
-    button: 'Export', preparing: 'Preparing…',
+    button: 'Export', preparing: 'Generating…',
+    generating: (what: string) => `Generating ${what}`,
+    ready: (what: string) => `${what} ready, the download has started`,
+    failed: (what: string) => `${what} could not be generated`,
+    stage: { collect: 'Collecting the data', write: 'Writing the file', compress: 'Packing the file' },
+    keepOpen: 'You can keep working, just leave this page open.',
     excel: 'Excel (.xlsx)', excelHint: 'Matrix and one row per field and profile',
     csvGrid: 'CSV, as shown', csvLong: 'CSV, one row per field and profile',
     metadata: 'Salesforce metadata (.zip)', metadataHint: 'Profiles and permission sets to deploy with sf or keep in Git',
