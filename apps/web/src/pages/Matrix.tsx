@@ -4,6 +4,10 @@ import { AccessLegend } from '../AccessLegend.tsx';
 import { MultiPick, type PickOption } from '../MultiPick.tsx';
 import { bounds, forEachCell, menuPosition, rangeSize, type CellRange } from '../cellRange.ts';
 import { useT } from '../i18n.tsx';
+import { ExportMenu, type ExportItem } from '../export/ExportMenu.tsx';
+import { CSV_TYPE, XLSX_TYPE, download, slug, stamp, toCsv, toXlsx, type Sheet } from '../export/table.ts';
+import { fieldPermissionBundle, type MetaTarget } from '../export/metadata.ts';
+import { zip } from '../export/zip.ts';
 import { api, type Access, type BulkAction, type FieldMeta, type Matrix, type Org, type PermSet, type SObject } from '../api.ts';
 
 const lockedPs = (p: PermSet) => !!p.namespace || p.type === 'Group' || p.type === 'Muting';
@@ -343,6 +347,54 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   const rb = range && bounds(range);
   live.current = { cellAt, extendTo, clickCell, setRange, setMenu, headH: view.headH, fcolW: view.fcolW };
   const permissionableVisible = fields.filter(i => allFields[i]!.permissionable);
+
+  // ---- export: what is on screen (filters and pending changes included)
+  const exportName = (ext: string, kind = 'fls') => `orgsmith-${kind}-${slug(org.label)}-${slug(selected.join('-'))}-${stamp()}.${ext}`;
+  const psKindLabel = (p: PermSet) => p.isProfile ? t.export.profile : t.export.permSet;
+  const gridSheet = (): Sheet => ({
+    name: t.export.sheetMatrix,
+    rows: [
+      [t.export.object, t.export.field, t.export.apiName, t.export.type, ...columns.map(j => `${allPs[j]!.label} (${psKindLabel(allPs[j]!)})`)],
+      ...fields.map(i => {
+        const f = allFields[i]!;
+        return [f.object, f.label, f.name, f.type, ...columns.map(j => f.permissionable ? t.access.long[cur(j * F + i)]! : t.matrix.always)];
+      })
+    ]
+  });
+  const longSheet = (): Sheet => ({
+    name: t.export.sheetDetails,
+    rows: [
+      [t.export.object, t.export.field, t.export.apiName, t.export.kind, t.export.name, t.export.apiName, t.export.read, t.export.edit],
+      ...permissionableVisible.flatMap(i => {
+        const f = allFields[i]!;
+        return columns.map(j => {
+          const p = allPs[j]!, v = cur(j * F + i);
+          return [f.object, f.label, f.name, psKindLabel(p), p.label, p.isProfile ? null : p.name, v > 0, v === 2];
+        });
+      })
+    ]
+  });
+  const exportMetadata = async () => {
+    const names = await api.profileNames(org.id);
+    let noName = 0, lockedCount = 0;
+    const targets: MetaTarget[] = [];
+    for (const j of columns) {
+      const p = allPs[j]!;
+      if (lockedPs(p)) { lockedCount++; continue; }
+      const fullName = p.isProfile ? names[p.id] : p.name;
+      if (!fullName) { noName++; continue; }
+      targets.push({ kind: p.isProfile ? 'Profile' : 'PermissionSet', fullName, access: permissionableVisible.map(i => cur(j * F + i)) });
+    }
+    if (!targets.length || !permissionableVisible.length) return t.export.nothing;
+    download(exportName('zip', 'fls-metadata'), zip(fieldPermissionBundle(targets, permissionableVisible.map(i => allFields[i]!.name))), 'application/zip');
+    return t.export.leftOut(noName, lockedCount) || undefined;
+  };
+  const exportItems: ExportItem[] = [
+    { id: 'xlsx', label: t.export.excel, hint: t.export.excelHint, run: () => download(exportName('xlsx'), toXlsx([gridSheet(), longSheet()]), XLSX_TYPE) },
+    { id: 'csv', label: t.export.csvGrid, run: () => download(exportName('csv'), toCsv(gridSheet().rows, t.locale), CSV_TYPE) },
+    { id: 'csv-long', label: t.export.csvLong, run: () => download(exportName('csv', 'fls-rows'), toCsv(longSheet().rows, t.locale), CSV_TYPE) },
+    { id: 'metadata', label: t.export.metadata, hint: t.export.metadataHint, run: exportMetadata }
+  ];
   const objectMatches = objectQuery.length < 2 ? [] : objects.filter(o =>
     !selected.includes(o.name) && (o.label.toLowerCase().includes(objectQuery.toLowerCase()) || o.name.toLowerCase().includes(objectQuery.toLowerCase()))).slice(0, 8);
 
@@ -352,7 +404,11 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
         <div><div className="eyebrow">{org.label}</div><h1>{t.matrix.title}</h1>
           <p>{t.matrix.intro}</p></div>
         <span className="spacer" />
-        <button className="btn" onClick={() => setHelp(true)}>{t.matrix.guide}</button>
+        <div className="row">
+          {matrix && !loading && <ExportMenu items={exportItems}
+            note={[t.export.scope(fields.length, columns.length), pending.size ? t.export.pending(pending.size) : ''].filter(Boolean).join(' ')} />}
+          <button className="btn" onClick={() => setHelp(true)}>{t.matrix.guide}</button>
+        </div>
       </div>
       <MatrixHelp open={help} onClose={() => setHelp(false)} />
 

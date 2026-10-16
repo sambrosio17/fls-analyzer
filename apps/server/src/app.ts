@@ -9,7 +9,7 @@ import type { Config } from './config.ts';
 import { pkcePair, randomToken, safeEqual, TokenCipher } from './crypto.ts';
 import { DEFAULT_TENANT, Db, orgLabel, type OrgRow } from './db.ts';
 import { SalesforceClient, SalesforceError, type SfApi } from './salesforce/client.ts';
-import { loadLayoutAnalysis, loadPageAnalysis } from './salesforce/pages.ts';
+import { loadLayoutAnalysis, loadPageAnalysis, loadProfiles } from './salesforce/pages.ts';
 import { accessStrings, listObjects, loadFields, loadOrgInfo, loadPermissionSets, loadSnapshot, loadUserPermissions } from './salesforce/metadata.ts';
 import { authorizeUrl, exchangeCode, loginUrlFor, refreshAccessToken, type OAuthSettings, type TokenResponse } from './salesforce/oauth.ts';
 import { ChangeSetService, NotFoundError } from './services/changesets.ts';
@@ -190,6 +190,12 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
   app.get('/api/orgs/:id/layouts', async req => {
     const org = orgOr404((req.params as { id: string }).id);
     return loadLayoutAnalysis(apiFor(org), objectQuery.parse(req.query).object);
+  });
+  // Metadata API names of the profiles, keyed by their profile-owned permission set, for the metadata export.
+  app.get('/api/orgs/:id/profile-names', async req => {
+    const org = orgOr404((req.params as { id: string }).id);
+    const profiles = await loadProfiles(apiFor(org));
+    return Object.fromEntries(profiles.filter(p => p.fullName).map(p => [p.permSetId, p.fullName]));
   });
   app.get('/api/orgs/:id/lightning-pages', async req => {
     const org = orgOr404((req.params as { id: string }).id);

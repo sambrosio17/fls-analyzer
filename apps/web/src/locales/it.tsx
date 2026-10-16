@@ -231,6 +231,25 @@ export const it: Messages = {
     noPages: 'Nessuna Lightning record page per questo oggetto.'
   },
 
+  export: {
+    button: 'Esporta', preparing: 'Preparo…',
+    excel: 'Excel (.xlsx)', excelHint: 'Matrice e una riga per campo e profilo',
+    csvGrid: 'CSV, come a schermo', csvLong: 'CSV, una riga per campo e profilo',
+    metadata: 'Metadata Salesforce (.zip)', metadataHint: 'Profili e permission set da distribuire con sf o da tenere in Git',
+    csv: 'CSV',
+    scope: (f: number, c: number) => `${f} campi × ${c} profili/permission set, con i filtri attuali.`,
+    rowsScope: (n: number) => `${n} righe, con i filtri attuali.`,
+    pending: (n: number) => n === 1 ? 'Include 1 modifica in sospeso.' : `Include ${n} modifiche in sospeso.`,
+    leftOut: (profiles: number, locked: number) => [
+      profiles ? `${profiles} profili esclusi: Salesforce non ha restituito il loro nome metadata.` : '',
+      locked ? `${locked} permission set gestiti o di gruppo esclusi: non si possono distribuire.` : ''
+    ].filter(Boolean).join(' '),
+    nothing: 'Niente da esportare con i filtri attuali.',
+    sheetMatrix: 'Matrice', sheetDetails: 'Dettaglio', sheetAssignments: 'Assegnazioni', sheetLayouts: 'Layout', sheetPages: 'Pagine', sheetChanges: 'Modifiche',
+    object: 'Oggetto', field: 'Campo', apiName: 'Nome API', type: 'Tipo', kind: 'Profilo o permission set', name: 'Nome', read: 'Lettura', edit: 'Modifica',
+    profile: 'Profilo', permSet: 'Permission set', warnings: 'Avvisi', error: 'Errore', source: 'Origine'
+  },
+
   help: {
     title: 'Come funziona la matrice FLS',
     menuCells: (n: number) => `${n} celle`,
