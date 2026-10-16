@@ -198,6 +198,11 @@ export const it: Messages = {
     sheet: 'Classi Apex'
   },
 
+  loads: {
+    open: 'Apri',
+    load: { running: 'Caricamento in corso…', done: 'Caricato, pronto da vedere', error: 'Caricamento non riuscito' },
+    run: { running: 'Applicazione delle modifiche…', done: 'Esecuzione terminata, vedi il risultato', error: 'Esecuzione non riuscita' }
+  },
   accent: {
     color: 'Colore', label: "Colore dell'org", change: "Cambia il colore dell'org",
     names: { ember: 'Brace', amber: 'Ambra', olive: 'Oliva', emerald: 'Smeraldo', cyan: 'Ciano', blue: 'Blu', indigo: 'Indaco', magenta: 'Magenta', sand: 'Sabbia', slate: 'Ardesia' }

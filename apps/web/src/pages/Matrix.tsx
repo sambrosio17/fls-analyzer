@@ -9,6 +9,7 @@ import { CSV_TYPE, XLSX_TYPE, download, slug, stamp, toCsv, toXlsx, type Sheet }
 import { fieldPermissionBundle, type MetaTarget } from '../export/metadata.ts';
 import { zip } from '../export/zip.ts';
 import { mapWithProgress, part, type Progress } from '../export/progress.ts';
+import { trackLoad, useTabId } from '../loads.ts';
 import { api, type Access, type BulkAction, type FieldMeta, type Matrix, type Org, type PermSet, type SObject } from '../api.ts';
 
 const lockedPs = (p: PermSet) => !!p.namespace || p.type === 'Group' || p.type === 'Muting';
@@ -32,6 +33,7 @@ export function MatrixPage({ org, mode = 'fls', onChangeSet, initialObjects = []
   const apex = mode === 'apex';
   const m = apex ? { ...t.matrix, ...t.apex.matrix } : t.matrix;
   const A = apex ? t.apex.access : t.access;
+  const tabId = useTabId();
   const [objects, setObjects] = useState<SObject[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [objectQuery, setObjectQuery] = useState('');
@@ -69,7 +71,7 @@ export function MatrixPage({ org, mode = 'fls', onChangeSet, initialObjects = []
     discard(); setRows(new Set()); setCols(new Set()); setFieldPick([]);
     if (!list.length) { setMatrix(null); return; }
     setLoading(true); setError(null);
-    try { setMatrix(await api.matrix(org.id, list)); } catch (e) { setError((e as Error).message); } finally { setLoading(false); }
+    try { setMatrix(await trackLoad(tabId, 'load', api.matrix(org.id, list))); } catch (e) { setError((e as Error).message); } finally { setLoading(false); }
   };
 
   const allFields = matrix?.fields ?? [];

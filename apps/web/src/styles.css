@@ -495,7 +495,9 @@ td.c button:disabled { pointer-events: none; }
 }
 .spinner { width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; opacity: .7; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.export-toast { position: fixed; right: 16px; bottom: 16px; z-index: 60; width: 320px; max-width: calc(100vw - 32px); padding: 12px 14px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; box-shadow: 0 12px 32px rgb(0 0 0 / .22); animation: toast-in .18s ease-out; }
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: flex; flex-direction: column; gap: 8px; width: 320px; max-width: calc(100vw - 32px); }
+.toasts:empty { display: none; }
+.export-toast { padding: 12px 14px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; box-shadow: 0 12px 32px rgb(0 0 0 / .22); animation: toast-in .18s ease-out; }
 .export-toast.done { border-left-color: var(--ok, var(--accent)); }
 .export-toast.error { border-left-color: var(--danger); }
 .export-toast p { margin: 6px 0 0; }
@@ -523,3 +525,13 @@ td.c button:disabled { pointer-events: none; }
 .orgtab .orgtab-label { padding-left: 8px; }
 .accent-pop { position: fixed; z-index: 50; display: grid; gap: 8px; width: 152px; padding: 10px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgb(0 0 0 / .25); }
 .accent-pop-h { font-size: 12px; color: var(--muted); }
+
+/* Each org tab shows its own colour, not the active org's: the dark tone on the top bar, the light one on the open tab. */
+.orgtab { --org-c: var(--org-d); }
+.orgtab.on { --org-c: var(--org-l); }
+@media (prefers-color-scheme: dark) { .orgtab.on { --org-c: var(--org-d); } }
+.orgtab .env.sandbox { color: var(--org-c); background: color-mix(in srgb, var(--org-c) 18%, transparent); }
+.load-org { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.load-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sw-l); }
+@media (prefers-color-scheme: dark) { .load-dot { background: var(--sw-d); } }
+.load-foot { align-items: center; }
