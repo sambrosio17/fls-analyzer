@@ -33,7 +33,10 @@ export interface MemoryOrgData {
   objectPerms: { ParentId: string; SobjectType: string; PermissionsRead: boolean }[];
   describes: Record<string, { label: string; fields: MemField[] }>;
   pages?: MemPages;
+  apexClasses?: MemApexClass[];
 }
+export interface MemApexClass { Id: string; Name: string; NamespacePrefix: string | null }
+export interface MemEntityAccess { Id: string; ParentId: string; SetupEntityId: string }
 
 const whereEq = (soql: string, column: string) => soql.match(new RegExp(`${column} = '([^']*)'`))?.[1];
 
@@ -49,6 +52,8 @@ const inSet = (soql: string, column: string) => {
 export class MemoryOrg implements SfApi {
   readonly apiVersion = 'v62.0';
   fieldPerms: MemFieldPerm[] = [];
+  /** SetupEntityAccess rows for Apex classes. */
+  entityAccess: MemEntityAccess[] = [];
   /** Fields whose insert fails, to simulate license errors. */
   rejectFields = new Set<string>();
   private seq = 0;
@@ -61,7 +66,18 @@ export class MemoryOrg implements SfApi {
     return Id;
   }
 
+  addClassAccess(parentId: string, classId: string): string {
+    const Id = `0J0${String(++this.seq).padStart(12, '0')}`;
+    this.entityAccess.push({ Id, ParentId: parentId, SetupEntityId: classId });
+    return Id;
+  }
+
   async query<T>(soql: string): Promise<T[]> {
+    if (soql.includes('FROM ApexClass')) return (this.data.apexClasses ?? []).map(c => ({ ...c })) as T[];
+    if (soql.includes('FROM SetupEntityAccess')) {
+      const parents = inSet(soql, 'ParentId');
+      return this.entityAccess.filter(a => parents.has(a.ParentId)).map(a => ({ ...a })) as T[];
+    }
     if (soql.includes('FROM PermissionSet')) {
       return this.data.permissionSets.filter(p => !soql.includes('IsOwnedByProfile = true') || p.IsOwnedByProfile) as T[];
     }
@@ -139,6 +155,12 @@ export class MemoryOrg implements SfApi {
     const records = (body as { records?: Record<string, unknown>[] } | undefined)?.records ?? [];
     if (method === 'POST') {
       return records.map((r): SaveResult => {
+        if ((r.attributes as { type: string }).type === 'SetupEntityAccess') {
+          const classId = r.SetupEntityId as string;
+          if (!this.data.apexClasses?.some(c => c.Id === classId)) return { success: false, errors: [{ statusCode: 'INVALID_CROSS_REFERENCE_KEY', message: 'Apex class not found' }] };
+          if (this.entityAccess.some(a => a.ParentId === r.ParentId && a.SetupEntityId === classId)) return { success: false, errors: [{ statusCode: 'DUPLICATE_VALUE', message: 'Access already granted' }] };
+          return { id: this.addClassAccess(r.ParentId as string, classId), success: true };
+        }
         if (this.rejectFields.has(r.Field as string)) return { success: false, errors: [{ statusCode: 'FIELD_INTEGRITY_EXCEPTION', message: 'Field not available for this license' }] };
         return { id: this.addPerm(r.ParentId as string, r.Field as string, r.PermissionsRead as boolean, r.PermissionsEdit as boolean), success: true };
       }) as T;
@@ -155,9 +177,10 @@ export class MemoryOrg implements SfApi {
     if (method === 'DELETE') {
       const ids = new URL(`https://x${path}`).searchParams.get('ids')!.split(',');
       return ids.map((id): SaveResult => {
-        const before = this.fieldPerms.length;
+        const before = this.fieldPerms.length + this.entityAccess.length;
         this.fieldPerms = this.fieldPerms.filter(p => p.Id !== id);
-        return before === this.fieldPerms.length ? { success: false, errors: [{ statusCode: 'ENTITY_IS_DELETED', message: 'Record not found' }] } : { id, success: true };
+        this.entityAccess = this.entityAccess.filter(a => a.Id !== id);
+        return before === this.fieldPerms.length + this.entityAccess.length ? { success: false, errors: [{ statusCode: 'ENTITY_IS_DELETED', message: 'Record not found' }] } : { id, success: true };
       }) as T;
     }
     throw new Error(`Unexpected request ${method} ${path}`);

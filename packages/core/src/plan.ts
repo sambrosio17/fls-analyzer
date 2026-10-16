@@ -1,6 +1,6 @@
 import { FlsSnapshot } from './snapshot.ts';
 import {
-  EDIT, NONE, READ, objectOf,
+  EDIT, NONE, READ, isApex, objectOf,
   type Access, type BulkAction, type ChangeItem, type Desired, type FieldMeta, type Operation,
   type PermSetMeta, type Plan, type SkippedItem, type WarningCode
 } from './types.ts';
@@ -59,16 +59,18 @@ export function planChanges({ snapshot, fields, permissionSets, desired }: PlanI
 
     const warnings: WarningCode[] = [];
     let after = d.access;
-    if (field.calculated && after === EDIT) { after = READ; warnings.push('CALCULATED_READ_ONLY'); }
+    const apex = isApex(field.object);
+    // An Apex class is either enabled or not: "edit" just means enabled.
+    if (field.calculated && after === EDIT) { after = READ; if (!apex) warnings.push('CALCULATED_READ_ONLY'); }
 
     const cell = snapshot.get(d.parentId, d.field);
     if (after === cell.access) { skip('NO_CHANGE'); continue; }
 
     const sobjectType = objectOf(d.field);
-    if (after !== NONE && !snapshot.hasObjectRead(d.parentId, sobjectType)) warnings.push('NO_OBJECT_ACCESS');
+    if (!apex && after !== NONE && !snapshot.hasObjectRead(d.parentId, sobjectType)) warnings.push('NO_OBJECT_ACCESS');
 
     const op: Operation = cell.recordId === null ? 'insert' : after === NONE ? 'delete' : 'update';
-    items.push({ parentId: d.parentId, field: d.field, sobjectType, before: cell.access, after, recordId: cell.recordId, op, warnings });
+    items.push({ parentId: d.parentId, field: d.field, sobjectType, before: cell.access, after, recordId: cell.recordId, op, warnings, ...(field.entityId ? { entityId: field.entityId } : {}) });
   }
   items.sort((a, b) => a.parentId.localeCompare(b.parentId) || a.field.localeCompare(b.field));
   return { items, skipped };

@@ -29,8 +29,14 @@ export function fakeOrg(isSandbox = true): MemoryOrg {
           f('BillingAddress', 'Billing Address', 'address')
         ]
       }
-    }
+    },
+    apexClasses: [
+      { Id: '01p000000000001', Name: 'AccountController', NamespacePrefix: null },
+      { Id: '01p000000000002', Name: 'InvoiceBatch', NamespacePrefix: null },
+      { Id: '01p000000000003', Name: 'QuoteCalculator', NamespacePrefix: 'SBQQ' }
+    ]
   });
   org.addPerm('0PS000000000001', 'Account.Industry', true, false);
+  org.addClassAccess('0PS000000000001', '01p000000000001');
   return org;
 }
