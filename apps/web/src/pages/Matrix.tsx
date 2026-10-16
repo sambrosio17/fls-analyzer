@@ -8,6 +8,7 @@ import { ExportMenu, type ExportItem } from '../export/ExportMenu.tsx';
 import { CSV_TYPE, XLSX_TYPE, download, slug, stamp, toCsv, toXlsx, type Sheet } from '../export/table.ts';
 import { fieldPermissionBundle, type MetaTarget } from '../export/metadata.ts';
 import { zip } from '../export/zip.ts';
+import { mapWithProgress, part, type Progress } from '../export/progress.ts';
 import { api, type Access, type BulkAction, type FieldMeta, type Matrix, type Org, type PermSet, type SObject } from '../api.ts';
 
 const lockedPs = (p: PermSet) => !!p.namespace || p.type === 'Group' || p.type === 'Muting';
@@ -351,48 +352,52 @@ export function MatrixPage({ org, onChangeSet, initialObjects = [], onObjectsCha
   // ---- export: what is on screen (filters and pending changes included)
   const exportName = (ext: string, kind = 'fls') => `orgsmith-${kind}-${slug(org.label)}-${slug(selected.join('-'))}-${stamp()}.${ext}`;
   const psKindLabel = (p: PermSet) => p.isProfile ? t.export.profile : t.export.permSet;
-  const gridSheet = (): Sheet => ({
+  const gridSheet = async (p: Progress): Promise<Sheet> => ({
     name: t.export.sheetMatrix,
     rows: [
       [t.export.object, t.export.field, t.export.apiName, t.export.type, ...columns.map(j => `${allPs[j]!.label} (${psKindLabel(allPs[j]!)})`)],
-      ...fields.map(i => {
+      ...await mapWithProgress(fields, i => {
         const f = allFields[i]!;
         return [f.object, f.label, f.name, f.type, ...columns.map(j => f.permissionable ? t.access.long[cur(j * F + i)]! : t.matrix.always)];
-      })
+      }, part(p, 0, 1, 'collect'), Math.max(1, Math.floor(20000 / Math.max(1, columns.length))))
     ]
   });
-  const longSheet = (): Sheet => ({
+  const longSheet = async (p: Progress): Promise<Sheet> => ({
     name: t.export.sheetDetails,
     rows: [
       [t.export.object, t.export.field, t.export.apiName, t.export.kind, t.export.name, t.export.apiName, t.export.read, t.export.edit],
-      ...permissionableVisible.flatMap(i => {
+      ...(await mapWithProgress(permissionableVisible, i => {
         const f = allFields[i]!;
         return columns.map(j => {
-          const p = allPs[j]!, v = cur(j * F + i);
-          return [f.object, f.label, f.name, psKindLabel(p), p.label, p.isProfile ? null : p.name, v > 0, v === 2];
+          const ps = allPs[j]!, v = cur(j * F + i);
+          return [f.object, f.label, f.name, psKindLabel(ps), ps.label, ps.isProfile ? null : ps.name, v > 0, v === 2];
         });
-      })
+      }, part(p, 0, 1, 'collect'), Math.max(1, Math.floor(20000 / Math.max(1, columns.length))))).flat()
     ]
   });
-  const exportMetadata = async () => {
+  const exportMetadata = async (p: Progress) => {
+    await p(0, 'collect');
     const names = await api.profileNames(org.id);
     let noName = 0, lockedCount = 0;
     const targets: MetaTarget[] = [];
-    for (const j of columns) {
-      const p = allPs[j]!;
-      if (lockedPs(p)) { lockedCount++; continue; }
-      const fullName = p.isProfile ? names[p.id] : p.name;
+    for (const [k, j] of columns.entries()) {
+      const ps = allPs[j]!;
+      if (lockedPs(ps)) { lockedCount++; continue; }
+      const fullName = ps.isProfile ? names[ps.id] : ps.name;
       if (!fullName) { noName++; continue; }
-      targets.push({ kind: p.isProfile ? 'Profile' : 'PermissionSet', fullName, access: permissionableVisible.map(i => cur(j * F + i)) });
+      targets.push({ kind: ps.isProfile ? 'Profile' : 'PermissionSet', fullName, access: permissionableVisible.map(i => cur(j * F + i)) });
+      await p(0.1 + 0.2 * k / columns.length);
     }
     if (!targets.length || !permissionableVisible.length) return t.export.nothing;
-    download(exportName('zip', 'fls-metadata'), zip(fieldPermissionBundle(targets, permissionableVisible.map(i => allFields[i]!.name))), 'application/zip');
+    await p(0.3, 'write');
+    const files = fieldPermissionBundle(targets, permissionableVisible.map(i => allFields[i]!.name));
+    download(exportName('zip', 'fls-metadata'), await zip(files, part(p, 0.5, 1, 'compress')), 'application/zip');
     return t.export.leftOut(noName, lockedCount) || undefined;
   };
   const exportItems: ExportItem[] = [
-    { id: 'xlsx', label: t.export.excel, hint: t.export.excelHint, run: () => download(exportName('xlsx'), toXlsx([gridSheet(), longSheet()]), XLSX_TYPE) },
-    { id: 'csv', label: t.export.csvGrid, run: () => download(exportName('csv'), toCsv(gridSheet().rows, t.locale), CSV_TYPE) },
-    { id: 'csv-long', label: t.export.csvLong, run: () => download(exportName('csv', 'fls-rows'), toCsv(longSheet().rows, t.locale), CSV_TYPE) },
+    { id: 'xlsx', label: t.export.excel, hint: t.export.excelHint, run: async p => download(exportName('xlsx'), await toXlsx([await gridSheet(part(p, 0, 0.15)), await longSheet(part(p, 0.15, 0.3))], part(p, 0.3, 1)), XLSX_TYPE) },
+    { id: 'csv', label: t.export.csvGrid, run: async p => download(exportName('csv'), await toCsv((await gridSheet(part(p, 0, 0.4))).rows, t.locale, part(p, 0.4, 1)), CSV_TYPE) },
+    { id: 'csv-long', label: t.export.csvLong, run: async p => download(exportName('csv', 'fls-rows'), await toCsv((await longSheet(part(p, 0, 0.4))).rows, t.locale, part(p, 0.4, 1)), CSV_TYPE) },
     { id: 'metadata', label: t.export.metadata, hint: t.export.metadataHint, run: exportMetadata }
   ];
   const objectMatches = objectQuery.length < 2 ? [] : objects.filter(o =>

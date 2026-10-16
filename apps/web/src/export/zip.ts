@@ -1,4 +1,5 @@
 /** Minimal ZIP writer (stored, no compression): enough for xlsx files and metadata bundles built in the browser. */
+import { noProgress, type Progress } from './progress.ts';
 
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
@@ -10,24 +11,39 @@ const CRC_TABLE = (() => {
   return t;
 })();
 
+const crcUpdate = (c: number, data: Uint8Array, from: number, to: number) => {
+  for (let i = from; i < to; i++) c = CRC_TABLE[(c ^ data[i]!) & 0xff]! ^ (c >>> 8);
+  return c;
+};
+
 export function crc32(data: Uint8Array): number {
-  let c = 0xffffffff;
-  for (let i = 0; i < data.length; i++) c = CRC_TABLE[(c ^ data[i]!) & 0xff]! ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
+  return (crcUpdate(0xffffffff, data, 0, data.length) ^ 0xffffffff) >>> 0;
 }
+
+const CHUNK = 1 << 20;
 
 export interface ZipEntry { path: string; content: string | Uint8Array }
 
-export function zip(entries: ZipEntry[], date = new Date()): Uint8Array {
+/** Progress goes by bytes checksummed, the only step that takes time on big files. */
+export async function zip(entries: ZipEntry[], p: Progress = noProgress, date = new Date()): Promise<Uint8Array> {
   const enc = new TextEncoder();
+  const datas = entries.map(e => typeof e.content === 'string' ? enc.encode(e.content) : e.content);
+  const total = datas.reduce((n, d) => n + d.length, 0) || 1;
+  let done = 0;
   const dosTime = (date.getHours() << 11) | (date.getMinutes() << 5) | (date.getSeconds() >> 1);
   const dosDate = ((date.getFullYear() - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
   const locals: Uint8Array[] = [], centrals: Uint8Array[] = [];
   let offset = 0;
-  for (const e of entries) {
+  for (const [k, e] of entries.entries()) {
     const name = enc.encode(e.path);
-    const data = typeof e.content === 'string' ? enc.encode(e.content) : e.content;
-    const crc = crc32(data);
+    const data = datas[k]!;
+    let c = 0xffffffff;
+    for (let at = 0; at < data.length; at += CHUNK) {
+      c = crcUpdate(c, data, at, Math.min(data.length, at + CHUNK));
+      done += Math.min(CHUNK, data.length - at);
+      await p(done / total, 'compress');
+    }
+    const crc = (c ^ 0xffffffff) >>> 0;
     const local = new Uint8Array(30 + name.length + data.length);
     const lv = new DataView(local.buffer);
     lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true); lv.setUint16(6, 0x0800, true); lv.setUint16(8, 0, true);

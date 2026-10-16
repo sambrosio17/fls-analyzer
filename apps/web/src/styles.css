@@ -452,3 +452,19 @@ td.c button:disabled { pointer-events: none; }
   .h-pickpill { opacity: 1; }
   .h-drop { opacity: .35; }
 }
+.spinner { width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; opacity: .7; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.export-toast { position: fixed; right: 16px; bottom: 16px; z-index: 60; width: 320px; max-width: calc(100vw - 32px); padding: 12px 14px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; box-shadow: 0 12px 32px rgb(0 0 0 / .22); animation: toast-in .18s ease-out; }
+.export-toast.done { border-left-color: var(--ok, var(--accent)); }
+.export-toast.error { border-left-color: var(--danger); }
+.export-toast p { margin: 6px 0 0; }
+.export-toast-h { display: flex; align-items: flex-start; gap: 8px; }
+.export-toast-h strong { flex: 1; font-size: 13px; line-height: 1.35; }
+.export-toast-x { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; padding: 0 2px; cursor: pointer; }
+.export-bar { height: 6px; margin-top: 10px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.export-bar span { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .15s linear; }
+.export-toast-sub { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: var(--muted); }
+@keyframes bar-wait { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+.export-bar.wait span { width: 30%; animation: bar-wait 1.2s ease-in-out infinite; }
+@keyframes toast-in { from { transform: translateX(16px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .export-toast, .spinner, .export-bar.wait span { animation: none; } .export-bar span { transition: none; } }

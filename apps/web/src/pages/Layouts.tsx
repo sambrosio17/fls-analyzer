@@ -103,8 +103,8 @@ function Filters({ value, onChange, profiles, recordTypes, targets, targetLabel,
 /** Excel and CSV for a view: the CSV holds the first sheet. */
 function exportItems(t: ReturnType<typeof useT>, base: string, sheets: () => Sheet[]): ExportItem[] {
   return [
-    { id: 'xlsx', label: t.export.excel, run: () => download(`${base}.xlsx`, toXlsx(sheets()), XLSX_TYPE) },
-    { id: 'csv', label: t.export.csv, run: () => download(`${base}.csv`, toCsv(sheets()[0]!.rows, t.locale), CSV_TYPE) }
+    { id: 'xlsx', label: t.export.excel, run: async p => download(`${base}.xlsx`, await toXlsx(sheets(), p), XLSX_TYPE) },
+    { id: 'csv', label: t.export.csv, run: async p => download(`${base}.csv`, await toCsv(sheets()[0]!.rows, t.locale, p), CSV_TYPE) }
   ];
 }
 

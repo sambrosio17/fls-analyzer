@@ -9,6 +9,7 @@ import { LayoutsPage } from './pages/Layouts.tsx';
 import { Brand } from './Brand.tsx';
 import { TokenTabButton } from './TokenButton.tsx';
 import { LangPicker, useT } from './i18n.tsx';
+import { ExportProgress } from './export/ExportMenu.tsx';
 import {
   TOOLS, closeOrg, closeTab, groupTabs, loadWorkspace, newObjectTab, openChangeSet, openOrg, pruneOrgs, saveWorkspace,
   selectTab, selectTool, tabTitle, toolOf, updateTab, visibleTab, type WorkTab, type Workspace
@@ -200,6 +201,7 @@ export function App() {
           );
         })}
       </main>
+      <ExportProgress />
     </>
   );
 }

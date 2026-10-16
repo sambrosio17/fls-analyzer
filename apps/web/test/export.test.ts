@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { crc32, zip } from '../src/export/zip.ts';
 import { columnName, toCsv, toXlsx } from '../src/export/table.ts';
 import { fieldPermissionBundle } from '../src/export/metadata.ts';
+import { getExportState, runExport } from '../src/export/progress.ts';
 
 const unzipList = (data: Uint8Array) => {
   const dir = mkdtempSync(join(tmpdir(), 'zip-'));
@@ -18,17 +19,17 @@ describe('zip', () => {
   it('computes the standard CRC-32', () => {
     expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xcbf43926);
   });
-  it('writes an archive Python can read back', () => {
-    const { file } = unzipList(zip([{ path: 'a.txt', content: 'ciao' }, { path: 'dir/è.xml', content: '<x/>' }]));
+  it('writes an archive Python can read back', async () => {
+    const { file } = unzipList(await zip([{ path: 'a.txt', content: 'ciao' }, { path: 'dir/è.xml', content: '<x/>' }]));
     const out = execFileSync('python3', ['-c', 'import sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; print("|".join(n+"="+z.read(n).decode() for n in z.namelist()))', file]).toString().trim();
     expect(out).toBe('a.txt=ciao|dir/è.xml=<x/>');
   });
 });
 
 describe('csv', () => {
-  it('quotes when needed and uses ; where the decimal separator is a comma', () => {
-    expect(toCsv([['a', 'b,c'], ['say "hi"', 1]], 'en-US')).toBe('﻿a,"b,c"\r\n"say ""hi""",1\r\n');
-    expect(toCsv([['a', 'b;c']], 'it-IT')).toBe('﻿a;"b;c"\r\n');
+  it('quotes when needed and uses ; where the decimal separator is a comma', async () => {
+    expect(await toCsv([['a', 'b,c'], ['say "hi"', 1]], 'en-US')).toBe('﻿a,"b,c"\r\n"say ""hi""",1\r\n');
+    expect(await toCsv([['a', 'b;c']], 'it-IT')).toBe('﻿a;"b;c"\r\n');
   });
 });
 
@@ -36,11 +37,12 @@ describe('xlsx', () => {
   it('names columns like Excel', () => {
     expect([0, 25, 26, 51, 52, 701, 702].map(columnName)).toEqual(['A', 'Z', 'AA', 'AZ', 'BA', 'ZZ', 'AAA']);
   });
-  it('writes a workbook with escaped inline strings', () => {
-    const { file } = unzipList(toXlsx([{ name: 'FLS: Account', rows: [['Field', 'Read'], ['A & B <x>', true], ['n', 3]] }]));
-    const out = execFileSync('python3', ['-c', 'import sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); print(z.read("xl/workbook.xml").decode()); print(z.read("xl/worksheets/sheet1.xml").decode())', file]).toString();
+  it('writes a workbook with escaped shared strings', async () => {
+    const { file } = unzipList(await toXlsx([{ name: 'FLS: Account', rows: [['Field', 'Read'], ['A & B <x>', true], ['n', 3]] }]));
+    const out = execFileSync('python3', ['-c', 'import sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); print(z.read("xl/workbook.xml").decode()); print(z.read("xl/sharedStrings.xml").decode()); print(z.read("xl/worksheets/sheet1.xml").decode())', file]).toString();
     expect(out).toContain('name="FLS  Account"');
-    expect(out).toContain('A &amp; B &lt;x&gt;');
+    expect(out).toContain('<si><t xml:space="preserve">A &amp; B &lt;x&gt;</t></si>');
+    expect(out).toContain('<c r="A2" t="s"><v>2</v></c>');
     expect(out).toContain('<c r="B2" t="b"><v>1</v></c>');
     expect(out).toContain('<c r="B3"><v>3</v></c>');
   });
@@ -62,5 +64,31 @@ describe('metadata bundle', () => {
     expect(admin.indexOf('Account.Industry')).toBeLessThan(admin.indexOf('Account.Rating'));
     expect(admin).toContain('<editable>false</editable>\n        <field>Account.Industry</field>\n        <readable>false</readable>');
     expect(admin).toContain('<editable>true</editable>\n        <field>Account.Rating</field>\n        <readable>true</readable>');
+  });
+});
+
+describe('progress', () => {
+  it('reports rising progress up to 1 while writing a big workbook', async () => {
+    const seen: number[] = [];
+    const rows = Array.from({ length: 5000 }, (_, i) => [`field ${i}`, i % 2 === 0, i]);
+    await toXlsx([{ name: 'A', rows }, { name: 'B', rows }], async f => { seen.push(f); });
+    expect(seen.length).toBeGreaterThan(10);
+    expect(seen.every((f, i) => i === 0 || f >= seen[i - 1]!)).toBe(true);
+    expect(seen.at(-1)).toBe(1);
+  });
+  it('writes the same bytes with a progress callback as without', async () => {
+    const rows = [['a', 1], ['b', true]];
+    expect(await toCsv(rows, 'en-US', async () => {})).toBe(await toCsv(rows, 'en-US'));
+  });
+  it('runs one export at a time and keeps the note it returns', async () => {
+    let release!: () => void;
+    let second = false;
+    const first = runExport('A', () => new Promise<string>(r => { release = () => r('left out'); }));
+    await new Promise(r => setTimeout(r, 5));
+    await runExport('B', () => { second = true; });
+    expect(second).toBe(false);
+    release();
+    await first;
+    expect(getExportState()).toMatchObject({ label: 'A', status: 'done', message: 'left out' });
   });
 });

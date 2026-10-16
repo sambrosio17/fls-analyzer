@@ -69,8 +69,8 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
         <span className="spacer" />
         <div className="row">
           <ExportMenu note={t.export.rowsScope(shown.length)} items={[
-            { id: 'xlsx', label: t.export.excel, run: () => download(fileName('xlsx'), toXlsx([sheet()]), XLSX_TYPE) },
-            { id: 'csv', label: t.export.csv, run: () => download(fileName('csv'), toCsv(sheet().rows, t.locale), CSV_TYPE) }
+            { id: 'xlsx', label: t.export.excel, run: async p => download(fileName('xlsx'), await toXlsx([sheet()], p), XLSX_TYPE) },
+            { id: 'csv', label: t.export.csv, run: async p => download(fileName('csv'), await toCsv(sheet().rows, t.locale, p), CSV_TYPE) }
           ]} />
           <button className="btn" onClick={onBack}>{t.common.close}</button>
         </div>
