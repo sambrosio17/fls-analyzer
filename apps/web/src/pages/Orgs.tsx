@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { api, type Org } from '../api.ts';
 import { TokenRefresh } from '../TokenButton.tsx';
 import { useT } from '../i18n.tsx';
+import { AccentPicker } from '../AccentPicker.tsx';
+import { ACCENT_COLORS, accentOf } from '../accents.ts';
 
 interface Props {
   orgs: Org[];
@@ -51,7 +53,7 @@ export function Orgs({ orgs, error, selectedId, onOpen, onRemoved, onRenamed }: 
             {orgs.map(o => (
               <TokenRefresh org={o} key={o.id}>{(tokenButton, tokenMessage) => (
               <div className="org-card">
-                <span className="dot ok" />
+                <span className="dot" style={{ background: ACCENT_COLORS[accentOf(o.accent)].light }} />
                 <div>
                   {editing?.id === o.id ? (
                     <form className="row" onSubmit={rename}>
@@ -64,6 +66,8 @@ export function Orgs({ orgs, error, selectedId, onOpen, onRemoved, onRenamed }: 
                   )}
                   {editing?.id === o.id && renameError && <p className="err-text">{renameError}</p>}
                   <p>{o.alias && <>{o.name} · </>}<span className="mono">{o.username}</span>{o.lastSyncAt && t.orgs.readAt(new Date(o.lastSyncAt).toLocaleString(t.locale))}</p>
+                  <div className="org-accent"><span className="muted">{t.accent.color}</span>
+                    <AccentPicker id={`accent-${o.id}`} value={o.accent} onChange={a => api.setOrgAccent(o.id, a).then(onRenamed)} /></div>
                 </div>
                 <div className="row">
                   {tokenButton}

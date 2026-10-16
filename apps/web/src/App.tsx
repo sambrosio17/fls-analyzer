@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { api, type Org } from './api.ts';
 import { Login } from './pages/Login.tsx';
 import { Orgs } from './pages/Orgs.tsx';
@@ -10,6 +10,8 @@ import { Brand } from './Brand.tsx';
 import { TokenTabButton } from './TokenButton.tsx';
 import { LangPicker, useT } from './i18n.tsx';
 import { ExportProgress } from './export/ExportMenu.tsx';
+import { AccentPicker } from './AccentPicker.tsx';
+import { ACCENT_COLORS, accentCss, accentOf, type Accent } from './accents.ts';
 import {
   TOOLS, closeOrg, closeTab, groupTabs, loadWorkspace, newObjectTab, openChangeSet, openOrg, pruneOrgs, saveWorkspace,
   APEX_OBJECT, selectTab, selectTool, tabTitle, toolOf, updateTab, visibleTab, type WorkTab, type Workspace
@@ -17,6 +19,7 @@ import {
 
 type View = 'orgs' | 'history' | 'work';
 
+const ACCENT_STYLE = accentCss();
 const storage = (() => { try { return window.localStorage; } catch { return null; } })();
 
 export function App() {
@@ -31,6 +34,8 @@ export function App() {
   const [dirty, setDirty] = useState(() => new Set<string>());
   const [orgMenu, setOrgMenu] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
+  // Colour picker opened from an org tab's dot, placed under it.
+  const [accentMenu, setAccentMenu] = useState<{ orgId: string; x: number; y: number } | null>(null);
 
   const shown = view === 'work' ? visibleTab(ws) : null;
 
@@ -67,6 +72,23 @@ export function App() {
     });
   }, [session]);
 
+  // The open org's accent colours the whole work area; other views keep the brand colour.
+  useEffect(() => {
+    const org = view === 'work' ? orgs?.find(o => o.id === ws.activeOrg) : null;
+    const accent = accentOf(org?.accent);
+    if (org && accent !== 'ember') document.documentElement.dataset.accent = accent;
+    else delete document.documentElement.dataset.accent;
+  }, [view, ws.activeOrg, orgs]);
+  useEffect(() => {
+    if (!accentMenu) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !(e.target as Element).closest?.('.accent-pop')) setAccentMenu(null);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
+  }, [accentMenu]);
+
   if (session === null) return null;
   if (!session) return <Login onDone={() => setSession(true)} />;
   if (!orgs) return null;
@@ -91,6 +113,10 @@ export function App() {
 
   const activeOrg = view === 'work' ? orgById(ws.activeOrg) : null;
   const tool = activeOrg ? toolOf(ws, activeOrg.id) : null;
+  const setAccent = async (orgId: string, accent: Accent) => {
+    const updated = await api.setOrgAccent(orgId, accent);
+    setOrgs(list => list?.map(o => o.id === updated.id ? updated : o) ?? list);
+  };
   const group = activeOrg && tool ? groupTabs(ws, activeOrg.id, tool) : [];
   const closedOrgs = orgs.filter(o => !ws.orgs.includes(o.id));
 
@@ -116,6 +142,9 @@ export function App() {
             return (
               <div key={id} className={`orgtab${on ? ' on' : ''}${o.isSandbox ? '' : ' prod'}${changed ? ' dirty' : ''}`} title={`${o.name} · ${o.username}`}
                 onAuxClick={e => { if (e.button === 1) closeOrgTab(id); }}>
+                <button className="accent-dot" aria-label={t.accent.change} title={t.accent.change}
+                  style={{ '--sw': ACCENT_COLORS[accentOf(o.accent)].dark } as CSSProperties}
+                  onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setAccentMenu(accentMenu?.orgId === id ? null : { orgId: id, x: r.left, y: r.bottom + 6 }); }} />
                 <button role="tab" aria-selected={on} className="orgtab-label" onClick={() => go(openOrg(ws, id))}>
                   <b>{o.label}</b><span className={`env ${o.isSandbox ? 'sandbox' : 'prod'}`}>{o.isSandbox ? t.common.sandbox : t.common.production}</span>
                 </button>
@@ -151,7 +180,7 @@ export function App() {
               );
             })}
           </div>
-          <div className="wrap objtabs" role="tablist" aria-label={tool === 'changeset' ? t.app.openChangeSets : t.app.openObjects}>
+          {tool !== 'apex' && <div className="wrap objtabs" role="tablist" aria-label={tool === 'changeset' ? t.app.openChangeSets : t.app.openObjects}>
             {group.map(tab => {
               const on = tab.id === shown?.id;
               const title = tabTitle(tab, t.app);
@@ -166,7 +195,13 @@ export function App() {
             {tool !== 'changeset' && (
               <button className="tab-add" aria-label={t.app.newObject} title={t.app.newObject} onClick={() => go(newObjectTab(ws, activeOrg.id, tool))}>+</button>
             )}
-          </div>
+          </div>}
+        </div>
+      )}
+      {accentMenu && (
+        <div className="accent-pop" style={{ left: accentMenu.x, top: accentMenu.y }}>
+          <span className="accent-pop-h">{t.accent.label}</span>
+          <AccentPicker value={orgById(accentMenu.orgId)?.accent ?? null} onChange={a => { void setAccent(accentMenu.orgId, a); setAccentMenu(null); }} />
         </div>
       )}
 
@@ -202,6 +237,7 @@ export function App() {
         })}
       </main>
       <ExportProgress />
+      <style>{ACCENT_STYLE}</style>
     </>
   );
 }

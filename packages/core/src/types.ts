@@ -114,3 +114,7 @@ export function objectOf(field: string): string {
   const dot = field.indexOf('.');
   return dot === -1 ? field : field.slice(0, dot);
 }
+
+/** Accent colours an org can take in the app (the first is the brand default). Colours live in the web app. */
+export const ACCENTS = ['ember', 'amber', 'olive', 'emerald', 'cyan', 'blue', 'indigo', 'magenta', 'sand', 'slate'] as const;
+export type Accent = typeof ACCENTS[number];

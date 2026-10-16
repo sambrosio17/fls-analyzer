@@ -509,3 +509,17 @@ td.c button:disabled { pointer-events: none; }
 .export-bar.wait span { width: 30%; animation: bar-wait 1.2s ease-in-out infinite; }
 @keyframes toast-in { from { transform: translateX(16px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .export-toast, .spinner, .export-bar.wait span { animation: none; } .export-bar span { transition: none; } }
+/* Org accent colours: swatches, the dot on each org tab and its picker. */
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.swatch { width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 2px solid var(--surface); background: var(--sw-l); box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+.swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--ink); }
+.swatch:hover { transform: scale(1.12); }
+@media (prefers-color-scheme: dark) { .swatch { background: var(--sw-d); } }
+.org-accent { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 12px; }
+.org-accent .swatches { flex-wrap: nowrap; gap: 5px; }
+.org-accent .swatch { width: 18px; height: 18px; }
+.accent-dot { flex: none; width: 10px; height: 10px; margin-left: 10px; padding: 0; border: 0; border-radius: 50%; background: var(--sw); cursor: pointer; box-shadow: 0 0 0 2px transparent; }
+.accent-dot:hover { box-shadow: 0 0 0 2px var(--bar-muted); }
+.orgtab .orgtab-label { padding-left: 8px; }
+.accent-pop { position: fixed; z-index: 50; display: grid; gap: 8px; width: 152px; padding: 10px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgb(0 0 0 / .25); }
+.accent-pop-h { font-size: 12px; color: var(--muted); }

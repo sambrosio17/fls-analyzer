@@ -3,7 +3,7 @@ export type BulkAction = 'read' | 'edit' | 'removeEdit' | 'none';
 export type Status = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'running' | 'done' | 'partial' | 'failed';
 
 /** `label` is the alias chosen by the user, or the Salesforce org name when there is none. */
-export interface Org { id: string; label: string; alias: string | null; name: string; username: string; instanceUrl: string; isSandbox: boolean; lastSyncAt: string | null }
+export interface Org { id: string; label: string; alias: string | null; name: string; username: string; instanceUrl: string; isSandbox: boolean; lastSyncAt: string | null; accent: string | null }
 export interface SObject { name: string; label: string; custom: boolean }
 export interface FieldMeta { object: string; name: string; label: string; type: string; permissionable: boolean; calculated: boolean; custom: boolean; encrypted: boolean; hiddenFromUser?: boolean }
 export interface PermSet { id: string; name: string; label: string; isProfile: boolean; namespace: string | null; license: string | null; type: string | null }
@@ -69,6 +69,7 @@ export const api = {
   orgs: () => call<Org[]>('GET', '/api/orgs'),
   removeOrg: (id: string) => call('DELETE', `/api/orgs/${id}`),
   renameOrg: (id: string, alias: string) => call<Org>('PATCH', `/api/orgs/${id}`, { alias }),
+  setOrgAccent: (id: string, accent: string) => call<Org>('PATCH', `/api/orgs/${id}`, { accent }),
   /** Gets a new access token; fails with status 409 when the org must be logged in again. */
   refreshToken: (id: string) => call<{ refreshedAt: string }>('POST', `/api/orgs/${id}/token`),
   /** Profile metadata names by profile-owned permission set id. */

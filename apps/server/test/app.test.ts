@@ -183,6 +183,15 @@ describe('API', () => {
     expect((await call('POST', `/api/change-sets/${cs.id}/execute`, { confirmName: 'Acme PROD' })).status).toBe(200);
     expect((await waitDone(cs.id)).status).toBe('done');
   });
+
+  it('keeps an accent color per org, from the palette only', async () => {
+    current = await setup(true);
+    const { call } = current;
+    expect((await call('PATCH', '/api/orgs/org1', { accent: 'cyan' })).body).toMatchObject({ accent: 'cyan' });
+    expect((await call('PATCH', '/api/orgs/org1', { alias: 'UAT' })).body).toMatchObject({ accent: 'cyan', alias: 'UAT' });
+    expect((await call('PATCH', '/api/orgs/org1', { accent: 'red' })).status).toBe(400);
+    expect((await call('PATCH', '/api/orgs/org1', { accent: null })).body).toMatchObject({ accent: null });
+  });
 });
 
 describe('access token refresh', () => {
