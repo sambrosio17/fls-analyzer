@@ -13,10 +13,11 @@ import { ExportProgress } from './export/ExportMenu.tsx';
 import { LoadNotices } from './LoadNotices.tsx';
 import { TabContext, forgetTab, setVisibleTab } from './loads.ts';
 import { AccentPicker } from './AccentPicker.tsx';
+import { useTabDrag } from './tabDrag.ts';
 import { ACCENT_COLORS, accentCss, accentOf, type Accent } from './accents.ts';
 import {
   TOOLS, closeOrg, closeTab, groupTabs, loadWorkspace, newObjectTab, openChangeSet, openOrg, pruneOrgs, saveWorkspace,
-  APEX_OBJECT, selectTab, selectTool, tabTitle, toolOf, updateTab, visibleTab, type WorkTab, type Workspace
+  APEX_OBJECT, moveOrg, moveTab, selectTab, selectTool, tabTitle, toolOf, updateTab, visibleTab, type WorkTab, type Workspace
 } from './workspace.ts';
 
 type View = 'orgs' | 'history' | 'work';
@@ -92,6 +93,10 @@ export function App() {
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
   }, [accentMenu]);
 
+  const orgDrag = useTabDrag(ws.orgs, (id, before) => setWs(w => moveOrg(w, id, before)));
+  const groupIds = ws.activeOrg ? groupTabs(ws, ws.activeOrg, toolOf(ws, ws.activeOrg)).map(x => x.id) : [];
+  const tabDrag = useTabDrag(groupIds, (id, before) => setWs(w => moveTab(w, id, before)));
+
   if (session === null) return null;
   if (!session) return <Login onDone={() => setSession(true)} />;
   if (!orgs) return null;
@@ -144,7 +149,7 @@ export function App() {
             const on = view === 'work' && ws.activeOrg === id;
             const changed = ws.tabs.some(x => x.orgId === id && dirty.has(x.id));
             return (
-              <div key={id} className={`orgtab${on ? ' on' : ''}${o.isSandbox ? '' : ' prod'}${changed ? ' dirty' : ''}`} title={`${o.name} · ${o.username}`}
+              <div key={id} className={`orgtab${on ? ' on' : ''}${o.isSandbox ? '' : ' prod'}${changed ? ' dirty' : ''}`} title={`${o.name} · ${o.username}`} {...orgDrag(id)}
                 style={{ '--org-l': ACCENT_COLORS[accentOf(o.accent)].light, '--org-d': ACCENT_COLORS[accentOf(o.accent)].dark } as CSSProperties}
                 onAuxClick={e => { if (e.button === 1) closeOrgTab(id); }}>
                 <button className="accent-dot" aria-label={t.accent.change} title={t.accent.change}
@@ -190,7 +195,7 @@ export function App() {
               const on = tab.id === shown?.id;
               const title = tabTitle(tab, t.app);
               return (
-                <div key={tab.id} className={`objtab${on ? ' on' : ''}${dirty.has(tab.id) ? ' dirty' : ''}${tab.objects.length || tab.tool === 'changeset' ? '' : ' empty'}`} title={title}
+                <div key={tab.id} className={`objtab${on ? ' on' : ''}${dirty.has(tab.id) ? ' dirty' : ''}${tab.objects.length || tab.tool === 'changeset' ? '' : ' empty'}`} title={title} {...tabDrag(tab.id)}
                   onAuxClick={e => { if (e.button === 1) closeObject(tab); }}>
                   <button role="tab" aria-selected={on} className="objtab-label" onClick={() => go(selectTab(ws, tab.id))}>{title}</button>
                   <button className="tab-x" aria-label={t.app.closeX(title)} onClick={() => closeObject(tab)}>×</button>
