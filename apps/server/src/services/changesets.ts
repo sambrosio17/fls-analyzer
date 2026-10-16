@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import {
+  assignmentConflicts, assignmentKey, normalizeAssignments, reverseAssignments, type AssignmentChange,
   buildRequests, expandBulk, findConflicts, isApex, objectOf, parseResults, planChanges, rollbackDesired, transition,
   type BulkAction, type ChangeSetEvent, type ChangeSetStatus, type Desired, type SaveResult
 } from '@fls/core';
 import type { SfApi } from '../salesforce/client.ts';
 import { loadApexClasses, loadFields, loadPermissionSets, loadSnapshot } from '../salesforce/metadata.ts';
-import { itemFromRow, now, type ChangeSetRow, type Db, type OrgRow } from '../db.ts';
+import { loadCurrentAssignments, writeAssignments } from './assignments.ts';
+import { assignmentFromRow, itemFromRow, now, type ChangeSetRow, type Db, type OrgRow } from '../db.ts';
 
 export interface ServiceDeps {
   db: Db;
@@ -65,6 +67,21 @@ export class ChangeSetService {
     return cs;
   }
 
+  /**
+   * Saves page layout and Lightning page assignment changes as a draft. The "before" values come
+   * from the org, not from the request, so the preview shows what will really change.
+   */
+  async createAssignments(orgId: string, input: { description?: string; changes: AssignmentChange[] }, rollbackOf: string | null = null): Promise<ChangeSetRow> {
+    const org = this.org(orgId);
+    const current = await loadCurrentAssignments(this.d.apiFor(org), input.changes);
+    const changes = normalizeAssignments(input.changes.map(c => ({ ...c, before: current(c) })));
+    if (!changes.length) throw Object.assign(new Error('Nothing to change: the org already has these assignments.'), { statusCode: 400 });
+    const cs = this.d.db.createChangeSet(
+      { id: randomUUID(), tenant: this.d.tenant, orgId, author: this.d.actor, description: input.description ?? '', rollbackOf, skipped: [] }, [], changes);
+    this.d.db.audit({ tenant: this.d.tenant, orgId, changeSetId: cs.id, actor: this.d.actor, action: 'change_set.created', detail: `${changes.length} assignments` });
+    return cs;
+  }
+
   private move(cs: ChangeSetRow, event: ChangeSetEvent, outcome?: 'done' | 'partial' | 'failed'): ChangeSetStatus {
     const org = this.org(cs.org_id);
     return transition(cs.status, event, {
@@ -98,6 +115,10 @@ export class ChangeSetService {
   }
 
   private async countConflicts(cs: ChangeSetRow): Promise<number> {
+    if (cs.kind === 'assignments') {
+      const changes = this.d.db.listAssignments(cs.id).map(assignmentFromRow);
+      return assignmentConflicts(changes, await loadCurrentAssignments(this.d.apiFor(this.org(cs.org_id)), changes)).length;
+    }
     const items = this.d.db.listItems(cs.id).map(itemFromRow);
     if (!items.length) return 0;
     const api = this.d.apiFor(this.org(cs.org_id));
@@ -119,6 +140,7 @@ export class ChangeSetService {
 
   private async execute(id: string): Promise<void> {
     const cs = this.changeSet(id);
+    if (cs.kind === 'assignments') return this.executeAssignments(cs);
     const org = this.org(cs.org_id);
     const api = this.d.apiFor(org);
     const rows = this.d.db.listItems(id);
@@ -185,9 +207,45 @@ export class ChangeSetService {
     this.d.db.audit({ tenant: this.d.tenant, orgId: org.id, changeSetId: id, actor: this.d.actor, action: 'change_set.finished', detail: `${outcome}: ${verified}/${rows.length}` });
   }
 
+  /** Assignments: skip the ones changed in the org since the preview, write the rest, read back to verify. */
+  private async executeAssignments(cs: ChangeSetRow): Promise<void> {
+    const org = this.org(cs.org_id);
+    const api = this.d.apiFor(org);
+    const rows = this.d.db.listAssignments(cs.id).map(r => ({ row: r, change: assignmentFromRow(r) }));
+    const rowIdOf = new Map(rows.map(x => [assignmentKey(x.change), x.row.id]));
+
+    const conflicts = new Set(assignmentConflicts(rows.map(x => x.change), await loadCurrentAssignments(api, rows.map(x => x.change))));
+    for (const c of conflicts) this.d.db.updateAssignment(rowIdOf.get(assignmentKey(c))!, { status: 'conflict', error_code: 'CONFLICT', error_message: 'Changed in the org after the preview.' });
+    const runnable = rows.map(x => x.change).filter(c => !conflicts.has(c));
+
+    const written = await writeAssignments(api, runnable);
+    for (const w of written.filter(w => !w.ok)) this.d.db.updateAssignment(rowIdOf.get(assignmentKey(w.change))!, { status: 'error', error_code: w.errorCode, error_message: w.errorMessage });
+
+    let verified = 0;
+    const ok = written.filter(w => w.ok).map(w => w.change);
+    if (ok.length) {
+      const after = await loadCurrentAssignments(api, ok);
+      for (const c of ok) {
+        const rowId = rowIdOf.get(assignmentKey(c))!;
+        if (after(c) === c.after) { verified++; this.d.db.updateAssignment(rowId, { status: 'ok' }); }
+        else this.d.db.updateAssignment(rowId, { status: 'error', error_code: 'VERIFY_MISMATCH', error_message: 'The org does not show the requested assignment after the update.' });
+      }
+    }
+
+    const outcome = verified === rows.length ? 'done' : verified > 0 ? 'partial' : 'failed';
+    this.d.db.updateChangeSet(cs.id, { status: this.move(this.changeSet(cs.id), 'finish', outcome), finished_at: now() });
+    this.d.db.touchOrg(org.id);
+    this.d.db.audit({ tenant: this.d.tenant, orgId: org.id, changeSetId: cs.id, actor: this.d.actor, action: 'change_set.finished', detail: `${outcome}: ${verified}/${rows.length}` });
+  }
+
   /** New draft that restores the rows this change set changed successfully. */
   async rollback(id: string): Promise<ChangeSetRow> {
     const cs = this.changeSet(id);
+    if (cs.kind === 'assignments') {
+      const done = this.d.db.listAssignments(id).filter(r => r.status === 'ok').map(assignmentFromRow);
+      if (!done.length) throw new Error('Nothing to roll back: no row of this change set was applied.');
+      return this.createAssignments(cs.org_id, { description: `Annulla CS-${String(cs.seq).padStart(4, '0')}`, changes: reverseAssignments(done) }, id);
+    }
     const ok = this.d.db.listItems(id).filter(r => r.status === 'ok').map(itemFromRow);
     if (!ok.length) throw new Error('Nothing to roll back: no row of this change set was applied.');
     return this.create(cs.org_id, { description: `Annulla CS-${String(cs.seq).padStart(4, '0')}`, changes: rollbackDesired(ok) }, id);

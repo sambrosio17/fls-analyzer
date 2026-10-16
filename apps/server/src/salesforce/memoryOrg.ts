@@ -1,5 +1,5 @@
 import type { SaveResult } from '@fls/core';
-import type { MetadataRecord, SfApi } from './client.ts';
+import type { MetadataRecord, MetadataSaveResult, SfApi } from './client.ts';
 
 export interface MemPermSet {
   Id: string; Name: string; Label: string; Type: string; IsOwnedByProfile: boolean; NamespacePrefix: string | null;
@@ -37,6 +37,8 @@ export interface MemoryOrgData {
 }
 export interface MemApexClass { Id: string; Name: string; NamespacePrefix: string | null }
 export interface MemEntityAccess { Id: string; ParentId: string; SetupEntityId: string }
+
+const layoutKey = (l: { Name: string; NamespacePrefix: string | null }) => l.NamespacePrefix ? `${l.NamespacePrefix}__${l.Name}` : l.Name;
 
 const whereEq = (soql: string, column: string) => soql.match(new RegExp(`${column} = '([^']*)'`))?.[1];
 
@@ -130,6 +132,8 @@ export class MemoryOrg implements SfApi {
     const pages = this.data.pages;
     if (type === 'Profile') return Object.entries(pages?.profileFullNames ?? {}).map(([id, fullName]) => ({ id, fullName }));
     if (type === 'CustomApplication') return (pages?.apps ?? []).map((a, i) => ({ fullName: a.fullName, id: `02u${String(i).padStart(12, '0')}` }));
+    // Like a real org, full names encode some characters of the layout name.
+    if (type === 'Layout') return (pages?.layouts ?? []).map(l => ({ id: l.Id, fullName: `${l.TableEnumOrId}-${layoutKey(l).replace(/\(/g, '%28').replace(/\)/g, '%29')}` }));
     throw new Error(`Unexpected listMetadata: ${type}`);
   }
 
@@ -144,6 +148,49 @@ export class MemoryOrg implements SfApi {
     const source = type === 'CustomApplication' ? this.data.pages?.apps : type === 'CustomObject' ? this.data.pages?.objects : undefined;
     if (!source) throw new Error(`Unexpected readMetadata: ${type}`);
     return structuredClone(source.filter(r => fullNames.includes(r.fullName)));
+  }
+
+  /** Profiles (layout assignments only) and Lightning apps; other elements of a profile are ignored. */
+  async updateMetadata(type: string, records: MetadataRecord[]): Promise<MetadataSaveResult[]> {
+    const pages = this.data.pages;
+    if (!pages) throw new Error('No pages in this org');
+    const fail = (fullName: string, statusCode: string, message: string): MetadataSaveResult => ({ fullName, success: false, errors: [{ statusCode, message }] });
+    if (type === 'Profile') {
+      return records.map(r => {
+        const profileId = Object.entries(pages.profileFullNames).find(([, n]) => n === r.fullName)?.[0];
+        if (!profileId) return fail(r.fullName, 'INVALID_CROSS_REFERENCE_KEY', `No profile named ${r.fullName}`);
+        const list = ([] as { layout: string; recordType?: string }[]).concat((r.layoutAssignments ?? []) as never);
+        const resolved = [];
+        for (const a of list) {
+          const name = decodeURIComponent(a.layout);
+          const layout = pages.layouts.find(l => `${l.TableEnumOrId}-${layoutKey(l)}` === name);
+          if (!layout) return fail(r.fullName, 'INVALID_CROSS_REFERENCE_KEY', `In field: layout - no Layout named ${a.layout} found`);
+          const rt = a.recordType ? pages.recordTypes.find(t => `${t.SobjectType}.${t.DeveloperName}` === a.recordType) : null;
+          if (rt === undefined) return fail(r.fullName, 'INVALID_CROSS_REFERENCE_KEY', `In field: recordType - no RecordType named ${a.recordType} found`);
+          resolved.push({ layout, recordTypeId: rt?.Id ?? null });
+        }
+        for (const { layout, recordTypeId } of resolved) {
+          const at = pages.profileLayouts.find(x => x.ProfileId === profileId && x.TableEnumOrId === layout.TableEnumOrId && x.RecordTypeId === recordTypeId);
+          if (at) at.LayoutId = layout.Id;
+          else pages.profileLayouts.push({ ProfileId: profileId, LayoutId: layout.Id, RecordTypeId: recordTypeId, TableEnumOrId: layout.TableEnumOrId });
+        }
+        return { fullName: r.fullName, success: true, errors: [] };
+      });
+    }
+    if (type === 'CustomApplication') {
+      return records.map(r => {
+        const i = pages.apps.findIndex(a => a.fullName === r.fullName);
+        if (i < 0) return fail(r.fullName, 'INVALID_CROSS_REFERENCE_KEY', `No app named ${r.fullName}`);
+        const overrides = ([] as { content?: string; profile?: string }[]).concat((r.profileActionOverrides ?? []) as never);
+        const unknownPage = overrides.find(o => !pages.flexiPages.some(p => p.DeveloperName === o.content));
+        if (unknownPage) return fail(r.fullName, 'FIELD_INTEGRITY_EXCEPTION', `Lightning page ${unknownPage.content} not found`);
+        const unknownProfile = overrides.find(o => !Object.values(pages.profileFullNames).includes(o.profile ?? ''));
+        if (unknownProfile) return fail(r.fullName, 'FIELD_INTEGRITY_EXCEPTION', `Profile ${unknownProfile.profile} not found`);
+        pages.apps[i] = structuredClone(r);
+        return { fullName: r.fullName, success: true, errors: [] };
+      });
+    }
+    throw new Error(`Unexpected updateMetadata: ${type}`);
   }
 
   async request<T>(method: string, path: string, body?: unknown): Promise<T> {

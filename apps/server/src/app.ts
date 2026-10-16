@@ -35,6 +35,15 @@ const createSchema = z.object({
   bulk: z.array(z.object({ fields: z.array(z.string()).min(1), parentIds: z.array(z.string()).min(1), action: z.enum(['read', 'edit', 'removeEdit', 'none']) })).max(50).optional()
 });
 
+const name = z.string().min(1).max(255);
+const assignmentSchema = z.object({
+  description: z.string().max(500).optional(),
+  changes: z.array(z.object({
+    kind: z.enum(['layout', 'page']), object: z.string().regex(/^[A-Za-z0-9_]+$/), profile: name, profileLabel: name,
+    recordType: name.nullable(), app: name.nullable(), before: name.nullable().default(null), after: name.nullable()
+  }).refine(c => (c.kind === 'page') === !!c.app, 'Page assignments need an app, layout assignments none.')).min(1).max(5000)
+});
+
 const aliasSchema = z.string().trim().min(1).max(40);
 
 export function orgDto(o: OrgRow) {
@@ -231,7 +240,11 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
       id: cs.id, number: `CS-${String(cs.seq).padStart(4, '0')}`, org: orgDto(org), author: cs.author, description: cs.description,
       status: cs.status, rollbackOf: cs.rollback_of, createdAt: cs.created_at, submittedAt: cs.submitted_at,
       approvedBy: cs.approved_by, approvedAt: cs.approved_at, startedAt: cs.started_at, finishedAt: cs.finished_at,
-      requiresApproval: !org.is_sandbox, skipped: JSON.parse(cs.skipped_json),
+      requiresApproval: !org.is_sandbox, skipped: JSON.parse(cs.skipped_json), kind: cs.kind,
+      assignments: db.listAssignments(cs.id).map(r => ({
+        id: r.id, kind: r.kind, object: r.object, profile: r.profile, profileLabel: r.profile_label, recordType: r.record_type, app: r.app,
+        before: r.before_value, after: r.after_value, status: r.status, errorCode: r.error_code, errorMessage: r.error_message
+      })),
       items: db.listItems(cs.id).map(r => ({
         id: r.id, parentId: r.parent_id, parentLabel: r.parent_label, field: r.field, sobjectType: r.sobject_type,
         before: r.before_access, after: r.after_access, op: r.op, warnings: r.warnings ? r.warnings.split(',') : [],
@@ -244,11 +257,15 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
     const { orgId } = z.object({ orgId: z.string().optional() }).parse(req.query);
     return db.listChangeSets(tenant, orgId).map(cs => ({
       id: cs.id, number: `CS-${String(cs.seq).padStart(4, '0')}`, orgId: cs.org_id, author: cs.author, description: cs.description,
-      status: cs.status, createdAt: cs.created_at, finishedAt: cs.finished_at, total: cs.total, ok: cs.ok ?? 0, errors: cs.errors ?? 0
+      status: cs.status, kind: cs.kind, createdAt: cs.created_at, finishedAt: cs.finished_at, total: cs.total, ok: cs.ok ?? 0, errors: cs.errors ?? 0
     }));
   });
   app.post('/api/orgs/:id/change-sets', { bodyLimit: 32 * 1024 * 1024 }, async req => {
     const cs = await service.create((req.params as { id: string }).id, createSchema.parse(req.body));
+    return csDto(cs.id);
+  });
+  app.post('/api/orgs/:id/assignment-change-sets', async req => {
+    const cs = await service.createAssignments((req.params as { id: string }).id, assignmentSchema.parse(req.body));
     return csDto(cs.id);
   });
   app.get('/api/change-sets/:id', async req => csDto((req.params as { id: string }).id));

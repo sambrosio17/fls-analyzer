@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
 import { useLang } from '../i18n.tsx';
 import { CHANGELOG, type ChangeDemo } from '../changelog.ts';
-import { ApexDemo, LoadDemo, OrgDemo, TabsDemo } from './Guide.tsx';
+import { ApexDemo, LayoutEditDemo, LoadDemo, OrgDemo, TabsDemo } from './Guide.tsx';
 import { ExportDemo, FlowDemo, MATRIX_SECTIONS } from './MatrixHelp.tsx';
 
 const matrixDemo = (key: string) => MATRIX_SECTIONS.find(s => s.key === key)!.demo;
 const DEMOS: Record<ChangeDemo, () => ReactNode> = {
-  orgs: () => <OrgDemo />, tabs: () => <TabsDemo />, load: () => <LoadDemo />, apex: () => <ApexDemo />,
+  orgs: () => <OrgDemo />, layouts: () => <LayoutEditDemo />, tabs: () => <TabsDemo />, load: () => <LoadDemo />, apex: () => <ApexDemo />,
   drag: () => matrixDemo('drag'), filter: () => matrixDemo('filter'), export: () => <ExportDemo />, flow: () => <FlowDemo />
 };
 

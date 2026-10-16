@@ -287,7 +287,7 @@ function TabBody({ tab, org, onPatch, onClose, onChangeSet, onDirty }: {
       return <MatrixPage mode="apex" org={org} onChangeSet={onChangeSet} initialObjects={[APEX_OBJECT]} onDirtyChange={onDirty} />;
     case 'layouts':
       return <LayoutsPage org={org} initialObject={tab.objects[0] ?? null} initialTab={tab.layoutMode}
-        onChange={(object, layoutMode) => onPatch({ objects: object ? [object] : [], layoutMode })} />;
+        onChange={(object, layoutMode) => onPatch({ objects: object ? [object] : [], layoutMode })} onChangeSet={onChangeSet} onDirty={onDirty} />;
     case 'changeset':
       return tab.changeSetId ? <ChangeSetPage key={tab.changeSetId} id={tab.changeSetId} onOpen={onChangeSet} onBack={onClose} /> : null;
   }

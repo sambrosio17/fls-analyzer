@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { beginLoad, useTabId } from '../loads.ts';
-import { api, type ChangeSet, type Status } from '../api.ts';
+import { api, type AssignmentItem, type ChangeSet, type Status } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { ExportMenu } from '../export/ExportMenu.tsx';
 import { CSV_TYPE, XLSX_TYPE, download, slug, toCsv, toXlsx, type Sheet } from '../export/table.ts';
@@ -52,8 +52,12 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
   };
 
   const items = cs.items;
+  const assign = cs.kind === 'assignments';
+  /** Rows of either kind: field and Apex access, or layout and page assignments. */
+  const rows: { status: string }[] = assign ? cs.assignments : items;
+  const total = rows.length;
   const count = (op: string) => items.filter(i => i.op === op).length;
-  const failed = items.filter(i => i.status === 'error' || i.status === 'conflict');
+  const failed = rows.filter(i => i.status === 'error' || i.status === 'conflict');
   const shown = items.filter(i =>
     opFilter === 'all' ? true : opFilter === 'warn' ? i.warnings.length > 0 : opFilter === 'failed' ? i.status === 'error' || i.status === 'conflict' : i.op === opFilter);
   const skippedByReason = cs.skipped.reduce<Record<string, number>>((acc, s) => ({ ...acc, [s.reason]: (acc[s.reason] ?? 0) + 1 }), {});
@@ -64,7 +68,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
   const isApex = (i: { sobjectType: string }) => i.sobjectType === 'ApexClass';
   const acc = (i: { sobjectType: string }) => isApex(i) ? t.apex.access : t.access;
   const name = (i: { field: string; sobjectType: string }) => isApex(i) ? i.field.slice('ApexClass.'.length) : i.field;
-  const sheet = (): Sheet => ({
+  const sheet = (): Sheet => assign ? assignmentSheet(t, cs.assignments) : ({
     name: t.export.sheetChanges,
     rows: [
       [...t.changeSet.cols, t.export.warnings, t.export.error],
@@ -104,10 +108,10 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
         </div>
         <span className="spacer" />
         <div className="row">
-          <ExportMenu note={t.export.rowsScope(shown.length)} items={[
+          <ExportMenu note={t.export.rowsScope(assign ? total : shown.length)} items={[
             { id: 'xlsx', label: t.export.excel, run: async p => download(fileName('xlsx'), await toXlsx([sheet()], p), XLSX_TYPE) },
             { id: 'csv', label: t.export.csv, run: async p => download(fileName('csv'), await toCsv(sheet().rows, t.locale, p), CSV_TYPE) },
-            { id: 'metadata', label: t.export.metadata, hint: t.export.metadataChangeSetHint, run: exportMetadata }
+            ...(assign ? [] : [{ id: 'metadata', label: t.export.metadata, hint: t.export.metadataChangeSetHint, run: exportMetadata }])
           ]} />
           <button className="btn" onClick={onBack}>{t.common.close}</button>
         </div>
@@ -115,6 +119,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
       {error && <div className="banner prod">{error}</div>}
       {notice && <div className="banner info">{notice}</div>}
 
+      {assign ? <AssignmentView items={cs.assignments} finished={finished} /> : <>
       <div className="kpis">
         <div className="kpi"><div className="k">{t.changeSet.kpiChanges}</div><div className="n">{items.length}</div></div>
         <div className="kpi good"><div className="k">{t.changeSet.kpiNew}</div><div className="n">{count('insert')}</div></div>
@@ -125,8 +130,10 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
           : <div className="kpi warn"><div className="k">{t.changeSet.kpiWarnings}</div><div className="n">{items.filter(i => i.warnings.length).length}</div></div>}
       </div>
 
-      <div className="prev-grid">
-        <section className="panel" style={{ minWidth: 0 }}>
+      </>}
+
+      <div className={`prev-grid${assign ? ' solo' : ''}`}>
+        {!assign && <section className="panel" style={{ minWidth: 0 }}>
           <div className="panel-h"><h2>{t.changeSet.detail}</h2>
             <div className="row">
               {(['all', 'insert', 'update', 'delete', 'warn', ...(finished ? ['failed'] : [])] as (typeof opFilter)[]).map(f => [f, t.changeSet.filters[f]] as const).map(([f, l]) => (
@@ -158,7 +165,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
               </tbody>
             </table>
           </div>
-        </section>
+        </section>}
 
         <aside className="stack">
           {Object.keys(skippedByReason).length > 0 && (
@@ -170,8 +177,8 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
           <section className="panel">
             <div className="panel-h"><h2>{prod ? t.changeSet.approval : t.changeSet.confirmation}</h2>{prod && <span className="env prod">{t.changeSet.twoStep}</span>}</div>
             <div className="panel-b stack">
-              {cs.status === 'draft' && items.length === 0 && <p className="muted">{t.changeSet.nothing}</p>}
-              {cs.status === 'draft' && items.length > 0 && prod && (
+              {cs.status === 'draft' && total === 0 && <p className="muted">{t.changeSet.nothing}</p>}
+              {cs.status === 'draft' && total > 0 && prod && (
                 <>
                   <p className="muted">{t.changeSet.prodNeedsApproval}</p>
                   <button className="btn primary" disabled={busy} onClick={() => act(() => api.submit(cs.id))}>{t.changeSet.submit}</button>
@@ -189,23 +196,23 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
                   </div>
                 </>
               )}
-              {((cs.status === 'draft' && !prod && items.length > 0) || cs.status === 'approved') && (
+              {((cs.status === 'draft' && !prod && total > 0) || cs.status === 'approved') && (
                 <>
                   {prod && (
                     <label className="field"><span>{t.changeSet.typeToConfirm(cs.org.label)}</span>
                       <input className="input" id="confirm-name" value={confirmName} onChange={e => setConfirmName(e.target.value)} />
                     </label>
                   )}
-                  <label className="check"><input type="checkbox" id="reviewed" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />{t.changeSet.reviewed(items.length)}</label>
-                  <button className="btn primary" disabled={!canRun || busy} onClick={() => act(() => api.execute(cs.id, prod ? confirmName : undefined))}>{t.changeSet.apply(items.length)}</button>
+                  <label className="check"><input type="checkbox" id="reviewed" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />{t.changeSet.reviewed(total)}</label>
+                  <button className="btn primary" disabled={!canRun || busy} onClick={() => act(() => api.execute(cs.id, prod ? confirmName : undefined))}>{t.changeSet.apply(total)}</button>
                 </>
               )}
               {cs.status === 'running' && <p>{t.changeSet.running}</p>}
               {cs.status === 'rejected' && <p className="muted">{t.changeSet.rejected}</p>}
               {finished && (
                 <>
-                  <p>{cs.status === 'done' ? t.changeSet.allDone : t.changeSet.partial(items.length - failed.length, failed.length)}</p>
-                  {items.some(i => i.status === 'ok') && (
+                  <p>{cs.status === 'done' ? t.changeSet.allDone : t.changeSet.partial(total - failed.length, failed.length)}</p>
+                  {rows.some(i => i.status === 'ok') && (
                     <button className="btn" disabled={busy} onClick={() => act(() => api.rollback(cs.id), r => onOpen(r.id, r.number))}>{t.changeSet.rollback}</button>
                   )}
                 </>
@@ -214,6 +221,74 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
           </section>
         </aside>
       </div>
+    </>
+  );
+}
+
+type T = ReturnType<typeof useT>;
+const assignmentValue = (t: T, a: AssignmentItem, v: string | null) => v ?? (a.kind === 'page' ? t.changeSet.assign.defaultPage : '—');
+
+function assignmentSheet(t: T, items: AssignmentItem[]): Sheet {
+  return {
+    name: t.export.sheetChanges,
+    rows: [
+      [...t.changeSet.assign.cols, t.export.error],
+      ...items.map(a => [t.changeSet.assign.kind[a.kind], a.object, a.app, a.profileLabel, a.recordType ?? t.changeSet.assign.master,
+        assignmentValue(t, a, a.before), assignmentValue(t, a, a.after), t.changeSet.item[a.status] ?? a.status,
+        a.errorMessage ? `${a.errorCode ?? ''} ${a.errorMessage}`.trim() : null])
+    ]
+  };
+}
+
+/** Page layout and Lightning page assignments: who sees which layout or page, before and after. */
+function AssignmentView({ items, finished }: { items: AssignmentItem[]; finished: boolean }) {
+  const t = useT();
+  const a = t.changeSet.assign;
+  const [filter, setFilter] = useState<'all' | 'layout' | 'page' | 'failed'>('all');
+  const failed = (i: AssignmentItem) => i.status === 'error' || i.status === 'conflict';
+  const shown = items.filter(i => filter === 'all' ? true : filter === 'failed' ? failed(i) : i.kind === filter);
+  return (
+    <>
+      <div className="kpis">
+        <div className="kpi"><div className="k">{t.changeSet.kpiChanges}</div><div className="n">{items.length}</div></div>
+        <div className="kpi"><div className="k">{a.kind.layout}</div><div className="n">{items.filter(i => i.kind === 'layout').length}</div></div>
+        <div className="kpi"><div className="k">{a.kind.page}</div><div className="n">{items.filter(i => i.kind === 'page').length}</div></div>
+        <div className="kpi warn"><div className="k">{a.kpiCleared}</div><div className="n">{items.filter(i => i.kind === 'page' && !i.after).length}</div></div>
+        {finished && <div className="kpi bad"><div className="k">{t.changeSet.kpiFailed}</div><div className="n">{items.filter(failed).length}</div></div>}
+      </div>
+      <section className="panel" style={{ minWidth: 0, marginBottom: 16 }}>
+        <div className="panel-h"><h2>{t.changeSet.detail}</h2>
+          <div className="row">
+            {(['all', 'layout', 'page', ...(finished ? ['failed'] : [])] as (typeof filter)[]).map(f => (
+              <button key={f} className="chip" aria-pressed={filter === f} onClick={() => setFilter(f)}>
+                {f === 'all' || f === 'failed' ? t.changeSet.filters[f] : a.kind[f]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="tbl-wrap">
+          <table className="dt">
+            <thead><tr>{a.cols.map(c => <th key={c}>{c}</th>)}</tr></thead>
+            <tbody>
+              {shown.map(i => (
+                <tr key={i.id}>
+                  <td><span className="tag">{a.kind[i.kind]}</span></td>
+                  <td className="mono">{i.object}</td>
+                  <td>{i.app ?? <span className="muted">—</span>}</td>
+                  <td>{i.profileLabel}</td>
+                  <td>{i.recordType ?? <span className="muted">{a.master}</span>}</td>
+                  <td>{i.before ? i.before : <span className="muted">{assignmentValue(t, i, null)}</span>}</td>
+                  <td><b>{i.after ? i.after : <span className="muted">{assignmentValue(t, i, null)}</span>}</b>
+                    {i.errorMessage && <div className="err-text"><span className="mono">{i.errorCode}</span> {i.errorMessage}</div>}
+                  </td>
+                  <td><span className={`pill ${i.status === 'ok' ? 'st-ok' : i.status === 'pending' ? '' : 'st-err'}`}>{t.changeSet.item[i.status]}</span></td>
+                </tr>
+              ))}
+              {!shown.length && <tr><td colSpan={8} className="muted">{t.changeSet.noRows}</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </>
   );
 }

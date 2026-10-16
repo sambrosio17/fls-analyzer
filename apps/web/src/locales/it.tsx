@@ -61,7 +61,7 @@ export const it: Messages = {
       tabs: { title: 'Schede di lavoro', body: <>Le schede sono su tre livelli: le <b>org</b> aperte, lo <b>strumento</b> dell'org attiva (Matrice FLS, Classi Apex, Layout e pagine, Change set) e gli <b>oggetti</b> aperti in quello strumento. Ogni scheda oggetto tiene i suoi filtri e le modifiche in sospeso. <b>Trascina</b> una scheda per spostarla, oppure usa <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd>. Il pallino colorato sulla scheda dell'org ne cambia il colore, ↻ rinnova la sessione, il clic centrale chiude una scheda.</> },
       notices: { title: 'Caricamenti lunghi in sottofondo', body: <>I caricamenti continuano anche se cambi scheda. Se lasci una scheda mentre carica una matrice, i layout o esegue un change set, un pannello in basso a destra lo segue e ti dice quando è pronto; <b>Apri</b> ti riporta lì. Quando torni sulla scheda l'avviso sparisce.</> },
       apex: { title: 'Classi Apex', body: <>Quali profili e permission set possono eseguire ogni classe Apex. Funziona come la matrice FLS con due stati, abilitata o no: clic, trascinamento, tasto destro e azioni in blocco, poi anteprima e approvazione. Le classi dei pacchetti gestiti si possono nascondere con un filtro.</> },
-      layouts: { title: 'Layout e pagine', body: <>Scegli un oggetto per vedere, per ogni profilo e record type, quale <b>page layout</b> e quale <b>Lightning page</b> riceve (per app, record type e default dell'org), e i campi del layout che il profilo non può leggere. Per ora questa sezione è in sola lettura.</> },
+      layouts: { title: 'Layout e pagine', body: <>Scegli un oggetto per vedere, per ogni profilo e record type, quale <b>page layout</b> e quale <b>Lightning page</b> riceve (per app, record type e default dell'org), e i campi del layout che il profilo non può leggere. Con <b>Modifica assegnazioni</b> le cambi cella per cella, o tutta una colonna con <b>Tutta la colonna…</b>; le celle cambiate diventano viola. <b>Vai all'anteprima</b> crea un change set, che si applica come quelli FLS. Per le Lightning page la modifica vale per l'app scelta, e togliendo un'assegnazione specifica il profilo torna al default dell'app o dell'org.</> },
       changesets: { title: 'Change set', body: <>Nulla viene scritto finché non confermi. <b>Vai all'anteprima</b> trasforma le modifiche in sospeso in un change set con cosa viene aggiunto, cambiato e tolto, e gli avvisi. In produzione serve un'approvazione e devi scrivere il nome dell'org. L'esecuzione mostra l'avanzamento e il risultato riga per riga.</> },
       export: { title: 'Esportare', body: <>Il pulsante <b>Esporta</b> salva quello che vedi: la matrice in Excel o CSV o come metadata Salesforce (package.xml e un file per profilo e permission set), i change set in Excel, CSV o metadata con i valori che impostano, e i layout in Excel o CSV. Un pannello in basso a destra mostra l'avanzamento dei file grandi.</> },
       history: { title: 'Storico e annullamento', body: <>Lo <b>Storico</b> elenca ogni change set con chi l'ha preparato e approvato, e quando. Ognuno conserva i valori di prima, quindi <b>Annulla queste modifiche</b>, nel change set, crea un change set che li ripristina.</> },
@@ -141,7 +141,14 @@ export const it: Messages = {
     rejected: 'Change set rifiutato. Torna alla matrice per prepararne uno nuovo.',
     allDone: "Tutte le modifiche sono state applicate e verificate rileggendo l'org.",
     partial: (ok: number, failed: number) => `${ok} modifiche applicate, ${failed} non applicate.`,
-    rollback: 'Annulla queste modifiche'
+    rollback: 'Annulla queste modifiche',
+    assign: {
+      kind: { layout: 'Page layout', page: 'Lightning page' },
+      cols: ['Tipo', 'Oggetto', 'App', 'Profilo', 'Record type', 'Prima', 'Dopo', 'Esito'],
+      kpiCleared: 'Assegnazioni di pagina rimosse',
+      defaultPage: "Default (app o org)",
+      master: 'Master'
+    }
   },
 
   pick: {
@@ -238,7 +245,7 @@ export const it: Messages = {
 
   layouts: {
     title: 'Layout e Lightning page',
-    intro: 'Per ogni oggetto: quale page layout e quale Lightning page vede ogni profilo, per record type. In questa versione la sezione è in sola lettura.',
+    intro: 'Per ogni oggetto: quale page layout e quale Lightning page vede ogni profilo, per record type. Con Modifica assegnazioni puoi cambiarle: le modifiche passano da anteprima e approvazione, come quelle FLS.',
     changeObject: 'Cambia oggetto',
     chooseObject: 'Scegli un oggetto (es. Account)',
     pageLayout: 'Page layout',
@@ -278,7 +285,19 @@ export const it: Messages = {
     pageCols: ['Pagina', 'Componenti', 'Campi Dynamic Forms', 'Dove è assegnata'],
     showPageProfiles: 'Mostra i profili che vedono questa pagina',
     pageUnassigned: 'Non assegnata',
-    noPages: 'Nessuna Lightning record page per questo oggetto.'
+    noPages: 'Nessuna Lightning record page per questo oggetto.',
+    edit: 'Modifica assegnazioni', editDone: 'Fine modifica',
+    finishFirst: "Prima scarta le modifiche o vai all'anteprima.",
+    setColumn: 'Tutta la colonna…',
+    noSpecific: "(nessuna: default dell'app o dell'org)",
+    noFullName: 'Salesforce non ha restituito il nome metadata di questo profilo: non si può modificare.',
+    layoutEditHint: "Le celle cambiate sono evidenziate. Niente viene scritto finché non confermi l'anteprima.",
+    pageEditHint: "Le modifiche valgono per l'app scelta. Togliendo un'assegnazione specifica il profilo torna al default dell'app o dell'org.",
+    pending: (n: number) => n === 1 ? '1 assegnazione in sospeso' : `${n} assegnazioni in sospeso`,
+    discard: 'Scarta', toPreview: "Vai all'anteprima", preparing: 'Preparo…',
+    description: (n: number, object: string) => n === 1 ? `1 assegnazione su ${object}` : `${n} assegnazioni su ${object}`,
+    sent: (n: string) => `Le modifiche sono nel change set ${n}. Dopo averlo applicato, ricarica per vedere le nuove assegnazioni.`,
+    reload: 'Ricarica'
   },
 
   export: {

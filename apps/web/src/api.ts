@@ -24,8 +24,15 @@ export interface ChangeSet {
   id: string; number: string; org: Org; author: string; description: string; status: Status; rollbackOf: string | null;
   createdAt: string; submittedAt: string | null; approvedBy: string | null; approvedAt: string | null; startedAt: string | null; finishedAt: string | null;
   requiresApproval: boolean; skipped: { parentId: string; field: string; reason: string }[]; items: ChangeItem[]; conflicts?: number;
+  kind: 'fls' | 'assignments'; assignments: AssignmentItem[];
 }
-export interface ChangeSetSummary { id: string; number: string; orgId: string; author: string; description: string; status: Status; createdAt: string; finishedAt: string | null; total: number; ok: number; errors: number }
+export interface AssignmentInput {
+  kind: 'layout' | 'page'; object: string; profile: string; profileLabel: string; recordType: string | null; app: string | null; after: string | null;
+}
+export interface AssignmentItem extends AssignmentInput {
+  id: number; before: string | null; status: 'pending' | 'ok' | 'error' | 'conflict'; errorCode: string | null; errorMessage: string | null;
+}
+export interface ChangeSetSummary { id: string; number: string; orgId: string; author: string; description: string; status: Status; kind: 'fls' | 'assignments'; createdAt: string; finishedAt: string | null; total: number; ok: number; errors: number }
 
 export interface RecordTypeInfo { id: string | null; developerName: string | null; label: string; active: boolean }
 export interface ProfileInfo { id: string; permSetId: string; name: string; fullName: string | null }
@@ -81,6 +88,8 @@ export const api = {
   matrix: (orgId: string, objects: string[]) => call<Matrix>('GET', `/api/orgs/${orgId}/matrix?objects=${encodeURIComponent(objects.join(','))}`),
   createChangeSet: (orgId: string, body: { description?: string; changes?: { parentId: string; field: string; access: Access }[] }) =>
     call<ChangeSet>('POST', `/api/orgs/${orgId}/change-sets`, body),
+  createAssignments: (orgId: string, body: { description?: string; changes: AssignmentInput[] }) =>
+    call<ChangeSet>('POST', `/api/orgs/${orgId}/assignment-change-sets`, body),
   changeSet: (id: string) => call<ChangeSet>('GET', `/api/change-sets/${id}`),
   changeSets: (orgId?: string) => call<ChangeSetSummary[]>('GET', `/api/change-sets${orgId ? `?orgId=${orgId}` : ''}`),
   submit: (id: string) => call<ChangeSet>('POST', `/api/change-sets/${id}/submit`),
