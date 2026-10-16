@@ -287,6 +287,10 @@ export const es: Messages = {
         title: 'Buscar y filtrar',
         body: <>Los filtros <b>Campos</b> y <b>Perfiles y conjuntos de permisos</b> se abren con un clic: busca y marca solo los resultados que necesitas. Si buscas "sales" y encuentras tres perfiles, puedes quedarte con dos. <b>Marcar los resultados</b> los toma todos, <b>Vaciar</b> o la × quitan el filtro, y sin nada marcado se ven todos. También hay filtros rápidos: campos invisibles para todos, editables por todos, solo personalizados, o con cambios pendientes. Los contadores de las columnas siguen los filtros.</>
       },
+      export: {
+        title: 'Exportar',
+        body: <><b>Exportar</b> guarda lo que ves: los campos y perfiles filtrados, con los cambios pendientes. El <b>Excel</b> tiene dos hojas, la matriz como en pantalla y una fila por campo y perfil; los dos <b>CSV</b> tienen las mismas formas. Los <b>metadatos de Salesforce</b> son un zip con package.xml y un archivo por perfil y conjunto de permisos, listo para <code>sf project deploy</code> o Git; los conjuntos gestionados o de grupo quedan fuera. Mientras se genera el archivo el botón queda bloqueado y un panel abajo a la derecha muestra el avance, así que puedes seguir trabajando. Los change sets y Formatos y páginas también tienen su botón Exportar.</>
+      },
       flow: {
         title: 'De la vista previa a Salesforce',
         body: <>No se escribe nada hasta que confirmas. <b>Ir a la vista previa</b> crea un change set con los cambios pendientes y lo abre en una pestaña. En producción hace falta una aprobación y debes escribir el nombre de la org. Cada change set se puede deshacer desde el Historial.</>

@@ -290,6 +290,10 @@ export const en = {
         title: 'Searching and filtering',
         body: <>The <b>Fields</b> and <b>Profiles and permission sets</b> filters open with a click: search, then tick only the results you need. If you search "sales" and find three profiles, you can keep two. <b>Tick the results</b> takes them all, <b>Clear</b> or the × removes the filter, and nothing ticked means all. There are also quick filters: fields hidden from everyone, editable by all, custom only, or with pending changes. The counts at the top of the columns follow the filters.</>
       },
+      export: {
+        title: 'Exporting',
+        body: <><b>Export</b> saves what you see: the filtered fields and profiles, pending changes included. <b>Excel</b> has two sheets, the matrix as shown and one row per field and profile; the two <b>CSV</b> files have the same shapes. <b>Salesforce metadata</b> is a zip with package.xml and one file per profile and permission set, ready for <code>sf project deploy</code> or Git; managed and group permission sets are left out. While the file is generated the button is locked and a panel at the bottom right shows the progress, so you can keep working. Change sets and Layouts and pages have their own Export button.</>
+      },
       flow: {
         title: 'From preview to Salesforce',
         body: <>Nothing is written until you confirm. <b>Go to preview</b> creates a change set with the pending changes and opens it in a tab. In production it needs an approval and you must type the org name. Every change set can be undone from History.</>

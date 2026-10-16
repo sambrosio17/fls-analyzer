@@ -132,6 +132,25 @@ function FlowDemo() {
   );
 }
 
+/** Export menu: pick Excel, the button locks and the side panel fills up, then says the file is ready. */
+function ExportDemo() {
+  const t = useT();
+  const x = t.export;
+  return (
+    <div className="h-demo h-export" style={{ height: 206, width: 300 }} aria-hidden="true">
+      <span className="h-xbtn"><span className="h-xidle">{x.button} ▾</span><span className="h-xbusy"><i className="spinner" />{x.preparing}</span></span>
+      <span className="h-xmenu">
+        <i className="h-xpick">{x.excel}</i><i>{x.csvGrid}</i><i>{x.csvLong}</i><i>{x.metadata}</i>
+      </span>
+      <span className="h-xtoast">
+        <b className="h-xrun">{x.generating(x.excel)}</b><b className="h-xdone">{x.ready(x.excel)}</b>
+        <span className="h-xbar"><span /></span>
+      </span>
+      <Cursor anim="h-xcursor" from={px(70, 110)} to={px(242, 19)} then={px(160, 50)} />
+    </div>
+  );
+}
+
 /** Demos for each guide section, in order; titles and text come from the locale. */
 const SECTIONS = [
   { key: 'read', demo: <div className="h-legend"><AccessLegend /></div> },
@@ -140,6 +159,7 @@ const SECTIONS = [
   { key: 'right', demo: <RightClickDemo /> },
   { key: 'bulk', demo: <BulkDemo /> },
   { key: 'filter', demo: <FilterDemo /> },
+  { key: 'export', demo: <ExportDemo /> },
   { key: 'flow', demo: <FlowDemo /> }
 ] as const;
 
