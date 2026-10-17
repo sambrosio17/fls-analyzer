@@ -15,7 +15,7 @@ export interface ChangeEntry {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
-    date: '2026-10-17', prs: [], guide: 'changesets',
+    date: '2026-10-17', prs: [31], guide: 'changesets',
     text: {
       en: { title: 'Runs survive a server restart', body: 'If the server restarts while a change set is being applied, OrgFox picks it up again as soon as it starts. It reads the org to recognise the rows already written, applies only the others, and the change set says it was resumed.' },
       it: { title: 'Le esecuzioni sopravvivono a un riavvio del server', body: 'Se il server si riavvia mentre un change set viene applicato, OrgFox lo riprende appena riparte. Rilegge l’org per riconoscere le righe già scritte, applica solo le altre e il change set indica che è stato ripreso.' },
