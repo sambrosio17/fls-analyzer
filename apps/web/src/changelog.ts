@@ -15,7 +15,7 @@ export interface ChangeEntry {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
-    date: '2026-10-17', prs: [],
+    date: '2026-10-17', prs: [30],
     text: {
       en: { title: 'OrgFox', body: 'Orgsmith is now OrgFox: same app, same features, a new name that is easier to remember and a fox mascot. Exported files now start with orgfox-.' },
       it: { title: 'OrgFox', body: 'Orgsmith ora si chiama OrgFox: stessa app, stesse funzioni, un nome più facile da ricordare e una volpe come mascotte. I file esportati ora iniziano con orgfox-.' },
