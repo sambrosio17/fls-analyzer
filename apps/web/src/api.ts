@@ -22,7 +22,7 @@ export interface ChangeItem {
 }
 export interface ChangeSet {
   id: string; number: string; org: Org; author: string; description: string; status: Status; rollbackOf: string | null;
-  createdAt: string; submittedAt: string | null; approvedBy: string | null; approvedAt: string | null; startedAt: string | null; finishedAt: string | null;
+  createdAt: string; submittedAt: string | null; approvedBy: string | null; approvedAt: string | null; startedAt: string | null; finishedAt: string | null; resumedAt: string | null;
   requiresApproval: boolean; skipped: { parentId: string; field: string; reason: string }[]; items: ChangeItem[]; conflicts?: number;
   kind: 'fls' | 'assignments'; assignments: AssignmentItem[];
   /** Assignment runs: time per step. */

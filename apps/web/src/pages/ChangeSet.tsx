@@ -118,6 +118,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
       </div>
       {error && <div className="banner prod">{error}</div>}
       {notice && <div className="banner info">{notice}</div>}
+      {cs.resumedAt && <div className="banner info">{t.changeSet.resumed(new Date(cs.resumedAt).toLocaleString(t.locale))}</div>}
 
       {assign ? <AssignmentView items={cs.assignments} finished={finished} timings={cs.timings} /> : <>
       <div className="kpis">

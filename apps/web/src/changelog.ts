@@ -15,6 +15,15 @@ export interface ChangeEntry {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-10-17', prs: [31], guide: 'changesets',
+    text: {
+      en: { title: 'Runs survive a server restart', body: 'If the server restarts while a change set is being applied, OrgFox picks it up again as soon as it starts. It reads the org to recognise the rows already written, applies only the others, and the change set says it was resumed.' },
+      it: { title: 'Le esecuzioni sopravvivono a un riavvio del server', body: 'Se il server si riavvia mentre un change set viene applicato, OrgFox lo riprende appena riparte. Rilegge l’org per riconoscere le righe già scritte, applica solo le altre e il change set indica che è stato ripreso.' },
+      fr: { title: 'Les exécutions survivent à un redémarrage du serveur', body: 'Si le serveur redémarre pendant l’application d’un change set, OrgFox le reprend dès son démarrage. Il relit l’org pour reconnaître les lignes déjà écrites, n’applique que les autres, et le change set indique qu’il a été repris.' },
+      es: { title: 'Las ejecuciones sobreviven a un reinicio del servidor', body: 'Si el servidor se reinicia mientras se aplica un change set, OrgFox lo retoma en cuanto arranca. Relee la org para reconocer las filas ya escritas, aplica solo las demás y el change set indica que se retomó.' }
+    }
+  },
+  {
     date: '2026-10-17', prs: [30],
     text: {
       en: { title: 'OrgFox', body: 'Orgsmith is now OrgFox: same app, same features, a new name that is easier to remember and a fox mascot. Exported files now start with orgfox-.' },
