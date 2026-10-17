@@ -53,11 +53,11 @@ export const fr: Messages = {
   },
 
   guide: {
-    title: 'Guide d’Orgsmith',
-    intro: 'Tout ce que fait Orgsmith, avec de courtes animations. Les nouveautés sont listées dans Nouveautés et renvoient ici.',
+    title: 'Guide d’OrgFox',
+    intro: 'Tout ce que fait OrgFox, avec de courtes animations. Les nouveautés sont listées dans Nouveautés et renvoient ici.',
     groups: { start: 'Pour commencer', matrix: 'Matrice FLS', tools: 'Autres outils', apply: 'Change sets et exports', more: 'Plus' },
     sections: {
-      orgs: { title: 'Connecter une org', body: <>Sur la page <b>Org</b>, donnez un alias à l’org, choisissez Production, Sandbox ou My Domain et connectez-vous avec Salesforce : Orgsmith ne voit jamais votre mot de passe et agit avec les autorisations de votre utilisateur. Donnez à chaque org une des 10 <b>couleurs</b> ; l’espace de travail prend la couleur de l’org ouverte. <b>Renouveler le jeton</b> vous reconnecte quand la session expire.</> },
+      orgs: { title: 'Connecter une org', body: <>Sur la page <b>Org</b>, donnez un alias à l’org, choisissez Production, Sandbox ou My Domain et connectez-vous avec Salesforce : OrgFox ne voit jamais votre mot de passe et agit avec les autorisations de votre utilisateur. Donnez à chaque org une des 10 <b>couleurs</b> ; l’espace de travail prend la couleur de l’org ouverte. <b>Renouveler le jeton</b> vous reconnecte quand la session expire.</> },
       tabs: { title: 'Onglets de travail', body: <>Les onglets sont sur trois niveaux : les <b>orgs</b> ouvertes, l’<b>outil</b> de l’org active (Matrice FLS, Classes Apex, Présentations et pages, Change sets) et les <b>objets</b> ouverts dans cet outil. Chaque onglet d’objet garde ses filtres et ses changements en attente. <b>Faites glisser</b> un onglet pour le déplacer, ou utilisez <kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>←</kbd>/<kbd>→</kbd>. Le point coloré de l’onglet d’org change sa couleur, ↻ renouvelle la session, le clic du milieu ferme un onglet.</> },
       notices: { title: 'Chargements longs en arrière-plan', body: <>Les chargements continuent quand vous changez d’onglet. Si vous quittez un onglet pendant qu’il charge une matrice, des présentations ou exécute un change set, un panneau en bas à droite le suit et vous prévient quand c’est prêt ; <b>Ouvrir</b> vous y ramène. Revenir sur l’onglet efface l’avis.</> },
       apex: { title: 'Classes Apex', body: <>Quels profils et ensembles d’autorisations peuvent exécuter chaque classe Apex. Cela fonctionne comme la matrice FLS avec deux états, activée ou non : clic, glisser, clic droit et actions en masse, puis aperçu et approbation. Les classes de packages gérés peuvent être masquées par un filtre.</> },
@@ -67,13 +67,13 @@ export const fr: Messages = {
       changesets: { title: 'Change sets', body: <>Rien n’est écrit avant votre confirmation. <b>Voir l’aperçu</b> transforme les changements en attente en change set avec ce qui est ajouté, modifié et retiré, et les avertissements. En production il faut une approbation et saisir le nom de l’org. L’exécution montre la progression et le résultat ligne par ligne.</> },
       export: { title: 'Exporter', body: <>Le bouton <b>Exporter</b> enregistre ce que vous voyez : la matrice en Excel, en CSV ou en métadonnées Salesforce (package.xml et un fichier par profil et ensemble d’autorisations), les change sets en Excel, CSV ou métadonnées avec les valeurs qu’ils définissent, et les présentations en Excel ou CSV. Un panneau en bas à droite montre la progression des gros fichiers.</> },
       history: { title: 'Historique et annulation', body: <>L’<b>Historique</b> liste chaque change set avec qui l’a préparé et approuvé, et quand. Chacun garde les valeurs d’avant, donc <b>Annuler ces modifications</b>, dans le change set, crée un change set qui les restaure.</> },
-      settings: { title: 'Langue et session', body: <>Choisissez English, Italiano, Français ou Español dans le menu avec les drapeaux. <b>Se déconnecter</b> ferme la session Orgsmith ; vos orgs restent connectées.</> }
+      settings: { title: 'Langue et session', body: <>Choisissez English, Italiano, Français ou Español dans le menu avec les drapeaux. <b>Se déconnecter</b> ferme la session OrgFox ; vos orgs restent connectées.</> }
     }
   },
 
   settings: {
     title: 'Paramètres',
-    intro: 'Choisissez comment Orgsmith affiche les matrices. Le choix est gardé dans ce navigateur, et le menu Vue en haut de chaque outil le change aussi.',
+    intro: 'Choisissez comment OrgFox affiche les matrices. Le choix est gardé dans ce navigateur, et le menu Vue en haut de chaque outil le change aussi.',
     matrix: 'Matrices des autorisations (FLS et classes Apex)',
     layouts: 'Attributions de présentations et de pages Lightning',
     current: 'Utilisée',
@@ -170,7 +170,7 @@ export const fr: Messages = {
     }
   },
 
-  news: { title: 'Nouveautés', intro: 'Chaque changement d’Orgsmith, du plus récent au plus ancien.', seeGuide: 'Voir dans le guide' },
+  news: { title: 'Nouveautés', intro: 'Chaque changement d’OrgFox, du plus récent au plus ancien.', seeGuide: 'Voir dans le guide' },
 
   login: { password: 'Mot de passe', wrong: 'Mot de passe incorrect.', submit: 'Se connecter' },
 

@@ -43,6 +43,16 @@ main.wrap { padding-block: 20px 60px; }
 .brand-mark .on { fill: var(--mark); }
 .brand-mark .half { fill: var(--mark); opacity: .4; }
 .brand-mark .off { fill: none; stroke: currentColor; stroke-opacity: .4; stroke-width: 1.5; }
+/* Mascot: on light surfaces a graphite outline keeps the white cheeks visible. */
+.fox { width: 56px; height: 56px; flex: none; }
+.fox .f-o { fill: var(--mark); stroke: var(--mark); }
+.fox .f-d { fill: #23272D; stroke: #23272D; }
+.fox .f-w { fill: #F4F5F6; stroke: #F4F5F6; }
+.fox .f-n { fill: #16191D; stroke: #16191D; }
+.fox .f-line { fill: #1B1F24; stroke: #1B1F24; stroke-width: 7; }
+@media (prefers-color-scheme: dark) { .fox .f-line { fill: none; stroke: none; } }
+.login-fox { display: block; width: 88px; height: 88px; margin: 0 auto 14px; }
+.view-head .fox { margin-left: auto; }
 .tabs { display: flex; gap: 2px; }
 .tab { border: 0; background: none; padding: 7px 12px; border-radius: 8px; cursor: pointer; color: var(--bar-muted); font-weight: 600; }
 .tab:hover:not(:disabled) { background: var(--bar-hover); color: var(--bar-ink); }

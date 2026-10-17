@@ -53,11 +53,11 @@ export const es: Messages = {
   },
 
   guide: {
-    title: 'Guía de Orgsmith',
-    intro: 'Todo lo que hace Orgsmith, con animaciones breves. Las novedades aparecen en Novedades y enlazan aquí.',
+    title: 'Guía de OrgFox',
+    intro: 'Todo lo que hace OrgFox, con animaciones breves. Las novedades aparecen en Novedades y enlazan aquí.',
     groups: { start: 'Para empezar', matrix: 'Matriz FLS', tools: 'Otras herramientas', apply: 'Change sets y exportaciones', more: 'Más' },
     sections: {
-      orgs: { title: 'Conectar una org', body: <>En la página <b>Org</b>, dale un alias a la org, elige Producción, Sandbox o My Domain e inicia sesión con Salesforce: Orgsmith nunca ve tu contraseña y actúa con los permisos de tu usuario. Dale a cada org uno de los 10 <b>colores</b>; el área de trabajo toma el color de la org abierta. <b>Renovar token</b> vuelve a iniciar sesión cuando caduca.</> },
+      orgs: { title: 'Conectar una org', body: <>En la página <b>Org</b>, dale un alias a la org, elige Producción, Sandbox o My Domain e inicia sesión con Salesforce: OrgFox nunca ve tu contraseña y actúa con los permisos de tu usuario. Dale a cada org uno de los 10 <b>colores</b>; el área de trabajo toma el color de la org abierta. <b>Renovar token</b> vuelve a iniciar sesión cuando caduca.</> },
       tabs: { title: 'Pestañas de trabajo', body: <>Las pestañas tienen tres niveles: las <b>orgs</b> abiertas, la <b>herramienta</b> de la org activa (Matriz FLS, Clases Apex, Formatos y páginas, Change sets) y los <b>objetos</b> abiertos en esa herramienta. Cada pestaña de objeto guarda sus filtros y cambios pendientes. <b>Arrastra</b> una pestaña para moverla, o usa <kbd>Ctrl</kbd>+<kbd>Mayús</kbd>+<kbd>←</kbd>/<kbd>→</kbd>. El punto de color de la pestaña de la org cambia su color, ↻ renueva la sesión, el clic central cierra una pestaña.</> },
       notices: { title: 'Cargas largas en segundo plano', body: <>Las cargas siguen aunque cambies de pestaña. Si dejas una pestaña mientras carga una matriz, formatos o ejecuta un change set, un panel abajo a la derecha la sigue y te avisa cuando está lista; <b>Abrir</b> te lleva de vuelta. Al volver a la pestaña el aviso desaparece.</> },
       apex: { title: 'Clases Apex', body: <>Qué perfiles y conjuntos de permisos pueden ejecutar cada clase Apex. Funciona como la matriz FLS con dos estados, activada o no: clic, arrastre, clic derecho y acciones en bloque, luego vista previa y aprobación. Las clases de paquetes gestionados se pueden ocultar con un filtro.</> },
@@ -67,13 +67,13 @@ export const es: Messages = {
       changesets: { title: 'Change sets', body: <>No se escribe nada hasta que confirmas. <b>Ir a la vista previa</b> convierte los cambios pendientes en un change set con lo que se añade, cambia y quita, y los avisos. En producción necesita aprobación y escribir el nombre de la org. La ejecución muestra el progreso y el resultado fila por fila.</> },
       export: { title: 'Exportar', body: <>El botón <b>Exportar</b> guarda lo que ves: la matriz en Excel, CSV o como metadatos de Salesforce (package.xml y un archivo por perfil y conjunto de permisos), los change sets en Excel, CSV o metadatos con los valores que fijan, y los formatos en Excel o CSV. Un panel abajo a la derecha muestra el progreso de los archivos grandes.</> },
       history: { title: 'Historial y deshacer', body: <>El <b>Historial</b> muestra cada change set con quién lo preparó y aprobó, y cuándo. Cada uno guarda los valores anteriores, así que <b>Deshacer estos cambios</b>, en el change set, crea un change set que los restaura.</> },
-      settings: { title: 'Idioma y sesión', body: <>Elige English, Italiano, Français o Español en el menú con las banderas. <b>Salir</b> cierra la sesión de Orgsmith; tus orgs siguen conectadas.</> }
+      settings: { title: 'Idioma y sesión', body: <>Elige English, Italiano, Français o Español en el menú con las banderas. <b>Salir</b> cierra la sesión de OrgFox; tus orgs siguen conectadas.</> }
     }
   },
 
   settings: {
     title: 'Ajustes',
-    intro: 'Elige cómo muestra Orgsmith las matrices. La elección se guarda en este navegador, y el menú Vista arriba en cada herramienta también la cambia.',
+    intro: 'Elige cómo muestra OrgFox las matrices. La elección se guarda en este navegador, y el menú Vista arriba en cada herramienta también la cambia.',
     matrix: 'Matrices de permisos (FLS y clases Apex)',
     layouts: 'Asignaciones de formatos y páginas Lightning',
     current: 'En uso',
@@ -170,7 +170,7 @@ export const es: Messages = {
     }
   },
 
-  news: { title: 'Novedades', intro: 'Cada cambio de Orgsmith, del más reciente al más antiguo.', seeGuide: 'Ver en la guía' },
+  news: { title: 'Novedades', intro: 'Cada cambio de OrgFox, del más reciente al más antiguo.', seeGuide: 'Ver en la guía' },
 
   login: { password: 'Contraseña', wrong: 'Contraseña incorrecta.', submit: 'Entrar' },
 

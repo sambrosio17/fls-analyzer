@@ -3,6 +3,7 @@ import { useT } from '../i18n.tsx';
 import { Cursor, ExportDemo, FlowDemo, MATRIX_SECTIONS, px } from './MatrixHelp.tsx';
 import { ACCENT_COLORS } from '../accents.ts';
 import type { Messages } from '../locales/en.tsx';
+import { Fox } from '../Fox.tsx';
 
 const dot = (c: keyof typeof ACCENT_COLORS) => ({ background: ACCENT_COLORS[c].dark });
 
@@ -153,7 +154,7 @@ export function Guide({ focus }: { focus?: string | null }) {
   const go = (id: string) => document.getElementById(`guide-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   return (
     <div className="guide">
-      <div className="view-head"><div><h1>{g.title}</h1><p>{g.intro}</p></div></div>
+      <div className="view-head"><div><h1>{g.title}</h1><p>{g.intro}</p></div><Fox /></div>
       <div className="guide-grid">
         <nav className="guide-toc" aria-label={g.title}>
           {CHAPTERS.map(c => (

@@ -1,7 +1,7 @@
 import type { Lang } from './i18n.tsx';
 
 /**
- * What changed in Orgsmith, newest first. Every change users can see (above all UI and UX) gets an entry here
+ * What changed in OrgFox, newest first. Every change users can see (above all UI and UX) gets an entry here
  * and an update to the guide, in all four languages. `guide` links to a guide section, `demo` shows its animation.
  */
 export type ChangeDemo = 'orgs' | 'layouts' | 'tabs' | 'load' | 'apex' | 'drag' | 'filter' | 'export' | 'flow' | 'views' | 'paint';
@@ -14,6 +14,15 @@ export interface ChangeEntry {
 }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-10-17', prs: [],
+    text: {
+      en: { title: 'OrgFox', body: 'Orgsmith is now OrgFox: same app, same features, a new name that is easier to remember and a fox mascot. Exported files now start with orgfox-.' },
+      it: { title: 'OrgFox', body: 'Orgsmith ora si chiama OrgFox: stessa app, stesse funzioni, un nome più facile da ricordare e una volpe come mascotte. I file esportati ora iniziano con orgfox-.' },
+      fr: { title: 'OrgFox', body: 'Orgsmith s’appelle maintenant OrgFox : même application, mêmes fonctions, un nom plus facile à retenir et un renard pour mascotte. Les fichiers exportés commencent maintenant par orgfox-.' },
+      es: { title: 'OrgFox', body: 'Orgsmith ahora se llama OrgFox: la misma app, las mismas funciones, un nombre más fácil de recordar y un zorro como mascota. Los archivos exportados ahora empiezan por orgfox-.' }
+    }
+  },
   {
     date: '2026-10-16', prs: [29], guide: 'layoutViews', demo: 'paint',
     text: {

@@ -231,7 +231,7 @@ function LayoutView({ data, orgLabel, onSubmit, onDirty }: { data: LayoutAnalysi
         <div className="panel-h"><h2>{t.layouts.assignments}</h2>
           <span className="spacer" />
           <EditToggle editing={editing} onChange={setEditing} pending={edits.pending.size} />
-          <ExportMenu note={t.export.rowsScope(profiles.length)} items={exportItems(t, `orgsmith-layouts-${slug(orgLabel)}-${data.object}-${stamp()}`, () => [
+          <ExportMenu note={t.export.rowsScope(profiles.length)} items={exportItems(t, `orgfox-layouts-${slug(orgLabel)}-${data.object}-${stamp()}`, () => [
             {
               name: t.export.sheetAssignments,
               rows: [[t.layouts.profile, ...rts.map(rt => rt.label)], ...profiles.map(p => [p.name, ...rts.map(rt => {
@@ -403,7 +403,7 @@ function PageView({ data: analysis, orgLabel, onSubmit, onDirty }: { data: PageA
         <div className="panel-h"><h2>{t.layouts.perProfile} · {t.layouts.formFactor[ff].toLowerCase()}</h2>
           <span className="spacer" />
           <EditToggle editing={editing} onChange={setEditing} pending={edits.pending.size} />
-          <ExportMenu note={t.export.rowsScope(rows.length)} items={exportItems(t, `orgsmith-pages-${slug(orgLabel)}-${data.object}-${slug(appLabel(app))}-${stamp()}`, () => [
+          <ExportMenu note={t.export.rowsScope(rows.length)} items={exportItems(t, `orgfox-pages-${slug(orgLabel)}-${data.object}-${slug(appLabel(app))}-${stamp()}`, () => [
             {
               name: t.export.sheetAssignments,
               rows: [[t.layouts.profile, ...rts.flatMap(rt => [rt.label, `${rt.label} · ${t.export.source}`])],

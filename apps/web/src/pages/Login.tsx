@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api } from '../api.ts';
 import { Brand } from '../Brand.tsx';
+import { Fox } from '../Fox.tsx';
 import { LangPicker, useT } from '../i18n.tsx';
 
 export function Login({ onDone }: { onDone: () => void }) {
@@ -13,6 +14,7 @@ export function Login({ onDone }: { onDone: () => void }) {
   };
   return (
     <main className="wrap login">
+      <Fox className="fox login-fox" />
       <form className="panel panel-b" onSubmit={submit}>
         <div className="row login-head"><Brand /><span className="spacer" /><LangPicker /></div>
         <label className="field"><span>{t.login.password}</span>
