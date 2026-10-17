@@ -76,7 +76,7 @@ export function ChangeSetPage({ id, onOpen, onBack }: Props) {
         i.warnings.map(w => t.warning[w] ?? w).join(' '), i.errorMessage ? `${i.errorCode ?? ''} ${i.errorMessage}`.trim() : null])
     ]
   });
-  const fileName = (ext: string) => `orgsmith-${cs.number}-${slug(cs.org.label)}.${ext}`;
+  const fileName = (ext: string) => `orgfox-${cs.number}-${slug(cs.org.label)}.${ext}`;
   // The values this change set sets, as profile and permission set files ready to deploy or keep in Git.
   const exportMetadata = async (p: Progress) => {
     await p(0, 'collect');

@@ -362,7 +362,7 @@ export function MatrixPage({ org, mode = 'fls', onChangeSet, initialObjects = []
   const permissionableVisible = fields.filter(i => allFields[i]!.permissionable);
 
   // ---- export: what is on screen (filters and pending changes included)
-  const exportName = (ext: string, kind = apex ? 'apex' : 'fls') => `orgsmith-${kind}-${slug(org.label)}${apex ? '' : `-${slug(selected.join('-'))}`}-${stamp()}.${ext}`;
+  const exportName = (ext: string, kind = apex ? 'apex' : 'fls') => `orgfox-${kind}-${slug(org.label)}${apex ? '' : `-${slug(selected.join('-'))}`}-${stamp()}.${ext}`;
   const psKindLabel = (p: PermSet) => p.isProfile ? t.export.profile : t.export.permSet;
   const gridSheet = async (p: Progress): Promise<Sheet> => ({
     name: apex ? t.apex.sheet : t.export.sheetMatrix,
