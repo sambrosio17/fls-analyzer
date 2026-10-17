@@ -131,19 +131,35 @@ export class ChangeSetService {
     const cs = this.changeSet(id);
     this.d.db.updateChangeSet(id, { status: this.move(cs, 'start'), started_at: now() });
     this.d.db.audit({ tenant: this.d.tenant, orgId: cs.org_id, changeSetId: id, actor: this.d.actor, action: 'change_set.started' });
-    const done = this.execute(id).catch(err => {
-      this.d.db.updateChangeSet(id, { status: 'failed', finished_at: now() });
-      this.d.db.audit({ tenant: this.d.tenant, orgId: cs.org_id, changeSetId: id, actor: this.d.actor, action: 'change_set.failed', detail: String(err) });
-    });
-    return { changeSet: this.changeSet(id), done };
+    return { changeSet: this.changeSet(id), done: this.runInBackground(cs, false) };
   }
 
-  private async execute(id: string): Promise<void> {
+  /**
+   * Picks up the runs a server restart cut short. Rows already settled keep their result; the pending ones go
+   * through the same check against the org, so a row written just before the restart is recognised, not redone.
+   */
+  resumeInterrupted(): Promise<void>[] {
+    return this.d.db.listRunning(this.d.tenant).map(cs => {
+      this.d.db.updateChangeSet(cs.id, { resumed_at: now() });
+      this.d.db.audit({ tenant: this.d.tenant, orgId: cs.org_id, changeSetId: cs.id, actor: this.d.actor, action: 'change_set.resumed' });
+      return this.runInBackground(cs, true);
+    });
+  }
+
+  private runInBackground(cs: ChangeSetRow, resumed: boolean): Promise<void> {
+    return (cs.kind === 'assignments' ? this.executeAssignments(cs, resumed) : this.execute(cs.id, resumed)).catch(err => {
+      this.d.db.updateChangeSet(cs.id, { status: 'failed', finished_at: now() });
+      this.d.db.audit({ tenant: this.d.tenant, orgId: cs.org_id, changeSetId: cs.id, actor: this.d.actor, action: 'change_set.failed', detail: String(err) });
+    });
+  }
+
+  private async execute(id: string, resumed: boolean): Promise<void> {
     const cs = this.changeSet(id);
-    if (cs.kind === 'assignments') return this.executeAssignments(cs);
     const org = this.org(cs.org_id);
     const api = this.d.apiFor(org);
-    const rows = this.d.db.listItems(id);
+    const all = this.d.db.listItems(id);
+    // A resumed run only handles the rows the interrupted one did not settle.
+    const rows = all.filter(r => r.status === 'pending');
     const objects = unique(rows.map(r => r.sobject_type));
     const parentIds = unique(rows.map(r => r.parent_id));
 
@@ -155,6 +171,10 @@ export class ChangeSetService {
     const classIds = rows.some(r => isApex(r.sobject_type)) ? new Map((await loadApexClasses(api)).map(c => [c.name, c.entityId!])) : new Map<string, string>();
     const runnable = [];
     for (const x of items) {
+      if (resumed && fresh.get(x.item.parentId, x.item.field).access === x.item.after) {
+        this.d.db.updateItem(x.row.id, { status: 'ok', record_id: fresh.get(x.item.parentId, x.item.field).recordId });
+        continue;
+      }
       if (conflicts.has(x.item)) {
         this.d.db.updateItem(x.row.id, { status: 'conflict', error_code: 'CONFLICT', error_message: 'Changed in the org after the preview.' });
         continue;
@@ -192,51 +212,57 @@ export class ChangeSetService {
     }
 
     // 3. Verify: read back and compare with what was requested.
-    let verified = 0;
     if (okItems.length) {
       const { snapshot: after } = await loadSnapshot(api, objects, parentIds);
       for (const item of okItems) {
-        if (after.get(item.parentId, item.field).access === item.after) { verified++; continue; }
+        if (after.get(item.parentId, item.field).access === item.after) continue;
         this.d.db.updateItem(rowIdOf.get(item)!, { status: 'error', error_code: 'VERIFY_MISMATCH', error_message: 'The org does not show the requested access after the update.' });
       }
     }
 
-    const outcome = verified === rows.length ? 'done' : verified > 0 ? 'partial' : 'failed';
+    const verified = this.d.db.listItems(id).filter(r => r.status === 'ok').length;
+    const outcome = verified === all.length ? 'done' : verified > 0 ? 'partial' : 'failed';
     this.d.db.updateChangeSet(id, { status: this.move(this.changeSet(id), 'finish', outcome), finished_at: now() });
     this.d.db.touchOrg(org.id);
-    this.d.db.audit({ tenant: this.d.tenant, orgId: org.id, changeSetId: id, actor: this.d.actor, action: 'change_set.finished', detail: `${outcome}: ${verified}/${rows.length}` });
+    this.d.db.audit({ tenant: this.d.tenant, orgId: org.id, changeSetId: id, actor: this.d.actor, action: 'change_set.finished', detail: `${outcome}: ${verified}/${all.length}` });
   }
 
   /** Assignments: skip the ones changed in the org since the preview, write the rest, read back to verify. */
-  private async executeAssignments(cs: ChangeSetRow): Promise<void> {
+  private async executeAssignments(cs: ChangeSetRow, resumed: boolean): Promise<void> {
     const org = this.org(cs.org_id);
     const api = this.d.apiFor(org);
-    const rows = this.d.db.listAssignments(cs.id).map(r => ({ row: r, change: assignmentFromRow(r) }));
+    const all = this.d.db.listAssignments(cs.id);
+    // A resumed run only handles the rows the interrupted one did not settle.
+    const rows = all.filter(r => r.status === 'pending').map(r => ({ row: r, change: assignmentFromRow(r) }));
     const rowIdOf = new Map(rows.map(x => [assignmentKey(x.change), x.row.id]));
 
     const timings = new Timings();
-    const conflicts = new Set(assignmentConflicts(rows.map(x => x.change), await timings.time('check org', () => loadCurrentAssignments(api, rows.map(x => x.change)))));
+    const current = await timings.time('check org', () => loadCurrentAssignments(api, rows.map(x => x.change)));
+    const alreadyApplied = new Set(resumed ? rows.map(x => x.change).filter(c => current(c) === c.after) : []);
+    for (const c of alreadyApplied) this.d.db.updateAssignment(rowIdOf.get(assignmentKey(c))!, { status: 'ok' });
+    const pending = rows.map(x => x.change).filter(c => !alreadyApplied.has(c));
+    const conflicts = new Set(assignmentConflicts(pending, current));
     for (const c of conflicts) this.d.db.updateAssignment(rowIdOf.get(assignmentKey(c))!, { status: 'conflict', error_code: 'CONFLICT', error_message: 'Changed in the org after the preview.' });
-    const runnable = rows.map(x => x.change).filter(c => !conflicts.has(c));
+    const runnable = pending.filter(c => !conflicts.has(c));
 
     const written = await writeAssignments(api, runnable, timings);
     for (const w of written.filter(w => !w.ok)) this.d.db.updateAssignment(rowIdOf.get(assignmentKey(w.change))!, { status: 'error', error_code: w.errorCode, error_message: w.errorMessage });
 
-    let verified = 0;
     const ok = written.filter(w => w.ok).map(w => w.change);
     if (ok.length) {
       const after = await timings.time('verify', () => loadCurrentAssignments(api, ok));
       for (const c of ok) {
         const rowId = rowIdOf.get(assignmentKey(c))!;
-        if (after(c) === c.after) { verified++; this.d.db.updateAssignment(rowId, { status: 'ok' }); }
+        if (after(c) === c.after) this.d.db.updateAssignment(rowId, { status: 'ok' });
         else this.d.db.updateAssignment(rowId, { status: 'error', error_code: 'VERIFY_MISMATCH', error_message: 'The org does not show the requested assignment after the update.' });
       }
     }
 
-    const outcome = verified === rows.length ? 'done' : verified > 0 ? 'partial' : 'failed';
+    const verified = this.d.db.listAssignments(cs.id).filter(r => r.status === 'ok').length;
+    const outcome = verified === all.length ? 'done' : verified > 0 ? 'partial' : 'failed';
     this.d.db.updateChangeSet(cs.id, { status: this.move(this.changeSet(cs.id), 'finish', outcome), finished_at: now(), timings_json: JSON.stringify(timings.steps) });
     this.d.db.touchOrg(org.id);
-    this.d.db.audit({ tenant: this.d.tenant, orgId: org.id, changeSetId: cs.id, actor: this.d.actor, action: 'change_set.finished', detail: `${outcome}: ${verified}/${rows.length}` });
+    this.d.db.audit({ tenant: this.d.tenant, orgId: org.id, changeSetId: cs.id, actor: this.d.actor, action: 'change_set.finished', detail: `${outcome}: ${verified}/${all.length}` });
   }
 
   /** New draft that restores the rows this change set changed successfully. */
