@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { api, type Org } from './api.ts';
+import { api, type Org, type User } from './api.ts';
 import { Login } from './pages/Login.tsx';
 import { Orgs } from './pages/Orgs.tsx';
 import { MatrixPage } from './pages/Matrix.tsx';
@@ -34,6 +34,8 @@ const readSeen = () => { try { return storage?.getItem(NEWS_SEEN) ?? null; } cat
 export function App() {
   const t = useT();
   const [session, setSession] = useState<boolean | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [signup, setSignup] = useState<'open' | 'invite'>('invite');
   const [view, setView] = useState<View>('orgs');
   const [orgs, setOrgs] = useState<Org[] | null>(null);
   const [ws, setWs] = useState<Workspace>(() => loadWorkspace(storage));
@@ -51,7 +53,9 @@ export function App() {
 
   const shown = view === 'work' ? visibleTab(ws) : null;
 
-  useEffect(() => { api.session().then(s => setSession(s.authenticated)).catch(() => setSession(false)); }, []);
+  useEffect(() => {
+    api.session().then(s => { setUser(s.user); setSignup(s.signup); setSession(s.authenticated); }).catch(() => setSession(false));
+  }, []);
   useEffect(() => { saveWorkspace(storage, ws); }, [ws]);
   useEffect(() => {
     if (view !== 'news' || newsSeen === LATEST) return;
@@ -112,7 +116,7 @@ export function App() {
   const tabDrag = useTabDrag(groupIds, (id, before) => setWs(w => moveTab(w, id, before)));
 
   if (session === null) return null;
-  if (!session) return <Login onDone={() => setSession(true)} />;
+  if (!session) return <Login signup={signup} onDone={u => { setUser(u); setSession(true); }} />;
   if (!orgs) return null;
 
   const orgById = (id: string | null) => orgs.find(o => o.id === id) ?? null;
@@ -159,7 +163,8 @@ export function App() {
           </nav>
           <span className="spacer" />
           <LangPicker />
-          <button className="btn sm" onClick={() => api.logout().then(() => setSession(false))}>{t.app.logout}</button>
+          {user && <button className="linklike user-chip" title={user.email} onClick={() => setView('settings')}>{user.name}</button>}
+          <button className="btn sm" onClick={() => api.logout().then(() => { setOrgs(null); setUser(null); setSignup('invite'); setSession(false); })}>{t.app.logout}</button>
         </div>
         <div className="wrap orgtabs" role="tablist" aria-label={t.app.openOrgs}>
           {ws.orgs.map(id => {
@@ -242,7 +247,7 @@ export function App() {
             onRenamed={updated => setOrgs(orgs.map(o => o.id === updated.id ? updated : o))} />
         )}
         {view === 'guide' && <Guide focus={guideFocus} />}
-        {view === 'settings' && <Settings />}
+        {view === 'settings' && <Settings user={user} onUser={setUser} />}
         {view === 'news' && <News onGuide={section => { setGuideFocus(section); setView('guide'); }} />}
         {view === 'history' && <History orgs={orgs} onOpen={(id, orgId, number) => showChangeSet(orgId, id, number)} />}
         {view === 'work' && !activeOrg && (

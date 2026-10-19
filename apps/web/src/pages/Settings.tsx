@@ -1,3 +1,5 @@
+import { useState, type FormEvent } from 'react';
+import { api, ApiError, type User } from '../api.ts';
 import { useT } from '../i18n.tsx';
 import { LAYOUT_VIEWS, MATRIX_VIEWS, useViews, type LayoutView, type MatrixView } from '../views.ts';
 
@@ -26,8 +28,53 @@ export function ViewPicture({ view }: { view: MatrixView | LayoutView }) {
   }
 }
 
-/** Settings: how the permission matrices and the layout assignments are shown. */
-export function Settings() {
+/** Name and password of the signed-in account. */
+function AccountSettings({ user, onUser }: { user: User; onUser: (u: User) => void }) {
+  const t = useT();
+  const a = t.settings.account;
+  const [name, setName] = useState(user.name);
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const save = async (e: FormEvent, body: Parameters<typeof api.updateAccount>[0], done: string) => {
+    e.preventDefault();
+    setNote(null);
+    try {
+      onUser(await api.updateAccount(body));
+      setCurrent(''); setNext('');
+      setNote({ ok: true, text: done });
+    } catch (err) {
+      setNote({ ok: false, text: err instanceof ApiError && err.code === 'WRONG_PASSWORD' ? t.login.errors.WRONG_PASSWORD : err instanceof ApiError && err.status === 400 ? t.login.errors.INVALID : String((err as Error).message) });
+    }
+  };
+  return (
+    <section className="panel settings-group">
+      <div className="panel-h"><h2>{a.title}</h2><span className="muted small">{user.email}</span></div>
+      <div className="account-forms">
+        <form onSubmit={e => save(e, { name }, a.saved)}>
+          <label className="field"><span>{a.name}</span>
+            <input className="input" id="account-name" required maxLength={80} value={name} onChange={e => setName(e.target.value)} />
+          </label>
+          <button className="btn sm" type="submit" disabled={!name.trim() || name.trim() === user.name}>{a.save}</button>
+        </form>
+        <form onSubmit={e => save(e, { currentPassword: current, newPassword: next }, a.passwordChanged)}>
+          <label className="field"><span>{a.currentPassword}</span>
+            <input className="input" type="password" id="current-password" autoComplete="current-password" required value={current} onChange={e => setCurrent(e.target.value)} />
+          </label>
+          <label className="field"><span>{a.newPassword}</span>
+            <input className="input" type="password" id="new-password" autoComplete="new-password" required minLength={12} value={next} onChange={e => setNext(e.target.value)} />
+            <small className="muted">{t.login.passwordHint}</small>
+          </label>
+          <button className="btn sm" type="submit">{a.changePassword}</button>
+        </form>
+      </div>
+      {note && <p className={note.ok ? 'muted small' : 'error'} role="status">{note.text}</p>}
+    </section>
+  );
+}
+
+/** Settings: the account, and how the permission matrices and the layout assignments are shown. */
+export function Settings({ user, onUser }: { user: User | null; onUser: (u: User) => void }) {
   const t = useT();
   const s = t.settings;
   const [views, setViews] = useViews();
@@ -53,6 +100,7 @@ export function Settings() {
   return (
     <div className="settings">
       <div className="view-head"><div><h1>{s.title}</h1><p>{s.intro}</p></div></div>
+      {user && <AccountSettings user={user} onUser={onUser} />}
       {group('matrix', MATRIX_VIEWS)}
       {group('layouts', LAYOUT_VIEWS)}
       <p className="muted small">{s.language}</p>

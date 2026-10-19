@@ -67,13 +67,18 @@ export const it: Messages = {
       changesets: { title: 'Change set', body: <>Nulla viene scritto finché non confermi. <b>Vai all'anteprima</b> trasforma le modifiche in sospeso in un change set con cosa viene aggiunto, cambiato e tolto, e gli avvisi. In produzione serve un'approvazione e devi scrivere il nome dell'org. L'esecuzione mostra l'avanzamento e il risultato riga per riga. Se il server si riavvia durante un'esecuzione, OrgFox la riprende appena riparte: rilegge l'org per riconoscere le righe già scritte e applica solo le altre.</> },
       export: { title: 'Esportare', body: <>Il pulsante <b>Esporta</b> salva quello che vedi: la matrice in Excel o CSV o come metadata Salesforce (package.xml e un file per profilo e permission set), i change set in Excel, CSV o metadata con i valori che impostano, e i layout in Excel o CSV. Un pannello in basso a destra mostra l'avanzamento dei file grandi.</> },
       history: { title: 'Storico e annullamento', body: <>Lo <b>Storico</b> elenca ogni change set con chi l'ha preparato e approvato, e quando. Ognuno conserva i valori di prima, quindi <b>Annulla queste modifiche</b>, nel change set, crea un change set che li ripristina.</> },
-      settings: { title: 'Lingua e sessione', body: <>Scegli English, Italiano, Français o Español dal menu con le bandiere. <b>Esci</b> chiude la sessione di OrgFox; le org restano collegate.</> }
+      settings: { title: 'Account, lingua e sessione', body: <>Entri con <b>email e password</b>, e ogni account vede solo le sue org, i suoi change set e il suo storico. Nella beta chiusa entri con un link di invito. Clicca il tuo nome in alto per aprire <b>Impostazioni</b>, dove cambi nome e password: una nuova password disconnette gli altri dispositivi. Scegli English, Italiano, Français o Español dal menu con le bandiere. <b>Esci</b> chiude la sessione di OrgFox; le org restano collegate. La sessione si chiude anche dopo 12 ore senza uso.</> }
     }
   },
 
   settings: {
     title: 'Impostazioni',
-    intro: 'Scegli come OrgFox mostra le matrici. La scelta resta in questo browser, e la puoi cambiare anche dal menu Vista in alto in ogni strumento.',
+    intro: "Il tuo account, e come OrgFox mostra le matrici. Le viste restano in questo browser, e le puoi cambiare anche dal menu Vista in alto in ogni strumento.",
+    account: {
+      title: 'Account', name: 'Nome', save: 'Salva nome', saved: 'Salvato.',
+      currentPassword: 'Password attuale', newPassword: 'Nuova password', changePassword: 'Cambia password',
+      passwordChanged: 'Password cambiata. Gli altri dispositivi sono stati disconnessi.'
+    },
     matrix: 'Matrici dei permessi (FLS e classi Apex)',
     layouts: 'Assegnazioni di page layout e Lightning page',
     current: 'In uso',
@@ -172,7 +177,26 @@ export const it: Messages = {
 
   news: { title: 'Novità', intro: 'Ogni modifica a OrgFox, dalla più recente.', seeGuide: 'Vedi nella guida' },
 
-  login: { password: 'Password', wrong: 'Password errata.', submit: 'Entra' },
+  login: {
+    loginTitle: 'Accedi', signupTitle: 'Crea il tuo account', resetTitle: 'Scegli una nuova password',
+    email: 'Email', password: 'Password', newPassword: 'Nuova password', name: 'Il tuo nome',
+    passwordHint: 'Almeno 12 caratteri.',
+    submit: 'Entra', signupSubmit: 'Crea account', resetSubmit: 'Salva ed entra',
+    signupIntro: 'Ogni account ha le sue org, i suoi change set e il suo storico.',
+    invited: (email: string) => `Invito per ${email}.`,
+    toSignup: 'Nuovo? Crea un account', toLogin: 'Torna all’accesso',
+    inviteOnly: 'OrgFox è in beta chiusa: per creare un account serve un invito.',
+    forgot: 'Password dimenticata? Scrivici e ti mandiamo un link per reimpostarla.',
+    errors: {
+      WRONG_LOGIN: 'Email o password errata.',
+      THROTTLED: 'Troppi tentativi. Aspetta qualche minuto e riprova.',
+      INVITE_REQUIRED: 'Serve un invito valido per questo indirizzo email.',
+      EMAIL_TAKEN: 'Esiste già un account con questa email: accedi.',
+      LINK_INVALID: 'Questo link non è più valido. Chiedine uno nuovo.',
+      WRONG_PASSWORD: 'La password attuale è errata.',
+      INVALID: 'Controlla i campi: la password deve avere almeno 12 caratteri.'
+    }
+  },
 
   history: {
     title: 'Storico modifiche',

@@ -1,26 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app.ts';
-import type { Config } from '../src/config.ts';
-import { DEFAULT_TENANT, Db } from '../src/db.ts';
+import { DEFAULT_TENANT, type Db } from '../src/db.ts';
+import { addUser, config, login, OWNER, openTestDb } from './helpers.ts';
 import { SalesforceClient, toXml } from '../src/salesforce/client.ts';
 import { demoOrg } from '../src/salesforce/demo.ts';
 import { loadLayoutAnalysis, loadPageAnalysis } from '../src/salesforce/pages.ts';
 import { writeAssignments } from '../src/services/assignments.ts';
 import { assignmentFromRow } from '../src/db.ts';
 
-const config: Config = {
-  port: 0, appUrl: 'http://localhost:3000', appPassword: 'secret-pass', appSecret: 'x'.repeat(40), appUser: 'owner',
-  sfClientId: 'cid', sfClientSecret: null, sfApiVersion: 'v62.0', dbPath: ':memory:', requireDifferentApprover: false, demoMode: false
-};
 
 async function setup(reuse?: { db: Db; org: ReturnType<typeof demoOrg> }) {
-  const db = reuse?.db ?? new Db(':memory:');
+  const db = reuse?.db ?? await openTestDb();
+  if (!reuse) await addUser(db);
   const org = reuse?.org ?? demoOrg();
-  if (!reuse) db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: 'Acme UAT', username: 'me@acme.com',
+  if (!reuse) await db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: 'Acme UAT', username: 'me@acme.com',
     instance_url: 'https://acme.my.salesforce.com', login_url: 'https://test.salesforce.com', is_sandbox: 1, refresh_token_enc: 'x', access_token_enc: null, alias: null });
   const app = buildApp({ config, db, apiFor: () => org });
-  const login = await app.inject({ method: 'POST', url: '/api/session', payload: { password: 'secret-pass' } });
-  const cookie = login.headers['set-cookie'] as string;
+  const cookie = await login(app);
   const call = async (method: 'GET' | 'POST', url: string, payload?: object) => {
     const res = await app.inject({ method, url, payload, headers: { cookie } });
     return { status: res.statusCode, body: res.json() };
@@ -53,8 +49,8 @@ describe('assignment change sets', () => {
       changes: [layout('Sales User', 'Business', 'Account (Marketing) Layout'), page('Admin', 'Partner', 'Account_Sales_Page')]
     })).body;
     // The server stopped after writing the layout, before recording it.
-    db.updateChangeSet(cs.id, { status: 'running', started_at: new Date().toISOString() });
-    const [written] = db.listAssignments(cs.id).filter(r => r.kind === 'layout').map(assignmentFromRow);
+    await db.updateChangeSet(cs.id, { status: 'running', started_at: new Date().toISOString() });
+    const [written] = (await db.listAssignments(cs.id)).filter(r => r.kind === 'layout').map(assignmentFromRow);
     expect((await writeAssignments(org, [written!]))[0]!.ok).toBe(true);
     await current.app.close();
 

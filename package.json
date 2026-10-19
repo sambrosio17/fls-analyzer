@@ -11,7 +11,8 @@
     "build": "npm run build --workspace @fls/web",
     "start": "npm run start --workspace @fls/server",
     "test": "vitest run",
-    "typecheck": "tsc -p packages/core && tsc -p apps/server && tsc -p apps/web"
+    "typecheck": "tsc -p packages/core && tsc -p apps/server && tsc -p apps/web",
+    "account": "npm run account --workspace @fls/server --"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

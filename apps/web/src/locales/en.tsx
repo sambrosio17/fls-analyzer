@@ -70,13 +70,18 @@ export const en = {
       changesets: { title: 'Change sets', body: <>Nothing is written until you confirm. <b>Go to preview</b> turns pending changes into a change set with what is added, changed and removed, and warnings. In production it needs approval and the org name typed in. Running it shows progress and the result per row. If the server restarts during a run, OrgFox picks it up again when it starts: it reads the org to recognise the rows already written and applies only the rest.</> },
       export: { title: 'Export', body: <>The <b>Export</b> button saves what you see: the matrix as Excel or CSV or as Salesforce metadata (package.xml and one file per profile and permission set), change sets as Excel, CSV or metadata with the values they set, and layouts as Excel or CSV. A panel at the bottom right shows the progress of big files.</> },
       history: { title: 'History and undo', body: <><b>History</b> lists every change set with who prepared and approved it and when. Each one keeps the values from before, so <b>Undo these changes</b>, in the change set, creates a change set that restores them.</> },
-      settings: { title: 'Language and session', body: <>Pick English, Italiano, Français or Español from the menu with the flags. <b>Log out</b> ends the OrgFox session; your orgs stay connected.</> }
+      settings: { title: 'Account, language and session', body: <>You log in with your <b>email and password</b>, and each account sees only its own orgs, change sets and history. In the closed beta you join with an invite link. Click your name at the top to open <b>Settings</b>, where you change your name and password: a new password logs out your other devices. Pick English, Italiano, Français or Español from the menu with the flags. <b>Log out</b> ends the OrgFox session; your orgs stay connected. The session also ends after 12 hours without use.</> }
     }
   },
 
   settings: {
     title: 'Settings',
-    intro: 'Choose how OrgFox shows the matrices. The choice is saved in this browser, and the View menu at the top of each tool changes it too.',
+    intro: "Your account, and how OrgFox shows the matrices. The views are saved in this browser, and the View menu at the top of each tool changes them too.",
+    account: {
+      title: 'Account', name: 'Name', save: 'Save name', saved: 'Saved.',
+      currentPassword: 'Current password', newPassword: 'New password', changePassword: 'Change password',
+      passwordChanged: 'Password changed. Other devices have been logged out.'
+    },
     matrix: 'Permission matrices (FLS and Apex classes)',
     layouts: 'Page layout and Lightning page assignments',
     current: 'In use',
@@ -175,7 +180,26 @@ export const en = {
 
   news: { title: 'What’s new', intro: 'Every change to OrgFox, newest first.', seeGuide: 'See in the guide' },
 
-  login: { password: 'Password', wrong: 'Wrong password.', submit: 'Log in' },
+  login: {
+    loginTitle: 'Log in', signupTitle: 'Create your account', resetTitle: 'Choose a new password',
+    email: 'Email', password: 'Password', newPassword: 'New password', name: 'Your name',
+    passwordHint: 'At least 12 characters.',
+    submit: 'Log in', signupSubmit: 'Create account', resetSubmit: 'Save and log in',
+    signupIntro: 'Each account has its own orgs, change sets and history.',
+    invited: (email: string) => `You were invited as ${email}.`,
+    toSignup: 'New here? Create an account', toLogin: 'Back to log in',
+    inviteOnly: 'OrgFox is in closed beta: you need an invite to create an account.',
+    forgot: 'Forgot your password? Write to us and we will send you a reset link.',
+    errors: {
+      WRONG_LOGIN: 'Wrong email or password.',
+      THROTTLED: 'Too many attempts. Wait a few minutes and try again.',
+      INVITE_REQUIRED: 'You need a valid invite for this email address.',
+      EMAIL_TAKEN: 'An account with this email already exists: log in instead.',
+      LINK_INVALID: 'This link is no longer valid. Ask for a new one.',
+      WRONG_PASSWORD: 'The current password is wrong.',
+      INVALID: 'Check the fields: the password needs at least 12 characters.'
+    }
+  },
 
   history: {
     title: 'Change history',

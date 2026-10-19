@@ -58,9 +58,15 @@ export interface PageAnalysis {
 }
 
 export class ApiError extends Error {
-  /** `detail` is the raw cause the server reports next to its message, when it has one. */
-  constructor(readonly status: number, message: string, readonly detail?: string) { super(message); }
+  /**
+   * `detail` is the raw cause the server reports next to its message, when it has one;
+   * `code` names the error (e.g. WRONG_LOGIN) so it can be shown in the user's language.
+   */
+  constructor(readonly status: number, message: string, readonly detail?: string, readonly code?: string) { super(message); }
 }
+
+export interface User { name: string; email: string }
+export interface Session { authenticated: boolean; user: User | null; signup: 'open' | 'invite' }
 
 async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -69,15 +75,20 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const data = await res.json().catch(() => ({}));
-  const err = data as { error?: string; detail?: string };
-  if (!res.ok) throw new ApiError(res.status, err.error ?? `HTTP ${res.status}`, err.detail);
+  const err = data as { error?: string; detail?: string; code?: string };
+  if (!res.ok) throw new ApiError(res.status, err.error ?? `HTTP ${res.status}`, err.detail, err.code);
   return data as T;
 }
 
 export const api = {
-  session: () => call<{ authenticated: boolean; user: string | null }>('GET', '/api/session'),
-  login: (password: string) => call<{ authenticated: boolean }>('POST', '/api/session', { password }),
+  session: () => call<Session>('GET', '/api/session'),
+  login: (email: string, password: string) => call<Session>('POST', '/api/session', { email, password }),
   logout: () => call('DELETE', '/api/session'),
+  signup: (body: { name: string; email: string; password: string; invite?: string }) => call<Session>('POST', '/api/account', body),
+  /** The email an invite or reset link belongs to; fails when the link is no longer valid. */
+  link: (kind: 'invite' | 'reset', code: string) => call<{ email: string }>('GET', `/api/account/link?kind=${kind}&code=${encodeURIComponent(code)}`),
+  resetPassword: (code: string, password: string) => call<Session>('POST', '/api/account/reset', { code, password }),
+  updateAccount: (body: { name?: string; currentPassword?: string; newPassword?: string }) => call<User>('PATCH', '/api/account', body),
   orgs: () => call<Org[]>('GET', '/api/orgs'),
   removeOrg: (id: string) => call('DELETE', `/api/orgs/${id}`),
   renameOrg: (id: string, alias: string) => call<Org>('PATCH', `/api/orgs/${id}`, { alias }),

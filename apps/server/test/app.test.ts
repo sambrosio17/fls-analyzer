@@ -1,28 +1,24 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.ts';
-import type { Config } from '../src/config.ts';
-import { DEFAULT_TENANT, Db } from '../src/db.ts';
+import { DEFAULT_TENANT, type Db } from '../src/db.ts';
+import { addUser, config, login, OWNER, openTestDb } from './helpers.ts';
 import { fakeOrg } from './fakeOrg.ts';
 import { TokenCipher } from '../src/crypto.ts';
 import type { TokenResponse } from '../src/salesforce/oauth.ts';
 
-const config: Config = {
-  port: 0, appUrl: 'http://localhost:3000', appPassword: 'secret-pass', appSecret: 'x'.repeat(40), appUser: 'owner',
-  sfClientId: 'cid', sfClientSecret: null, sfApiVersion: 'v62.0', dbPath: ':memory:', requireDifferentApprover: false, demoMode: false
-};
 
 const SALES = '0PS000000000001';
 const FIN = '0PS000000000002';
 const CPQ = '0PS000000000003';
 
 async function setup(isSandbox = true, reuse?: { db: Db; fake: ReturnType<typeof fakeOrg> }) {
-  const db = reuse?.db ?? new Db(':memory:');
+  const db = reuse?.db ?? await openTestDb();
+  if (!reuse) await addUser(db);
   const fake = reuse?.fake ?? fakeOrg(isSandbox);
-  if (!reuse) db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: isSandbox ? 'Acme UAT' : 'Acme', username: 'me@acme.com',
+  if (!reuse) await db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: isSandbox ? 'Acme UAT' : 'Acme', username: 'me@acme.com',
     instance_url: 'https://acme.my.salesforce.com', login_url: 'https://login.salesforce.com', is_sandbox: isSandbox ? 1 : 0, refresh_token_enc: 'x', access_token_enc: null, alias: null });
   const app = buildApp({ config, db, apiFor: () => fake });
-  const login = await app.inject({ method: 'POST', url: '/api/session', payload: { password: 'secret-pass' } });
-  const cookie = login.headers['set-cookie'] as string;
+  const cookie = await login(app);
   const call = async (method: 'GET' | 'POST' | 'PATCH', url: string, payload?: object) => {
     const res = await app.inject({ method, url, payload, headers: { cookie } });
     return { status: res.statusCode, body: res.json() };
@@ -117,9 +113,9 @@ describe('API', () => {
     const cs = created.body;
     const row = (label: string, field: string) => cs.items.find((i: { parentLabel: string; field: string }) => i.parentLabel === label && i.field === field);
     // The server stopped mid-run: one row was written and recorded, one written but not yet recorded, two not written.
-    db.updateChangeSet(cs.id, { status: 'running', started_at: new Date().toISOString() });
+    await db.updateChangeSet(cs.id, { status: 'running', started_at: new Date().toISOString() });
     fake.addPerm(FIN, 'Account.Industry', true, true);
-    db.updateItem(row('Finance Access', 'Account.Industry').id, { status: 'ok' });
+    await db.updateItem(row('Finance Access', 'Account.Industry').id, { status: 'ok' });
     fake.addPerm(FIN, 'Account.Tax_Code__c', true, true);
     await current.app.close();
 
@@ -198,7 +194,7 @@ describe('API', () => {
     expect((await call('POST', `/api/change-sets/${cs.id}/execute`, { confirmName: 'Acme' })).status).toBe(409);
     expect((await call('POST', `/api/change-sets/${cs.id}/submit`)).body.status).toBe('pending_approval');
     const approved = await call('POST', `/api/change-sets/${cs.id}/approve`);
-    expect(approved.body).toMatchObject({ status: 'approved', approvedBy: 'owner', conflicts: 0 });
+    expect(approved.body).toMatchObject({ status: 'approved', approvedBy: OWNER, conflicts: 0 });
     expect((await call('POST', `/api/change-sets/${cs.id}/execute`, { confirmName: 'Wrong' })).status).toBe(400);
     // Once the org has an alias, that is the name to type.
     expect((await call('PATCH', '/api/orgs/org1', { alias: '  Acme PROD ' })).body).toMatchObject({ alias: 'Acme PROD', label: 'Acme PROD', name: 'Acme' });
@@ -219,14 +215,14 @@ describe('API', () => {
 
 describe('access token refresh', () => {
   async function tokenSetup(refresh: (loginUrl: string, token: string) => Promise<TokenResponse>) {
-    const db = new Db(':memory:');
+    const db = await openTestDb();
+    await addUser(db);
     const cipher = new TokenCipher(config.appSecret);
-    db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: 'Acme UAT', username: 'me@acme.com',
+    await db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: 'Acme UAT', username: 'me@acme.com',
       instance_url: 'https://acme.my.salesforce.com', login_url: 'https://test.salesforce.com', is_sandbox: 1,
       refresh_token_enc: cipher.encrypt('refresh-1'), access_token_enc: cipher.encrypt('old'), alias: 'UAT' });
     const app = buildApp({ config, db, apiFor: () => fakeOrg(true), refreshToken: refresh });
-    const login = await app.inject({ method: 'POST', url: '/api/session', payload: { password: 'secret-pass' } });
-    const cookie = login.headers['set-cookie'] as string;
+    const cookie = await login(app);
     return { app, db, cipher, cookie };
   }
 
@@ -239,7 +235,7 @@ describe('access token refresh', () => {
     const res = await app.inject({ method: 'POST', url: '/api/orgs/org1/token', headers: { cookie } });
     expect(res.statusCode).toBe(200);
     expect(calls).toEqual(['https://test.salesforce.com refresh-1']);
-    expect(cipher.decrypt(db.getOrg(DEFAULT_TENANT, 'org1')!.access_token_enc!)).toBe('new');
+    expect(cipher.decrypt((await db.getOrg(DEFAULT_TENANT, 'org1'))!.access_token_enc!)).toBe('new');
     await app.close();
   });
 
@@ -249,7 +245,7 @@ describe('access token refresh', () => {
     expect(res.statusCode).toBe(409);
     expect(res.json()).toMatchObject({ reauth: true });
     expect(res.json().error).toContain('invalid_grant');
-    expect(cipher.decrypt(db.getOrg(DEFAULT_TENANT, 'org1')!.access_token_enc!)).toBe('old');
+    expect(cipher.decrypt((await db.getOrg(DEFAULT_TENANT, 'org1'))!.access_token_enc!)).toBe('old');
     await app.close();
   });
 
