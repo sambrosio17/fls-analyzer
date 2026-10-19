@@ -15,6 +15,15 @@ export interface ChangeEntry {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-10-19', prs: [32], guide: 'settings',
+    text: {
+      en: { title: 'Accounts', body: 'OrgFox now has real accounts: you log in with your email and password, and each account sees only its own orgs, change sets and history. In the closed beta you join with an invite link. Change your name and password in Settings, where a new password logs out your other devices. On a local install the first account is created from the login page and keeps the orgs and change sets already there.' },
+      it: { title: 'Account', body: 'OrgFox ora ha account veri: entri con email e password, e ogni account vede solo le sue org, i suoi change set e il suo storico. Nella beta chiusa entri con un link di invito. Nome e password si cambiano in Impostazioni, e una nuova password disconnette gli altri dispositivi. In un’installazione locale il primo account si crea dalla pagina di accesso e tiene le org e i change set già presenti.' },
+      fr: { title: 'Comptes', body: 'OrgFox a maintenant de vrais comptes : vous vous connectez avec votre e-mail et votre mot de passe, et chaque compte ne voit que ses propres orgs, change sets et historique. Pendant la bêta fermée, on entre avec un lien d’invitation. Changez votre nom et votre mot de passe dans Paramètres ; un nouveau mot de passe déconnecte vos autres appareils. Sur une installation locale, le premier compte se crée depuis la page de connexion et garde les orgs et change sets déjà présents.' },
+      es: { title: 'Cuentas', body: 'OrgFox ya tiene cuentas de verdad: entras con tu email y contraseña, y cada cuenta ve solo sus propias orgs, change sets e historial. En la beta cerrada se entra con un enlace de invitación. Cambia tu nombre y contraseña en Ajustes; una contraseña nueva cierra la sesión en tus otros dispositivos. En una instalación local, la primera cuenta se crea desde la página de acceso y conserva las orgs y change sets que ya había.' }
+    }
+  },
+  {
     date: '2026-10-17', prs: [31], guide: 'changesets',
     text: {
       en: { title: 'Runs survive a server restart', body: 'If the server restarts while a change set is being applied, OrgFox picks it up again as soon as it starts. It reads the org to recognise the rows already written, applies only the others, and the change set says it was resumed.' },

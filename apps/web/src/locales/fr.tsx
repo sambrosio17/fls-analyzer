@@ -67,13 +67,18 @@ export const fr: Messages = {
       changesets: { title: 'Change sets', body: <>Rien n’est écrit avant votre confirmation. <b>Voir l’aperçu</b> transforme les changements en attente en change set avec ce qui est ajouté, modifié et retiré, et les avertissements. En production il faut une approbation et saisir le nom de l’org. L’exécution montre la progression et le résultat ligne par ligne. Si le serveur redémarre pendant une exécution, OrgFox la reprend au démarrage : il relit l’org pour reconnaître les lignes déjà écrites et n’applique que les autres.</> },
       export: { title: 'Exporter', body: <>Le bouton <b>Exporter</b> enregistre ce que vous voyez : la matrice en Excel, en CSV ou en métadonnées Salesforce (package.xml et un fichier par profil et ensemble d’autorisations), les change sets en Excel, CSV ou métadonnées avec les valeurs qu’ils définissent, et les présentations en Excel ou CSV. Un panneau en bas à droite montre la progression des gros fichiers.</> },
       history: { title: 'Historique et annulation', body: <>L’<b>Historique</b> liste chaque change set avec qui l’a préparé et approuvé, et quand. Chacun garde les valeurs d’avant, donc <b>Annuler ces modifications</b>, dans le change set, crée un change set qui les restaure.</> },
-      settings: { title: 'Langue et session', body: <>Choisissez English, Italiano, Français ou Español dans le menu avec les drapeaux. <b>Se déconnecter</b> ferme la session OrgFox ; vos orgs restent connectées.</> }
+      settings: { title: 'Compte, langue et session', body: <>Vous vous connectez avec votre <b>e-mail et mot de passe</b>, et chaque compte ne voit que ses propres orgs, change sets et historique. Pendant la bêta fermée, on entre avec un lien d’invitation. Cliquez sur votre nom en haut pour ouvrir <b>Paramètres</b>, où vous changez votre nom et votre mot de passe : un nouveau mot de passe déconnecte vos autres appareils. Choisissez English, Italiano, Français ou Español dans le menu avec les drapeaux. <b>Se déconnecter</b> ferme la session OrgFox ; vos orgs restent connectées. La session se ferme aussi après 12 heures sans utilisation.</> }
     }
   },
 
   settings: {
     title: 'Paramètres',
-    intro: 'Choisissez comment OrgFox affiche les matrices. Le choix est gardé dans ce navigateur, et le menu Vue en haut de chaque outil le change aussi.',
+    intro: "Votre compte, et la façon dont OrgFox affiche les matrices. Les vues sont gardées dans ce navigateur, et le menu Vue en haut de chaque outil les change aussi.",
+    account: {
+      title: 'Compte', name: 'Nom', save: 'Enregistrer le nom', saved: 'Enregistré.',
+      currentPassword: 'Mot de passe actuel', newPassword: 'Nouveau mot de passe', changePassword: 'Changer le mot de passe',
+      passwordChanged: 'Mot de passe changé. Les autres appareils ont été déconnectés.'
+    },
     matrix: 'Matrices des autorisations (FLS et classes Apex)',
     layouts: 'Attributions de présentations et de pages Lightning',
     current: 'Utilisée',
@@ -172,7 +177,26 @@ export const fr: Messages = {
 
   news: { title: 'Nouveautés', intro: 'Chaque changement d’OrgFox, du plus récent au plus ancien.', seeGuide: 'Voir dans le guide' },
 
-  login: { password: 'Mot de passe', wrong: 'Mot de passe incorrect.', submit: 'Se connecter' },
+  login: {
+    loginTitle: 'Se connecter', signupTitle: 'Créez votre compte', resetTitle: 'Choisissez un nouveau mot de passe',
+    email: 'E-mail', password: 'Mot de passe', newPassword: 'Nouveau mot de passe', name: 'Votre nom',
+    passwordHint: 'Au moins 12 caractères.',
+    submit: 'Se connecter', signupSubmit: 'Créer le compte', resetSubmit: 'Enregistrer et se connecter',
+    signupIntro: 'Chaque compte a ses propres orgs, change sets et historique.',
+    invited: (email: string) => `Invitation pour ${email}.`,
+    toSignup: 'Nouveau ? Créez un compte', toLogin: 'Retour à la connexion',
+    inviteOnly: 'OrgFox est en bêta fermée : il faut une invitation pour créer un compte.',
+    forgot: 'Mot de passe oublié ? Écrivez-nous et nous vous enverrons un lien pour le réinitialiser.',
+    errors: {
+      WRONG_LOGIN: 'E-mail ou mot de passe incorrect.',
+      THROTTLED: 'Trop de tentatives. Attendez quelques minutes et réessayez.',
+      INVITE_REQUIRED: 'Il faut une invitation valide pour cette adresse e-mail.',
+      EMAIL_TAKEN: 'Un compte existe déjà avec cet e-mail : connectez-vous.',
+      LINK_INVALID: 'Ce lien n’est plus valide. Demandez-en un nouveau.',
+      WRONG_PASSWORD: 'Le mot de passe actuel est incorrect.',
+      INVALID: 'Vérifiez les champs : le mot de passe doit avoir au moins 12 caractères.'
+    }
+  },
 
   history: {
     title: 'Historique des modifications',

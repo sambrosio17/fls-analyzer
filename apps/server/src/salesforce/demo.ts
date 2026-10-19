@@ -1,7 +1,8 @@
 import { MemoryOrg, type MemField, type MemPages, type MemPermSet } from './memoryOrg.ts';
 
 /** Demo org with sample data, to try the app without a Salesforce org (DEMO_MODE=true). */
-export const DEMO_ORG_ID = 'demo';
+/** Instance URL of the demo orgs: never contacted, it marks the org as the in-memory demo. */
+export const DEMO_INSTANCE_URL = 'https://demo.invalid';
 
 const f = (name: string, label: string, type: string, extra: Partial<MemField> = {}): MemField =>
   ({ name, label, type, permissionable: true, calculated: false, autoNumber: false, custom: name.endsWith('__c'), ...extra });

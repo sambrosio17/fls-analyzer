@@ -67,13 +67,18 @@ export const es: Messages = {
       changesets: { title: 'Change sets', body: <>No se escribe nada hasta que confirmas. <b>Ir a la vista previa</b> convierte los cambios pendientes en un change set con lo que se añade, cambia y quita, y los avisos. En producción necesita aprobación y escribir el nombre de la org. La ejecución muestra el progreso y el resultado fila por fila. Si el servidor se reinicia durante una ejecución, OrgFox la retoma al arrancar: relee la org para reconocer las filas ya escritas y aplica solo las demás.</> },
       export: { title: 'Exportar', body: <>El botón <b>Exportar</b> guarda lo que ves: la matriz en Excel, CSV o como metadatos de Salesforce (package.xml y un archivo por perfil y conjunto de permisos), los change sets en Excel, CSV o metadatos con los valores que fijan, y los formatos en Excel o CSV. Un panel abajo a la derecha muestra el progreso de los archivos grandes.</> },
       history: { title: 'Historial y deshacer', body: <>El <b>Historial</b> muestra cada change set con quién lo preparó y aprobó, y cuándo. Cada uno guarda los valores anteriores, así que <b>Deshacer estos cambios</b>, en el change set, crea un change set que los restaura.</> },
-      settings: { title: 'Idioma y sesión', body: <>Elige English, Italiano, Français o Español en el menú con las banderas. <b>Salir</b> cierra la sesión de OrgFox; tus orgs siguen conectadas.</> }
+      settings: { title: 'Cuenta, idioma y sesión', body: <>Entras con tu <b>email y contraseña</b>, y cada cuenta ve solo sus propias orgs, change sets e historial. En la beta cerrada se entra con un enlace de invitación. Haz clic en tu nombre arriba para abrir <b>Ajustes</b>, donde cambias tu nombre y tu contraseña: una contraseña nueva cierra la sesión en tus otros dispositivos. Elige English, Italiano, Français o Español en el menú con las banderas. <b>Salir</b> cierra la sesión de OrgFox; tus orgs siguen conectadas. La sesión también se cierra tras 12 horas sin uso.</> }
     }
   },
 
   settings: {
     title: 'Ajustes',
-    intro: 'Elige cómo muestra OrgFox las matrices. La elección se guarda en este navegador, y el menú Vista arriba en cada herramienta también la cambia.',
+    intro: "Tu cuenta, y cómo muestra OrgFox las matrices. Las vistas se guardan en este navegador, y el menú Vista arriba en cada herramienta también las cambia.",
+    account: {
+      title: 'Cuenta', name: 'Nombre', save: 'Guardar nombre', saved: 'Guardado.',
+      currentPassword: 'Contraseña actual', newPassword: 'Contraseña nueva', changePassword: 'Cambiar contraseña',
+      passwordChanged: 'Contraseña cambiada. Se cerró la sesión en los demás dispositivos.'
+    },
     matrix: 'Matrices de permisos (FLS y clases Apex)',
     layouts: 'Asignaciones de formatos y páginas Lightning',
     current: 'En uso',
@@ -172,7 +177,26 @@ export const es: Messages = {
 
   news: { title: 'Novedades', intro: 'Cada cambio de OrgFox, del más reciente al más antiguo.', seeGuide: 'Ver en la guía' },
 
-  login: { password: 'Contraseña', wrong: 'Contraseña incorrecta.', submit: 'Entrar' },
+  login: {
+    loginTitle: 'Entrar', signupTitle: 'Crea tu cuenta', resetTitle: 'Elige una contraseña nueva',
+    email: 'Email', password: 'Contraseña', newPassword: 'Contraseña nueva', name: 'Tu nombre',
+    passwordHint: 'Al menos 12 caracteres.',
+    submit: 'Entrar', signupSubmit: 'Crear cuenta', resetSubmit: 'Guardar y entrar',
+    signupIntro: 'Cada cuenta tiene sus propias orgs, change sets e historial.',
+    invited: (email: string) => `Invitación para ${email}.`,
+    toSignup: '¿Nuevo? Crea una cuenta', toLogin: 'Volver a entrar',
+    inviteOnly: 'OrgFox está en beta cerrada: necesitas una invitación para crear una cuenta.',
+    forgot: '¿Olvidaste la contraseña? Escríbenos y te enviaremos un enlace para cambiarla.',
+    errors: {
+      WRONG_LOGIN: 'Email o contraseña incorrectos.',
+      THROTTLED: 'Demasiados intentos. Espera unos minutos y vuelve a intentarlo.',
+      INVITE_REQUIRED: 'Necesitas una invitación válida para esta dirección de email.',
+      EMAIL_TAKEN: 'Ya existe una cuenta con este email: entra con ella.',
+      LINK_INVALID: 'Este enlace ya no es válido. Pide uno nuevo.',
+      WRONG_PASSWORD: 'La contraseña actual es incorrecta.',
+      INVALID: 'Revisa los campos: la contraseña necesita al menos 12 caracteres.'
+    }
+  },
 
   history: {
     title: 'Historial de cambios',

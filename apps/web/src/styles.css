@@ -103,6 +103,15 @@ ul.plain { list-style: none; margin: 0; display: grid; gap: 6px; }
 
 .login { max-width: 380px; padding-top: 12vh; }
 .login form { display: grid; gap: 14px; }
+.login form .field { margin-bottom: 0; }
+.login form p { margin: 0; }
+.login-title { font-size: 18px; margin: 0; }
+.login .linklike { color: var(--accent); justify-self: start; }
+.user-chip { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 4px; }
+.account-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; padding: 14px 16px 16px; }
+.settings-group > p { margin: 0; padding: 0 16px 14px; }
+.account-forms form { display: grid; align-content: start; }
+.account-forms .btn { justify-self: start; }
 .error { color: var(--danger); margin: 0; }
 .field { display: grid; gap: 4px; margin-bottom: 14px; }
 .field > span { font-size: 12px; font-weight: 600; color: var(--muted); }

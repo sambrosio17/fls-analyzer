@@ -6,15 +6,15 @@ import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { ACCENTS, TransitionError } from '@fls/core';
 import type { Config } from './config.ts';
-import { pkcePair, randomToken, safeEqual, TokenCipher } from './crypto.ts';
-import { DEFAULT_TENANT, Db, orgLabel, type OrgRow } from './db.ts';
+import { registerAccounts, type SessionUser } from './accounts.ts';
+import { pkcePair, randomToken, TokenCipher } from './crypto.ts';
+import { Db, orgLabel, type OrgRow } from './db.ts';
 import { SalesforceClient, SalesforceError, type SfApi } from './salesforce/client.ts';
 import { loadLayoutAnalysis, loadPageAnalysis, loadProfiles } from './salesforce/pages.ts';
 import { accessStrings, listObjects, loadFields, loadOrgInfo, loadPermissionSets, loadSnapshot, loadUserPermissions } from './salesforce/metadata.ts';
 import { authorizeUrl, exchangeCode, loginUrlFor, refreshAccessToken, type OAuthSettings, type TokenResponse } from './salesforce/oauth.ts';
-import { ChangeSetService, NotFoundError } from './services/changesets.ts';
+import { ChangeSetService, NotFoundError, type Actor } from './services/changesets.ts';
 
-const SESSION = 'fls_session';
 const OAUTH = 'fls_oauth';
 
 export interface AppOptions {
@@ -22,8 +22,10 @@ export interface AppOptions {
   db: Db;
   /** Overrides the Salesforce client (tests). */
   apiFor?: (org: OrgRow) => SfApi;
-  /** Fixed clients by org id, e.g. the demo org. */
-  extraApis?: Map<string, SfApi>;
+  /** Fixed clients for some orgs, e.g. the demo org; undefined for a real org. */
+  extraApi?: (org: OrgRow) => SfApi | undefined;
+  /** Called when a user signs in, e.g. to give their workspace the demo org. */
+  prepareTenant?: (tenant: string) => Promise<void>;
   /** Overrides the OAuth refresh-token call (tests). */
   refreshToken?: (loginUrl: string, refreshToken: string) => Promise<TokenResponse>;
 }
@@ -50,29 +52,28 @@ export function orgDto(o: OrgRow) {
   return { id: o.id, label: orgLabel(o), alias: o.alias, name: o.name, username: o.username, instanceUrl: o.instance_url, isSandbox: !!o.is_sandbox, lastSyncAt: o.last_sync_at, accent: o.accent ?? null };
 }
 
-export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshToken }: AppOptions) {
-  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? (process.env.VITEST ? 'silent' : 'info') } });
+export function buildApp({ config, db, apiFor: apiOverride, extraApi, prepareTenant, refreshToken }: AppOptions) {
+  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? (process.env.VITEST ? 'silent' : 'info') }, trustProxy: config.trustProxy });
   const cipher = new TokenCipher(config.appSecret);
-  const tenant = DEFAULT_TENANT;
   const oauth: OAuthSettings = { clientId: config.sfClientId, clientSecret: config.sfClientSecret, redirectUri: `${config.appUrl}/oauth/callback` };
   const secure = config.appUrl.startsWith('https://');
   const refresh = refreshToken ?? ((loginUrl: string, token: string) => refreshAccessToken(loginUrl, oauth, token));
   /** Gets a new access token with the stored refresh token and saves it. */
   const renewToken = async (org: OrgRow) => {
     const t = await refresh(org.login_url, cipher.decrypt(org.refresh_token_enc));
-    db.setAccessToken(org.id, cipher.encrypt(t.access_token));
+    await db.setAccessToken(org.id, cipher.encrypt(t.access_token));
     return t.access_token;
   };
 
-  const apiFor = apiOverride ?? ((org: OrgRow) => extraApis?.get(org.id) ?? new SalesforceClient({
+  const apiFor = apiOverride ?? ((org: OrgRow) => extraApi?.(org) ?? new SalesforceClient({
     instanceUrl: org.instance_url,
     apiVersion: config.sfApiVersion,
     accessToken: org.access_token_enc ? cipher.decrypt(org.access_token_enc) : null,
     refresh: () => renewToken(org)
   }));
-  const service = new ChangeSetService({ db, tenant, actor: config.appUser, requireDifferentApprover: config.requireDifferentApprover, apiFor });
+  const service = new ChangeSetService({ db, requireDifferentApprover: config.requireDifferentApprover, apiFor });
   // Runs a restart cut short carry on from where they stopped.
-  service.resumeInterrupted();
+  service.resumeInterrupted().catch(err => app.log.error(err));
 
   app.register(cookie, { secret: config.appSecret });
 
@@ -82,14 +83,25 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
     if (err instanceof z.ZodError) return reply.code(400).send({ error: 'Invalid request', issues: err.issues });
     if (err instanceof SalesforceError) return reply.code(502).send({ error: err.message, salesforce: err.body });
     app.log.error(err);
-    return reply.code((err as { statusCode?: number }).statusCode ?? 500).send({ error: (err as Error).message });
+    const { statusCode, code } = err as { statusCode?: number; code?: unknown };
+    // `code` lets the web app show the message in the user's language.
+    return reply.code(statusCode ?? 500).send({ error: (err as Error).message, ...(typeof code === 'string' && /^[A-Z_]+$/.test(code) ? { code } : {}) });
   });
 
-  const authed = (req: FastifyRequest) => {
-    const raw = req.cookies[SESSION];
-    return !!raw && req.unsignCookie(raw).valid;
+  const accounts = registerAccounts(app, { db, config, prepareTenant });
+  const users = new WeakMap<FastifyRequest, SessionUser>();
+  /** Tenant and actor of the signed-in user; the onRequest hook guarantees there is one on protected routes. */
+  const who = (req: FastifyRequest): Actor & { user: SessionUser } => {
+    const user = users.get(req);
+    if (!user) throw Object.assign(new Error('Login required'), { statusCode: 401 });
+    return { tenant: user.tenant, actor: user.email, user };
   };
+
+  const appOrigin = new URL(config.appUrl).origin;
   const appHost = new URL(config.appUrl).host;
+  /** Routes open without a session: log in, sign up, the invite and password reset links. */
+  const isPublic = (method: string, path: string) =>
+    path === '/api/session' || path === '/api/account/link' || path === '/api/account/reset' || (path === '/api/account' && method === 'POST');
   app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0]!;
     // Cookies are per host: opening the app on 127.0.0.1 while the OAuth callback returns to
@@ -97,32 +109,34 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
     if (req.method === 'GET' && !path.startsWith('/api/') && req.headers.host && req.headers.host !== appHost) {
       return reply.redirect(`${config.appUrl}${req.url}`);
     }
-    if (path === '/api/session' || !(path.startsWith('/api/') || path.startsWith('/oauth/')) || authed(req)) return;
+    const guarded = path.startsWith('/api/') || path.startsWith('/oauth/');
+    if (!guarded) return;
+    // Requests that change something must come from the app's own pages (cookies are SameSite=Lax too).
+    const origin = req.headers.origin;
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && origin && origin !== appOrigin) {
+      return reply.code(403).send({ error: 'Cross-site request refused.' });
+    }
+    const user = await accounts.sessionUser(req);
+    if (user) users.set(req, user);
+    if (user || isPublic(req.method, path)) return;
     if (path.startsWith('/oauth/')) {
       return reply.redirect(`/?oauthError=${encodeURIComponent('App session not found: log in to the app and connect the org again.')}`);
     }
     return reply.code(401).send({ error: 'Login required' });
   });
 
-  // ---- app session (single user in the MVP)
-  app.get('/api/session', async req => ({ authenticated: authed(req), user: authed(req) ? config.appUser : null }));
-  app.post('/api/session', async (req, reply) => {
-    const { password } = z.object({ password: z.string() }).parse(req.body);
-    if (!safeEqual(password, config.appPassword)) return reply.code(401).send({ error: 'Wrong password' });
-    db.audit({ tenant, actor: config.appUser, action: 'session.login' });
-    reply.setCookie(SESSION, randomToken(), { signed: true, httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 12 });
-    return { authenticated: true, user: config.appUser };
-  });
-  app.delete('/api/session', async (_req, reply) => {
-    reply.clearCookie(SESSION, { path: '/' });
-    return { authenticated: false };
+  app.addHook('onSend', async (req, reply) => {
+    securityHeaders(reply, secure);
+    const path = req.url.split('?')[0]!;
+    if (path.startsWith('/api/') || path.startsWith('/oauth/')) reply.header('Cache-Control', 'no-store');
   });
 
   // ---- Salesforce OAuth (web server flow + PKCE)
   app.get('/oauth/start', async (req, reply) => {
+    const { tenant } = who(req);
     const q = z.object({ env: z.enum(['production', 'sandbox', 'custom']).optional(), domain: z.string().optional(), alias: aliasSchema.optional(), org: z.string().optional() }).parse(req.query);
     // `org` logs in again to an org already connected, on the same login URL and keeping its alias.
-    const existing = q.org ? orgOr404(q.org) : null;
+    const existing = q.org ? await orgOr404(tenant, q.org) : null;
     if (!existing && !q.env) throw Object.assign(new Error('Missing env'), { statusCode: 400 });
     const loginUrl = existing?.login_url ?? loginUrlFor(q.env!, q.domain);
     const state = randomToken();
@@ -132,6 +146,7 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
   });
 
   app.get('/oauth/callback', async (req, reply) => {
+    const { tenant, actor } = who(req);
     const q = z.object({ code: z.string().optional(), state: z.string().optional(), error: z.string().optional(), error_description: z.string().optional() }).parse(req.query);
     const fail = (msg: string) => reply.redirect(`/?oauthError=${encodeURIComponent(msg)}`);
     if (q.error) return fail(q.error_description ?? q.error);
@@ -149,82 +164,77 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
       loadOrgInfo(tmp),
       fetch(token.id, { headers: { Authorization: `Bearer ${token.access_token}` } }).then(r => r.json() as Promise<{ username: string }>)
     ]);
-    const org = db.upsertOrg({
+    const org = await db.upsertOrg({
       id: randomToken(12), tenant_id: tenant, sf_org_id: info.orgId, name: info.name, username: identity.username,
       instance_url: token.instance_url, login_url: saved.loginUrl, is_sandbox: info.isSandbox ? 1 : 0,
       refresh_token_enc: cipher.encrypt(token.refresh_token), access_token_enc: cipher.encrypt(token.access_token), alias: saved.alias ?? null
     });
-    db.audit({ tenant, orgId: org.id, actor: config.appUser, action: 'org.connected', detail: `${info.name} (${identity.username})` });
+    await db.audit({ tenant, orgId: org.id, actor, action: 'org.connected', detail: `${info.name} (${identity.username})` });
     return reply.redirect(`/?org=${org.id}`);
   });
 
   // ---- orgs and metadata
-  const orgOr404 = (id: string) => {
-    const org = db.getOrg(tenant, id);
+  const orgOr404 = async (tenant: string, id: string) => {
+    const org = await db.getOrg(tenant, id);
     if (!org) throw new NotFoundError('Org not found.');
     return org;
   };
+  /** The org named in the route, if it belongs to the signed-in user's workspace. */
+  const routeOrg = (req: FastifyRequest) => orgOr404(who(req).tenant, (req.params as { id: string }).id);
 
-  app.get('/api/orgs', async () => db.listOrgs(tenant).map(orgDto));
+  app.get('/api/orgs', async req => (await db.listOrgs(who(req).tenant)).map(orgDto));
   app.patch('/api/orgs/:id', async req => {
-    const org = orgOr404((req.params as { id: string }).id);
+    const { tenant, actor } = who(req);
+    const org = await routeOrg(req);
     const { alias, accent } = z.object({ alias: aliasSchema.optional(), accent: z.enum(ACCENTS).nullable().optional() }).parse(req.body);
     if (alias !== undefined) {
-      db.setAlias(tenant, org.id, alias);
-      db.audit({ tenant, orgId: org.id, actor: config.appUser, action: 'org.renamed', detail: alias });
+      await db.setAlias(tenant, org.id, alias);
+      await db.audit({ tenant, orgId: org.id, actor, action: 'org.renamed', detail: alias });
     }
-    if (accent !== undefined) db.setAccent(tenant, org.id, accent);
-    return orgDto(orgOr404(org.id));
+    if (accent !== undefined) await db.setAccent(tenant, org.id, accent);
+    return orgDto(await orgOr404(tenant, org.id));
   });
   app.delete('/api/orgs/:id', async req => {
-    const { id } = req.params as { id: string };
-    db.deleteOrg(tenant, orgOr404(id).id);
-    db.audit({ tenant, orgId: id, actor: config.appUser, action: 'org.removed' });
+    const { tenant, actor } = who(req);
+    const org = await routeOrg(req);
+    await db.deleteOrg(tenant, org.id);
+    await db.audit({ tenant, orgId: org.id, actor, action: 'org.removed' });
     return { ok: true };
   });
   app.post('/api/orgs/:id/token', async (req, reply) => {
-    const org = orgOr404((req.params as { id: string }).id);
-    if (!extraApis?.has(org.id)) {
+    const { tenant, actor } = who(req);
+    const org = await routeOrg(req);
+    if (!extraApi?.(org)) {
       try { await renewToken(org); } catch (e) {
-        db.audit({ tenant, orgId: org.id, actor: config.appUser, action: 'org.token_refresh_failed', detail: (e as Error).message });
+        await db.audit({ tenant, orgId: org.id, actor, action: 'org.token_refresh_failed', detail: (e as Error).message });
         return reply.code(409).send({ error: `Salesforce did not renew the token (${(e as Error).message}). Log in to the org again.`, detail: (e as Error).message, reauth: true });
       }
     }
-    db.audit({ tenant, orgId: org.id, actor: config.appUser, action: 'org.token_refreshed' });
+    await db.audit({ tenant, orgId: org.id, actor, action: 'org.token_refreshed' });
     return { refreshedAt: new Date().toISOString() };
   });
-  app.get('/api/orgs/:id/status', async req => {
-    const api = apiFor(orgOr404((req.params as { id: string }).id));
-    return { permissions: await loadUserPermissions(api) };
-  });
-  app.get('/api/orgs/:id/objects', async req => listObjects(apiFor(orgOr404((req.params as { id: string }).id))));
-  app.get('/api/orgs/:id/permission-sets', async req => loadPermissionSets(apiFor(orgOr404((req.params as { id: string }).id))));
+  app.get('/api/orgs/:id/status', async req => ({ permissions: await loadUserPermissions(apiFor(await routeOrg(req))) }));
+  app.get('/api/orgs/:id/objects', async req => listObjects(apiFor(await routeOrg(req))));
+  app.get('/api/orgs/:id/permission-sets', async req => loadPermissionSets(apiFor(await routeOrg(req))));
 
   const objectQuery = z.object({ object: z.string().regex(/^[A-Za-z0-9_]+$/) });
-  app.get('/api/orgs/:id/layouts', async req => {
-    const org = orgOr404((req.params as { id: string }).id);
-    return loadLayoutAnalysis(apiFor(org), objectQuery.parse(req.query).object);
-  });
+  app.get('/api/orgs/:id/layouts', async req => loadLayoutAnalysis(apiFor(await routeOrg(req)), objectQuery.parse(req.query).object));
   // Metadata API names of the profiles, keyed by their profile-owned permission set, for the metadata export.
   app.get('/api/orgs/:id/profile-names', async req => {
-    const org = orgOr404((req.params as { id: string }).id);
-    const profiles = await loadProfiles(apiFor(org));
+    const profiles = await loadProfiles(apiFor(await routeOrg(req)));
     return Object.fromEntries(profiles.filter(p => p.fullName).map(p => [p.permSetId, p.fullName]));
   });
-  app.get('/api/orgs/:id/lightning-pages', async req => {
-    const org = orgOr404((req.params as { id: string }).id);
-    return loadPageAnalysis(apiFor(org), objectQuery.parse(req.query).object);
-  });
+  app.get('/api/orgs/:id/lightning-pages', async req => loadPageAnalysis(apiFor(await routeOrg(req)), objectQuery.parse(req.query).object));
 
   app.get('/api/orgs/:id/matrix', async req => {
-    const org = orgOr404((req.params as { id: string }).id);
+    const org = await routeOrg(req);
     const { objects } = z.object({ objects: z.string().min(1) }).parse(req.query);
     const list = [...new Set(objects.split(',').map(s => s.trim()).filter(Boolean))].slice(0, 20);
     const api = apiFor(org);
     const warnings: string[] = [];
     const [fields, permissionSets] = await Promise.all([loadFields(api, list, msg => { req.log.warn(msg); warnings.push(msg); }), loadPermissionSets(api)]);
     const { fieldPerms, objectPerms } = await loadSnapshot(api, list, permissionSets.map(p => p.id));
-    db.touchOrg(org.id);
+    await db.touchOrg(org.id);
     return {
       fields, permissionSets,
       access: accessStrings(fields.map(f => f.name), fieldPerms),
@@ -234,63 +244,78 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
   });
 
   // ---- change sets
-  const csDto = (id: string) => {
-    const cs = db.getChangeSet(tenant, id);
+  const csDto = async (tenant: string, id: string) => {
+    const cs = await db.getChangeSet(tenant, id);
     if (!cs) throw new NotFoundError('Change set not found.');
-    const org = orgOr404(cs.org_id);
+    const org = await orgOr404(tenant, cs.org_id);
+    const [assignments, items] = await Promise.all([db.listAssignments(cs.id), db.listItems(cs.id)]);
     return {
       id: cs.id, number: `CS-${String(cs.seq).padStart(4, '0')}`, org: orgDto(org), author: cs.author, description: cs.description,
       status: cs.status, rollbackOf: cs.rollback_of, createdAt: cs.created_at, submittedAt: cs.submitted_at,
       approvedBy: cs.approved_by, approvedAt: cs.approved_at, startedAt: cs.started_at, finishedAt: cs.finished_at, resumedAt: cs.resumed_at,
       requiresApproval: !org.is_sandbox, skipped: JSON.parse(cs.skipped_json), kind: cs.kind, timings: cs.timings_json ? JSON.parse(cs.timings_json) : null,
-      assignments: db.listAssignments(cs.id).map(r => ({
+      assignments: assignments.map(r => ({
         id: r.id, kind: r.kind, object: r.object, profile: r.profile, profileLabel: r.profile_label, recordType: r.record_type, app: r.app, formFactor: r.form_factor,
         before: r.before_value, after: r.after_value, status: r.status, errorCode: r.error_code, errorMessage: r.error_message
       })),
-      items: db.listItems(cs.id).map(r => ({
+      items: items.map(r => ({
         id: r.id, parentId: r.parent_id, parentLabel: r.parent_label, field: r.field, sobjectType: r.sobject_type,
         before: r.before_access, after: r.after_access, op: r.op, warnings: r.warnings ? r.warnings.split(',') : [],
         status: r.status, errorCode: r.error_code, errorMessage: r.error_message
       }))
     };
   };
+  const csId = (req: FastifyRequest) => (req.params as { id: string }).id;
 
   app.get('/api/change-sets', async req => {
     const { orgId } = z.object({ orgId: z.string().optional() }).parse(req.query);
-    return db.listChangeSets(tenant, orgId).map(cs => ({
+    return (await db.listChangeSets(who(req).tenant, orgId)).map(cs => ({
       id: cs.id, number: `CS-${String(cs.seq).padStart(4, '0')}`, orgId: cs.org_id, author: cs.author, description: cs.description,
-      status: cs.status, kind: cs.kind, createdAt: cs.created_at, finishedAt: cs.finished_at, total: cs.total, ok: cs.ok ?? 0, errors: cs.errors ?? 0
+      status: cs.status, kind: cs.kind, createdAt: cs.created_at, finishedAt: cs.finished_at, total: cs.total, ok: cs.ok, errors: cs.errors
     }));
   });
   app.post('/api/orgs/:id/change-sets', { bodyLimit: 32 * 1024 * 1024 }, async req => {
-    const cs = await service.create((req.params as { id: string }).id, createSchema.parse(req.body));
-    return csDto(cs.id);
+    const ctx = who(req);
+    const cs = await service.create(ctx, csId(req), createSchema.parse(req.body));
+    return csDto(ctx.tenant, cs.id);
   });
   app.post('/api/orgs/:id/assignment-change-sets', async req => {
-    const cs = await service.createAssignments((req.params as { id: string }).id, assignmentSchema.parse(req.body));
-    return csDto(cs.id);
+    const ctx = who(req);
+    const cs = await service.createAssignments(ctx, csId(req), assignmentSchema.parse(req.body));
+    return csDto(ctx.tenant, cs.id);
   });
-  app.get('/api/change-sets/:id', async req => csDto((req.params as { id: string }).id));
-  app.post('/api/change-sets/:id/submit', async req => csDto(service.submit((req.params as { id: string }).id).id));
-  app.post('/api/change-sets/:id/reject', async req => csDto(service.reject((req.params as { id: string }).id).id));
+  app.get('/api/change-sets/:id', async req => csDto(who(req).tenant, csId(req)));
+  app.post('/api/change-sets/:id/submit', async req => {
+    const ctx = who(req);
+    return csDto(ctx.tenant, (await service.submit(ctx, csId(req))).id);
+  });
+  app.post('/api/change-sets/:id/reject', async req => {
+    const ctx = who(req);
+    return csDto(ctx.tenant, (await service.reject(ctx, csId(req))).id);
+  });
   app.post('/api/change-sets/:id/approve', async req => {
-    const r = await service.approve((req.params as { id: string }).id);
-    return { ...csDto(r.changeSet.id), conflicts: r.conflicts };
+    const ctx = who(req);
+    const r = await service.approve(ctx, csId(req));
+    return { ...await csDto(ctx.tenant, r.changeSet.id), conflicts: r.conflicts };
   });
   app.post('/api/change-sets/:id/execute', async req => {
-    const id = (req.params as { id: string }).id;
-    const cs = db.getChangeSet(tenant, id);
+    const ctx = who(req);
+    const id = csId(req);
+    const cs = await db.getChangeSet(ctx.tenant, id);
     if (!cs) throw new NotFoundError('Change set not found.');
-    const org = orgOr404(cs.org_id);
+    const org = await orgOr404(ctx.tenant, cs.org_id);
     // Production needs the org name (alias if set) typed back as an extra guard.
     if (!org.is_sandbox) {
       const { confirmName } = z.object({ confirmName: z.string() }).parse(req.body ?? {});
       if (confirmName.trim() !== orgLabel(org)) throw Object.assign(new Error('The org name does not match.'), { statusCode: 400 });
     }
-    service.start(id);
-    return csDto(id);
+    await service.start(ctx, id);
+    return csDto(ctx.tenant, id);
   });
-  app.post('/api/change-sets/:id/rollback', async req => csDto((await service.rollback((req.params as { id: string }).id)).id));
+  app.post('/api/change-sets/:id/rollback', async req => {
+    const ctx = who(req);
+    return csDto(ctx.tenant, (await service.rollback(ctx, csId(req))).id);
+  });
 
   // ---- built web app (production)
   const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
@@ -303,4 +328,22 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
   }
 
   return app;
+}
+
+/**
+ * Browser protections on every response: no framing (clickjacking), scripts only from the app itself,
+ * no MIME sniffing, no referrer (OAuth codes travel in URLs), HTTPS only once served over HTTPS.
+ */
+export function securityHeaders(reply: FastifyReply, https: boolean): void {
+  reply.header('Content-Security-Policy', [
+    "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com", "img-src 'self' data: blob:", "connect-src 'self'",
+    "object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'"
+  ].join('; '));
+  reply.header('X-Content-Type-Options', 'nosniff');
+  reply.header('X-Frame-Options', 'DENY');
+  reply.header('Referrer-Policy', 'no-referrer');
+  reply.header('Cross-Origin-Opener-Policy', 'same-origin');
+  reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  if (https) reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 }
