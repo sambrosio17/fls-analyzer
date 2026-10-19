@@ -34,7 +34,7 @@ export const fr: Messages = {
 
   app: {
     guide: 'Guide', news: 'Nouveautés', newsUnread: 'Nouveautés à lire',
-    orgs: 'Orgs', history: 'Historique', logout: 'Déconnexion', settings: 'Paramètres',
+    orgs: 'Orgs', history: 'Historique', logout: 'Déconnexion', settings: 'Paramètres', admin: 'Administration',
     openOrgs: 'Orgs ouvertes', toolsLabel: 'Outils', openObjects: 'Objets ouverts', openChangeSets: 'Change sets ouverts',
     closeX: (name: string) => `Fermer ${name}`,
     openOrg: 'Ouvrir une org',
@@ -67,8 +67,28 @@ export const fr: Messages = {
       changesets: { title: 'Change sets', body: <>Rien n’est écrit avant votre confirmation. <b>Voir l’aperçu</b> transforme les changements en attente en change set avec ce qui est ajouté, modifié et retiré, et les avertissements. En production il faut une approbation et saisir le nom de l’org. L’exécution montre la progression et le résultat ligne par ligne. Si le serveur redémarre pendant une exécution, OrgFox la reprend au démarrage : il relit l’org pour reconnaître les lignes déjà écrites et n’applique que les autres.</> },
       export: { title: 'Exporter', body: <>Le bouton <b>Exporter</b> enregistre ce que vous voyez : la matrice en Excel, en CSV ou en métadonnées Salesforce (package.xml et un fichier par profil et ensemble d’autorisations), les change sets en Excel, CSV ou métadonnées avec les valeurs qu’ils définissent, et les présentations en Excel ou CSV. Un panneau en bas à droite montre la progression des gros fichiers.</> },
       history: { title: 'Historique et annulation', body: <>L’<b>Historique</b> liste chaque change set avec qui l’a préparé et approuvé, et quand. Chacun garde les valeurs d’avant, donc <b>Annuler ces modifications</b>, dans le change set, crée un change set qui les restaure.</> },
-      settings: { title: 'Compte, langue et session', body: <>Vous vous connectez avec votre <b>e-mail et mot de passe</b>, et chaque compte ne voit que ses propres orgs, change sets et historique. Pendant la bêta fermée, on entre avec un lien d’invitation. Cliquez sur votre nom en haut pour ouvrir <b>Paramètres</b>, où vous changez votre nom et votre mot de passe : un nouveau mot de passe déconnecte vos autres appareils. Choisissez English, Italiano, Français ou Español dans le menu avec les drapeaux. <b>Se déconnecter</b> ferme la session OrgFox ; vos orgs restent connectées. La session se ferme aussi après 12 heures sans utilisation.</> }
+      settings: { title: 'Compte, langue et session', body: <>Vous vous connectez avec votre <b>e-mail et mot de passe</b>, et chaque compte ne voit que ses propres orgs, change sets et historique. Pendant la bêta fermée, on entre avec un lien d’invitation. Cliquez sur votre nom en haut pour ouvrir <b>Paramètres</b>, où vous changez votre nom et votre mot de passe : un nouveau mot de passe déconnecte vos autres appareils. Choisissez English, Italiano, Français ou Español dans le menu avec les drapeaux. <b>Se déconnecter</b> ferme la session OrgFox ; vos orgs restent connectées. La session se ferme aussi après 12 heures sans utilisation.</> },
+      admin: { title: 'Administration', body: <>Le premier compte d’une installation est <b>admin</b> et voit la page <b>Administration</b>. Vous y <b>invitez</b> des personnes : saisissez leur e-mail, choisissez la durée de validité du lien, copiez-le et envoyez-le vous-même (OrgFox n’envoie pas encore d’e-mails). Le lien ne sert qu’une fois et seulement pour cet e-mail ; tant qu’il n’est pas utilisé, vous pouvez le <b>révoquer</b>. La liste des comptes montre l’inscription et la dernière connexion de chacun, ses orgs et change sets et s’il est connecté. Pour chaque compte, vous pouvez créer un <b>lien de réinitialisation du mot de passe</b>, le <b>déconnecter</b> partout, le rendre admin et le <b>désactiver</b> : ses sessions se ferment et il ne peut plus se connecter jusqu’à sa réactivation. Cette page ne modifie jamais votre propre compte.</> }
     }
+  },
+
+  admin: {
+    title: 'Administration',
+    intro: 'Invitez des personnes dans OrgFox et gérez leurs comptes. Seuls les admins voient cette page.',
+    inviteTitle: 'Inviter quelqu’un', email: 'E-mail', placeholder: 'nom@entreprise.fr', validFor: 'Lien valable', days: (n: number) => `${n} jours`, createInvite: 'Créer l’invitation',
+    signupInvite: 'Les nouveaux comptes demandent une invitation', signupOpen: 'Tout le monde peut créer un compte (SIGNUP=open)',
+    inviteReady: (email: string, days: number) => `Invitation pour ${email}, valable ${days} jours et une seule fois. Copiez-la et envoyez-la vous-même : OrgFox n’envoie pas encore d’e-mails.`,
+    resetReady: (email: string) => `Lien de réinitialisation du mot de passe pour ${email}, valable 24 heures. Copiez-le et envoyez-le vous-même.`,
+    link: 'Lien', copy: 'Copier', copied: 'Copié',
+    usersTitle: 'Comptes', count: (n: number) => `${n} comptes`, you: 'vous',
+    userCols: ['Compte', 'État', 'Inscription', 'Dernière connexion', 'Orgs · change sets', 'Sessions'],
+    adminTag: 'Admin', activeTag: 'Actif', disabledTag: 'Désactivé',
+    resetLink: 'Lien de réinitialisation', logout: 'Déconnecter', makeAdmin: 'Rendre admin', removeAdmin: 'Retirer admin', disable: 'Désactiver', enable: 'Réactiver',
+    confirmDisable: (email: string) => `Désactiver ${email} ? Ses sessions se ferment et la connexion est bloquée jusqu’à la réactivation du compte. Ses orgs et change sets sont conservés.`,
+    confirmAdmin: (email: string) => `Rendre ${email} admin ? Cette personne pourra inviter des gens et gérer tous les comptes.`,
+    invitesTitle: 'Invitations', inviteCols: ['E-mail', 'Créée', 'Expire', 'État'], revoke: 'Révoquer', noInvites: 'Aucune invitation pour le moment.',
+    status: { pending: 'En attente', used: 'Utilisée', expired: 'Expirée' },
+    errors: { EMAIL_TAKEN: 'Cet e-mail a déjà un compte.', SELF: 'Vous ne pouvez pas modifier votre propre compte ici.', ACCOUNT_DISABLED: 'Réactivez d’abord le compte.', NOT_FOUND: 'Introuvable : rechargez la page.' }
   },
 
   settings: {
@@ -194,7 +214,8 @@ export const fr: Messages = {
       EMAIL_TAKEN: 'Un compte existe déjà avec cet e-mail : connectez-vous.',
       LINK_INVALID: 'Ce lien n’est plus valide. Demandez-en un nouveau.',
       WRONG_PASSWORD: 'Le mot de passe actuel est incorrect.',
-      INVALID: 'Vérifiez les champs : le mot de passe doit avoir au moins 12 caractères.'
+      INVALID: 'Vérifiez les champs : le mot de passe doit avoir au moins 12 caractères.',
+      ACCOUNT_DISABLED: 'Ce compte a été désactivé. Écrivez-nous si vous pensez que c’est une erreur.'
     }
   },
 

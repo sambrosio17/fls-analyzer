@@ -15,6 +15,15 @@ export interface ChangeEntry {
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    date: '2026-10-19', prs: [33], guide: 'admin',
+    text: {
+      en: { title: 'Admin page', body: 'Admins have a new Admin page. Invite people with a link that works once and only for their email, see every invite and revoke the unused ones. For each account you see when it joined and last logged in and how many orgs it has, and you can make a password reset link, log it out everywhere, make it an admin or disable it. The first account of an install is an admin.' },
+      it: { title: 'Pagina Amministrazione', body: 'Gli admin hanno una nuova pagina Amministrazione. Inviti le persone con un link che vale una volta sola e solo per la loro email, vedi tutti gli inviti e revochi quelli non usati. Per ogni account vedi iscrizione, ultimo accesso e quante org ha, e puoi creare un link di reset della password, disconnetterlo ovunque, renderlo admin o disattivarlo. Il primo account di un’installazione è admin.' },
+      fr: { title: 'Page Administration', body: 'Les admins ont une nouvelle page Administration. Invitez des personnes avec un lien valable une seule fois et seulement pour leur e-mail, voyez toutes les invitations et révoquez celles qui ne sont pas utilisées. Pour chaque compte, vous voyez l’inscription, la dernière connexion et le nombre d’orgs, et vous pouvez créer un lien de réinitialisation du mot de passe, le déconnecter partout, le rendre admin ou le désactiver. Le premier compte d’une installation est admin.' },
+      es: { title: 'Página de administración', body: 'Los admins tienen una nueva página de Administración. Invita a personas con un enlace que sirve una sola vez y solo para su email, ve todas las invitaciones y revoca las que no se han usado. De cada cuenta ves el alta, el último acceso y cuántas orgs tiene, y puedes crear un enlace para cambiar la contraseña, cerrar su sesión en todas partes, hacerla admin o desactivarla. La primera cuenta de una instalación es admin.' }
+    }
+  },
+  {
     date: '2026-10-19', prs: [32], guide: 'settings',
     text: {
       en: { title: 'Accounts', body: 'OrgFox now has real accounts: you log in with your email and password, and each account sees only its own orgs, change sets and history. In the closed beta you join with an invite link. Change your name and password in Settings, where a new password logs out your other devices. On a local install the first account is created from the login page and keeps the orgs and change sets already there.' },

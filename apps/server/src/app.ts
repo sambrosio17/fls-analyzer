@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { ACCENTS, TransitionError } from '@fls/core';
 import type { Config } from './config.ts';
 import { registerAccounts, type SessionUser } from './accounts.ts';
+import { registerAdmin } from './admin.ts';
 import { pkcePair, randomToken, TokenCipher } from './crypto.ts';
 import { Db, orgLabel, type OrgRow } from './db.ts';
 import { SalesforceClient, SalesforceError, type SfApi } from './salesforce/client.ts';
@@ -96,6 +97,8 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApi, prepareTen
     if (!user) throw Object.assign(new Error('Login required'), { statusCode: 401 });
     return { tenant: user.tenant, actor: user.email, user };
   };
+
+  registerAdmin(app, { db, config, who });
 
   const appOrigin = new URL(config.appUrl).origin;
   const appHost = new URL(config.appUrl).host;

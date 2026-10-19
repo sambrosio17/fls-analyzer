@@ -37,7 +37,7 @@ export const en = {
 
   app: {
     guide: 'Guide', news: 'What’s new', newsUnread: 'New changes to read',
-    orgs: 'Orgs', history: 'History', logout: 'Log out', settings: 'Settings',
+    orgs: 'Orgs', history: 'History', logout: 'Log out', settings: 'Settings', admin: 'Admin',
     openOrgs: 'Open orgs', toolsLabel: 'Tools', openObjects: 'Open objects', openChangeSets: 'Open change sets',
     closeX: (name: string) => `Close ${name}`,
     openOrg: 'Open an org',
@@ -70,8 +70,28 @@ export const en = {
       changesets: { title: 'Change sets', body: <>Nothing is written until you confirm. <b>Go to preview</b> turns pending changes into a change set with what is added, changed and removed, and warnings. In production it needs approval and the org name typed in. Running it shows progress and the result per row. If the server restarts during a run, OrgFox picks it up again when it starts: it reads the org to recognise the rows already written and applies only the rest.</> },
       export: { title: 'Export', body: <>The <b>Export</b> button saves what you see: the matrix as Excel or CSV or as Salesforce metadata (package.xml and one file per profile and permission set), change sets as Excel, CSV or metadata with the values they set, and layouts as Excel or CSV. A panel at the bottom right shows the progress of big files.</> },
       history: { title: 'History and undo', body: <><b>History</b> lists every change set with who prepared and approved it and when. Each one keeps the values from before, so <b>Undo these changes</b>, in the change set, creates a change set that restores them.</> },
-      settings: { title: 'Account, language and session', body: <>You log in with your <b>email and password</b>, and each account sees only its own orgs, change sets and history. In the closed beta you join with an invite link. Click your name at the top to open <b>Settings</b>, where you change your name and password: a new password logs out your other devices. Pick English, Italiano, Français or Español from the menu with the flags. <b>Log out</b> ends the OrgFox session; your orgs stay connected. The session also ends after 12 hours without use.</> }
+      settings: { title: 'Account, language and session', body: <>You log in with your <b>email and password</b>, and each account sees only its own orgs, change sets and history. In the closed beta you join with an invite link. Click your name at the top to open <b>Settings</b>, where you change your name and password: a new password logs out your other devices. Pick English, Italiano, Français or Español from the menu with the flags. <b>Log out</b> ends the OrgFox session; your orgs stay connected. The session also ends after 12 hours without use.</> },
+      admin: { title: 'Admin', body: <>The first account of an install is an <b>admin</b> and sees the <b>Admin</b> page. There you <b>invite</b> people: type their email, choose how long the link stays valid, copy it and send it yourself (OrgFox does not send emails yet). The link works once and only for that email; you can <b>revoke</b> it while it is unused. The account list shows when each person joined and last logged in, how many orgs and change sets they have and whether they are signed in. For each account you can make a <b>password reset link</b>, <b>log it out</b> everywhere, make it an admin and <b>disable</b> it, which closes its sessions and blocks logins until you enable it again. Nothing on this page can be done to your own account.</> }
     }
+  },
+
+  admin: {
+    title: 'Admin',
+    intro: 'Invite people to OrgFox and manage their accounts. Only admins see this page.',
+    inviteTitle: 'Invite someone', email: 'Email', placeholder: 'name@company.com', validFor: 'Link valid for', days: (n: number) => `${n} days`, createInvite: 'Create invite',
+    signupInvite: 'New accounts need an invite', signupOpen: 'Anyone can create an account (SIGNUP=open)',
+    inviteReady: (email: string, days: number) => `Invite for ${email}, valid ${days} days and only once. Copy it and send it yourself: OrgFox does not send emails yet.`,
+    resetReady: (email: string) => `Password reset link for ${email}, valid 24 hours. Copy it and send it yourself.`,
+    link: 'Link', copy: 'Copy', copied: 'Copied',
+    usersTitle: 'Accounts', count: (n: number) => `${n} accounts`, you: 'you',
+    userCols: ['Account', 'Status', 'Joined', 'Last login', 'Orgs · change sets', 'Sessions'],
+    adminTag: 'Admin', activeTag: 'Active', disabledTag: 'Disabled',
+    resetLink: 'Reset link', logout: 'Log out', makeAdmin: 'Make admin', removeAdmin: 'Remove admin', disable: 'Disable', enable: 'Enable',
+    confirmDisable: (email: string) => `Disable ${email}? Their sessions close and they cannot log in until you enable the account again. Their orgs and change sets are kept.`,
+    confirmAdmin: (email: string) => `Make ${email} an admin? They will be able to invite people and manage every account.`,
+    invitesTitle: 'Invites', inviteCols: ['Email', 'Created', 'Expires', 'Status'], revoke: 'Revoke', noInvites: 'No invites yet.',
+    status: { pending: 'Waiting', used: 'Used', expired: 'Expired' },
+    errors: { EMAIL_TAKEN: 'This email already has an account.', SELF: 'You cannot change your own account here.', ACCOUNT_DISABLED: 'Enable the account first.', NOT_FOUND: 'Not found: reload the page.' }
   },
 
   settings: {
@@ -197,7 +217,8 @@ export const en = {
       EMAIL_TAKEN: 'An account with this email already exists: log in instead.',
       LINK_INVALID: 'This link is no longer valid. Ask for a new one.',
       WRONG_PASSWORD: 'The current password is wrong.',
-      INVALID: 'Check the fields: the password needs at least 12 characters.'
+      INVALID: 'Check the fields: the password needs at least 12 characters.',
+      ACCOUNT_DISABLED: 'This account has been disabled. Write to us if you think it is a mistake.'
     }
   },
 

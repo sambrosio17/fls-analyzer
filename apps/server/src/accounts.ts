@@ -14,7 +14,10 @@ const TOUCH_MS = 5 * 60 * 1000;
 
 const LINK_DAYS: Record<LinkKind, number> = { invite: 14, reset: 1 };
 
-export interface SessionUser { id: string; tenant: string; email: string; name: string; sessionId: string }
+export interface SessionUser { id: string; tenant: string; email: string; name: string; isAdmin: boolean; sessionId: string }
+
+/** What the web app knows about the signed-in user. */
+export const userDto = (u: Pick<UserRow, 'name' | 'email' | 'is_admin'>) => ({ name: u.name, email: u.email, isAdmin: !!u.is_admin });
 
 const email = z.string().trim().max(254).email().transform(normalizeEmail);
 const password = z.string().min(MIN_PASSWORD).max(200);
@@ -23,9 +26,9 @@ const userName = z.string().trim().min(1).max(80);
 const fail = (statusCode: number, message: string, extra: object = {}) => Object.assign(new Error(message), { statusCode, ...extra });
 
 /** Creates a one-time link (invite or password reset) and returns its code; only the hash is stored. */
-export async function createLink(db: Db, kind: LinkKind, to: string, days = LINK_DAYS[kind]): Promise<string> {
+export async function createLink(db: Db, kind: LinkKind, to: string, days = LINK_DAYS[kind], createdBy: string | null = null): Promise<string> {
   const code = randomToken(24);
-  await db.createLink({ idHash: tokenHash(code), kind, email: normalizeEmail(to), expiresAt: new Date(Date.now() + days * 86400000).toISOString() });
+  await db.createLink({ idHash: tokenHash(code), kind, email: normalizeEmail(to), expiresAt: new Date(Date.now() + days * 86400000).toISOString(), createdBy });
   return code;
 }
 
@@ -47,7 +50,7 @@ export function registerAccounts(app: FastifyInstance, o: { db: Db; config: Conf
     await db.touchLogin(user.id);
     await o.prepareTenant?.(user.tenant_id);
     reply.setCookie(SESSION, token, { signed: true, httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: MAX_MS / 1000 });
-    return { authenticated: true, user: { name: user.name, email: user.email } };
+    return { authenticated: true, user: userDto(user) };
   };
 
   /** The signed-in user, or null. Keeps the session alive while it is used. */
@@ -63,7 +66,7 @@ export function registerAccounts(app: FastifyInstance, o: { db: Db; config: Conf
       const expires = Math.min(at + IDLE_MS, Date.parse(session.created_at) + MAX_MS);
       await db.touchSession(session.id, new Date(expires).toISOString());
     }
-    return { id: user.id, tenant: user.tenant_id, email: user.email, name: user.name, sessionId: session.id };
+    return { id: user.id, tenant: user.tenant_id, email: user.email, name: user.name, isAdmin: !!user.is_admin, sessionId: session.id };
   };
 
   /** No account yet on a local install: the first one needs no invite. */
@@ -79,7 +82,7 @@ export function registerAccounts(app: FastifyInstance, o: { db: Db; config: Conf
   app.get('/api/session', async req => {
     const user = await sessionUser(req);
     return {
-      authenticated: !!user, user: user ? { name: user.name, email: user.email } : null,
+      authenticated: !!user, user: user ? { name: user.name, email: user.email, isAdmin: user.isAdmin } : null,
       signup: config.signup === 'open' || await openFirstAccount() ? 'open' : 'invite'
     };
   });
@@ -96,6 +99,8 @@ export function registerAccounts(app: FastifyInstance, o: { db: Db; config: Conf
       return reply.code(401).send({ error: 'Wrong email or password.', code: 'WRONG_LOGIN' });
     }
     throttle.clear([`email:${body.email}`]);
+    // Said only after the right password, so it tells nothing to someone guessing.
+    if (user.disabled_at) return reply.code(403).send({ error: 'This account has been disabled. Contact the OrgFox team.', code: 'ACCOUNT_DISABLED' });
     await db.audit({ tenant: user.tenant_id, actor: user.email, action: 'session.login' });
     return startSession(reply, user);
   });
@@ -130,12 +135,14 @@ export function registerAccounts(app: FastifyInstance, o: { db: Db; config: Conf
     }
     if (await db.getUserByEmail(body.email)) throw fail(409, 'An account with this email already exists: log in instead.', { code: 'EMAIL_TAKEN' });
     // The orgs and change sets of a single-user install made before accounts go to its first account.
-    const tenant = await db.hasUnclaimedData() && (await db.countUsers()) === 0 ? DEFAULT_TENANT : randomToken(12);
+    const first = (await db.countUsers()) === 0;
+    const tenant = first && await db.hasUnclaimedData() ? DEFAULT_TENANT : randomToken(12);
     const passwordHash = await hashPassword(body.password);
     const user = await db.sql.tx(async sql => {
       if (needsInvite && !await db.useLink(inviteHash!, 'invite', sql)) throw fail(403, 'This invite has already been used.', { code: 'INVITE_REQUIRED' });
-      await sql.run('INSERT INTO users (id, tenant_id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [randomToken(12), tenant, body.email, body.name, passwordHash, now()]);
+      // The first account of an install manages the others.
+      await sql.run('INSERT INTO users (id, tenant_id, email, name, password_hash, created_at, is_admin) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [randomToken(12), tenant, body.email, body.name, passwordHash, now(), first ? 1 : 0]);
       return (await sql.get<UserRow>('SELECT * FROM users WHERE email = ?', [body.email]))!;
     });
     await db.audit({ tenant, actor: user.email, action: 'account.created', detail: needsInvite ? 'invite' : 'open' });
@@ -148,7 +155,7 @@ export function registerAccounts(app: FastifyInstance, o: { db: Db; config: Conf
     const idHash = tokenHash(body.code);
     const to = await db.peekLink(idHash, 'reset');
     const user = to ? await db.getUserByEmail(to) : undefined;
-    if (!user || !await db.useLink(idHash, 'reset')) {
+    if (!user || user.disabled_at || !await db.useLink(idHash, 'reset')) {
       throttle.fail([`ip:${req.ip}`]);
       throw fail(404, 'This link is not valid any more. Ask for a new one.', { code: 'LINK_INVALID' });
     }
@@ -172,8 +179,7 @@ export function registerAccounts(app: FastifyInstance, o: { db: Db; config: Conf
       await db.sql.run('DELETE FROM sessions WHERE user_id = ? AND id <> ?', [me.id, me.sessionId]);
       await db.audit({ tenant: me.tenant, actor: me.email, action: 'account.password_changed' });
     }
-    const user = (await db.getUser(me.id))!;
-    return { name: user.name, email: user.email };
+    return userDto((await db.getUser(me.id))!);
   });
 
   return { sessionUser };

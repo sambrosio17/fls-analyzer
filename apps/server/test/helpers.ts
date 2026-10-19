@@ -30,9 +30,9 @@ export async function openTestDb(): Promise<Db> {
 
 let ownerHash: Promise<string> | null = null;
 /** Adds a user to a tenant (the default one unless given) and returns its email. */
-export async function addUser(db: Db, email = OWNER, tenant = DEFAULT_TENANT): Promise<string> {
+export async function addUser(db: Db, email = OWNER, tenant = DEFAULT_TENANT, admin = false): Promise<string> {
   const passwordHash = await (ownerHash ??= hashPassword(PASSWORD));
-  await db.createUser({ id: randomBytes(6).toString('hex'), tenant, email, name: email.split('@')[0]!, passwordHash });
+  await db.createUser({ id: randomBytes(6).toString('hex'), tenant, email, name: email.split('@')[0]!, passwordHash, admin });
   return email;
 }
 
