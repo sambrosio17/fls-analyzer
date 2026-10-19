@@ -310,7 +310,13 @@ export interface UserRow {
   password_hash: string;
   created_at: string;
   last_login_at: string | null;
+  /** 1 for the people who manage invites and accounts (the first account is one). */
+  is_admin: number;
+  /** Set when an admin turned the account off: it cannot log in. */
+  disabled_at: string | null;
 }
+
+export interface LinkRow { id: string; kind: LinkKind; email: string; created_at: string; expires_at: string; used_at: string | null; created_by: string | null }
 
 export type LinkKind = 'invite' | 'reset';
 
@@ -327,7 +333,24 @@ export class Db {
     if (db.sql.dialect === 'postgres') await db.sql.exec(POSTGRES_SCHEMA);
     else await db.migrateSqlite();
     await db.sql.exec(ACCOUNT_SCHEMA);
+    await db.migrateAccounts();
     return db;
+  }
+
+  private async addColumn(table: string, column: string, definition: string): Promise<void> {
+    if (this.sql.dialect === 'postgres') return this.sql.exec(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${column} ${definition}`);
+    const cols = (await this.sql.all<{ name: string }>(`PRAGMA table_info(${table})`)).map(c => c.name);
+    if (!cols.includes(column)) await this.sql.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+
+  /** Account columns added after the first release of accounts. */
+  private async migrateAccounts(): Promise<void> {
+    await this.addColumn('users', 'is_admin', 'INTEGER NOT NULL DEFAULT 0');
+    await this.addColumn('users', 'disabled_at', 'TEXT');
+    await this.addColumn('account_links', 'created_by', 'TEXT');
+    // An install always has an admin: the oldest account becomes one if none is left.
+    await this.sql.run(`UPDATE users SET is_admin = 1 WHERE id = (SELECT id FROM users ORDER BY created_at, id LIMIT 1)
+      AND NOT EXISTS (SELECT 1 FROM users WHERE is_admin = 1)`);
   }
 
   close(): Promise<void> { return this.sql.close(); }
@@ -482,9 +505,9 @@ export class Db {
     return toInt(row?.n) > 0 && !owner;
   }
 
-  async createUser(u: { id: string; tenant: string; email: string; name: string; passwordHash: string }): Promise<UserRow> {
-    await this.sql.run('INSERT INTO users (id, tenant_id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [u.id, u.tenant, u.email, u.name, u.passwordHash, now()]);
+  async createUser(u: { id: string; tenant: string; email: string; name: string; passwordHash: string; admin?: boolean }): Promise<UserRow> {
+    await this.sql.run('INSERT INTO users (id, tenant_id, email, name, password_hash, created_at, is_admin) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [u.id, u.tenant, u.email, u.name, u.passwordHash, now(), u.admin ? 1 : 0]);
     return (await this.getUser(u.id))!;
   }
 
@@ -513,7 +536,7 @@ export class Db {
   async getSession(idHash: string): Promise<{ session: SessionInfo; user: UserRow } | undefined> {
     const row = await this.sql.get<UserRow & { session_id: string; session_created_at: string; last_seen_at: string; expires_at: string }>(
       `SELECT u.*, s.id AS session_id, s.created_at AS session_created_at, s.last_seen_at, s.expires_at
-       FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ? AND s.expires_at > ?`, [idHash, now()]);
+       FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ? AND s.expires_at > ? AND u.disabled_at IS NULL`, [idHash, now()]);
     if (!row) return undefined;
     const { session_id, session_created_at, last_seen_at, expires_at, ...user } = row;
     return { session: { id: session_id, created_at: session_created_at, last_seen_at, expires_at }, user };
@@ -536,8 +559,38 @@ export class Db {
     await this.sql.run('DELETE FROM sessions WHERE expires_at <= ?', [now()]);
   }
 
-  async createLink(l: { idHash: string; kind: LinkKind; email: string; expiresAt: string }): Promise<void> {
-    await this.sql.run('INSERT INTO account_links (id, kind, email, created_at, expires_at) VALUES (?, ?, ?, ?, ?)', [l.idHash, l.kind, l.email, now(), l.expiresAt]);
+  async createLink(l: { idHash: string; kind: LinkKind; email: string; expiresAt: string; createdBy?: string | null }): Promise<void> {
+    await this.sql.run('INSERT INTO account_links (id, kind, email, created_at, expires_at, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+      [l.idHash, l.kind, l.email, now(), l.expiresAt, l.createdBy ?? null]);
+  }
+
+  listLinks(kind: LinkKind): Promise<LinkRow[]> {
+    return this.sql.all<LinkRow>('SELECT * FROM account_links WHERE kind = ? ORDER BY created_at DESC LIMIT 500', [kind]);
+  }
+
+  /** Removes a link nobody has used yet; false if it was used or does not exist. */
+  async deleteUnusedLink(id: string): Promise<boolean> {
+    return (await this.sql.run('DELETE FROM account_links WHERE id = ? AND used_at IS NULL', [id])) === 1;
+  }
+
+  /** Every account with how much it holds and whether it is signed in somewhere, for the admin page. */
+  async listUsers(): Promise<(UserRow & { orgs: number; change_sets: number; sessions: number })[]> {
+    const rows = await this.sql.all<UserRow & { orgs: unknown; change_sets: unknown; sessions: unknown }>(`SELECT u.*,
+        (SELECT COUNT(*) FROM orgs o WHERE o.tenant_id = u.tenant_id) AS orgs,
+        (SELECT COUNT(*) FROM change_sets c WHERE c.tenant_id = u.tenant_id) AS change_sets,
+        (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS sessions
+      FROM users u ORDER BY u.created_at`, [now()]);
+    return rows.map(r => ({ ...r, orgs: toInt(r.orgs), change_sets: toInt(r.change_sets), sessions: toInt(r.sessions) }));
+  }
+
+  setAdmin(userId: string, admin: boolean): Promise<void> {
+    return this.update('users', userId, { is_admin: admin ? 1 : 0 });
+  }
+
+  /** Turns an account off (closing its sessions) or back on. */
+  async setDisabled(userId: string, disabled: boolean): Promise<void> {
+    await this.update('users', userId, { disabled_at: disabled ? now() : null });
+    if (disabled) await this.deleteUserSessions(userId);
   }
 
   /** The email of a valid, unused link. */

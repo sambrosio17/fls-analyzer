@@ -882,3 +882,15 @@ td.c button:disabled { pointer-events: none; }
   .focus, .rules { grid-template-columns: minmax(0, 1fr); }
   .focus-side { position: static; max-height: 340px; }
 }
+
+/* Admin */
+.admin-invite { display: grid; grid-template-columns: minmax(220px, 1fr) 160px auto; gap: 12px; align-items: end; padding: 14px 16px; }
+.admin-invite .field { margin-bottom: 0; }
+.link-box { margin: 0 16px 16px; padding: 12px; border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 10px; }
+.link-box p { margin: 0 0 8px; }
+.link-box .row { gap: 8px; }
+.link-box .input { flex: 1; min-width: 0; font-size: 12px; }
+.admin-actions { white-space: nowrap; text-align: right; }
+.admin-actions .btn + .btn { margin-left: 6px; }
+.admin .tbl-wrap { max-height: none; }
+@media (max-width: 720px) { .admin-invite { grid-template-columns: 1fr; } }

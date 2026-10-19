@@ -32,6 +32,7 @@ Ogni persona entra con email e password e vede solo le sue org, i suoi change se
 
 - **Installazione locale** (`APP_URL` su `localhost` o `127.0.0.1`): il primo account si crea dalla pagina di accesso, senza invito. Se il database viene da una versione precedente agli account, le org e i change set già presenti passano a questo primo account.
 - **Hosting**: si entra solo con un invito, legato a un indirizzo email e valido 14 giorni. Dal server: `npm run account -- invite ada@example.com` stampa il link da mandare. `npm run account -- reset ada@example.com` stampa un link per scegliere una nuova password (valido 24 ore). Con `SIGNUP=open` chiunque può registrarsi.
+- **Amministrazione**: il primo account è admin e ha la pagina Amministrazione, dove crea e revoca inviti, vede tutti gli account, crea link di reset, chiude le sessioni, dà o toglie il ruolo admin e disattiva gli account. Un admin non può modificare il proprio account da lì. Dal server, `npm run account -- admin ada@example.com` rende admin un account (per recuperare l'accesso).
 - Password di almeno 12 caratteri, salvate con scrypt. Dopo 10 tentativi sbagliati in 15 minuti l'accesso si blocca per quell'email e quell'IP.
 - La sessione scade dopo 12 ore di inattività e comunque dopo 7 giorni. Il database conserva solo un hash del token, quindi una copia del database non apre sessioni. Cambiare la password chiude le sessioni sugli altri dispositivi.
 - `APP_PASSWORD` e `APP_USER` non servono più: change set e approvazioni registrano l'email dell'account.

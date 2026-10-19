@@ -65,7 +65,14 @@ export class ApiError extends Error {
   constructor(readonly status: number, message: string, readonly detail?: string, readonly code?: string) { super(message); }
 }
 
-export interface User { name: string; email: string }
+export interface User { name: string; email: string; isAdmin: boolean }
+
+export interface AdminUser {
+  id: string; name: string; email: string; createdAt: string; lastLoginAt: string | null;
+  isAdmin: boolean; disabled: boolean; orgs: number; changeSets: number; sessions: number
+}
+export interface AdminInvite { id: string; email: string; createdAt: string; expiresAt: string; usedAt: string | null; createdBy: string | null; status: 'pending' | 'used' | 'expired' }
+export interface AdminOverview { signup: 'open' | 'invite'; local: boolean; users: AdminUser[]; invites: AdminInvite[] }
 export interface Session { authenticated: boolean; user: User | null; signup: 'open' | 'invite' }
 
 async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
@@ -89,6 +96,14 @@ export const api = {
   link: (kind: 'invite' | 'reset', code: string) => call<{ email: string }>('GET', `/api/account/link?kind=${kind}&code=${encodeURIComponent(code)}`),
   resetPassword: (code: string, password: string) => call<Session>('POST', '/api/account/reset', { code, password }),
   updateAccount: (body: { name?: string; currentPassword?: string; newPassword?: string }) => call<User>('PATCH', '/api/account', body),
+  admin: {
+    overview: () => call<AdminOverview>('GET', '/api/admin'),
+    invite: (email: string, days: number) => call<{ link: string }>('POST', '/api/admin/invites', { email, days }),
+    revokeInvite: (id: string) => call('DELETE', `/api/admin/invites/${encodeURIComponent(id)}`),
+    resetLink: (userId: string) => call<{ link: string }>('POST', `/api/admin/users/${userId}/reset-link`),
+    logoutUser: (userId: string) => call('POST', `/api/admin/users/${userId}/logout`),
+    updateUser: (userId: string, body: { disabled?: boolean; isAdmin?: boolean }) => call('PATCH', `/api/admin/users/${userId}`, body)
+  },
   orgs: () => call<Org[]>('GET', '/api/orgs'),
   removeOrg: (id: string) => call('DELETE', `/api/orgs/${id}`),
   renameOrg: (id: string, alias: string) => call<Org>('PATCH', `/api/orgs/${id}`, { alias }),

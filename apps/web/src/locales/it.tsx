@@ -34,7 +34,7 @@ export const it: Messages = {
 
   app: {
     guide: 'Guida', news: 'Novità', newsUnread: 'Ci sono novità da leggere',
-    orgs: 'Org', history: 'Storico', logout: 'Esci', settings: 'Impostazioni',
+    orgs: 'Org', history: 'Storico', logout: 'Esci', settings: 'Impostazioni', admin: 'Amministrazione',
     openOrgs: 'Org aperte', toolsLabel: 'Strumenti', openObjects: 'Oggetti aperti', openChangeSets: 'Change set aperti',
     closeX: (name: string) => `Chiudi ${name}`,
     openOrg: "Apri un'org",
@@ -67,8 +67,28 @@ export const it: Messages = {
       changesets: { title: 'Change set', body: <>Nulla viene scritto finché non confermi. <b>Vai all'anteprima</b> trasforma le modifiche in sospeso in un change set con cosa viene aggiunto, cambiato e tolto, e gli avvisi. In produzione serve un'approvazione e devi scrivere il nome dell'org. L'esecuzione mostra l'avanzamento e il risultato riga per riga. Se il server si riavvia durante un'esecuzione, OrgFox la riprende appena riparte: rilegge l'org per riconoscere le righe già scritte e applica solo le altre.</> },
       export: { title: 'Esportare', body: <>Il pulsante <b>Esporta</b> salva quello che vedi: la matrice in Excel o CSV o come metadata Salesforce (package.xml e un file per profilo e permission set), i change set in Excel, CSV o metadata con i valori che impostano, e i layout in Excel o CSV. Un pannello in basso a destra mostra l'avanzamento dei file grandi.</> },
       history: { title: 'Storico e annullamento', body: <>Lo <b>Storico</b> elenca ogni change set con chi l'ha preparato e approvato, e quando. Ognuno conserva i valori di prima, quindi <b>Annulla queste modifiche</b>, nel change set, crea un change set che li ripristina.</> },
-      settings: { title: 'Account, lingua e sessione', body: <>Entri con <b>email e password</b>, e ogni account vede solo le sue org, i suoi change set e il suo storico. Nella beta chiusa entri con un link di invito. Clicca il tuo nome in alto per aprire <b>Impostazioni</b>, dove cambi nome e password: una nuova password disconnette gli altri dispositivi. Scegli English, Italiano, Français o Español dal menu con le bandiere. <b>Esci</b> chiude la sessione di OrgFox; le org restano collegate. La sessione si chiude anche dopo 12 ore senza uso.</> }
+      settings: { title: 'Account, lingua e sessione', body: <>Entri con <b>email e password</b>, e ogni account vede solo le sue org, i suoi change set e il suo storico. Nella beta chiusa entri con un link di invito. Clicca il tuo nome in alto per aprire <b>Impostazioni</b>, dove cambi nome e password: una nuova password disconnette gli altri dispositivi. Scegli English, Italiano, Français o Español dal menu con le bandiere. <b>Esci</b> chiude la sessione di OrgFox; le org restano collegate. La sessione si chiude anche dopo 12 ore senza uso.</> },
+      admin: { title: 'Amministrazione', body: <>Il primo account di un'installazione è <b>admin</b> e vede la pagina <b>Amministrazione</b>. Lì <b>inviti</b> le persone: scrivi l'email, scegli per quanto vale il link, copialo e mandalo tu (OrgFox non invia ancora email). Il link funziona una volta sola e solo per quell'email; finché non è usato puoi <b>revocarlo</b>. L'elenco degli account mostra per ognuno la data di iscrizione e dell'ultimo accesso, quante org e change set ha e se ha sessioni aperte. Per ogni account puoi creare un <b>link di reset della password</b>, <b>disconnetterlo</b> ovunque, renderlo admin e <b>disattivarlo</b>: le sue sessioni si chiudono e non può entrare finché non lo riattivi. Su questa pagina non puoi modificare il tuo account.</> }
     }
+  },
+
+  admin: {
+    title: 'Amministrazione',
+    intro: 'Invita le persone in OrgFox e gestisci i loro account. Solo gli admin vedono questa pagina.',
+    inviteTitle: 'Invita qualcuno', email: 'Email', placeholder: 'nome@azienda.it', validFor: 'Link valido per', days: (n: number) => `${n} giorni`, createInvite: 'Crea invito',
+    signupInvite: 'Per i nuovi account serve un invito', signupOpen: 'Chiunque può creare un account (SIGNUP=open)',
+    inviteReady: (email: string, days: number) => `Invito per ${email}, valido ${days} giorni e una volta sola. Copialo e mandalo tu: OrgFox non invia ancora email.`,
+    resetReady: (email: string) => `Link di reset della password per ${email}, valido 24 ore. Copialo e mandalo tu.`,
+    link: 'Link', copy: 'Copia', copied: 'Copiato',
+    usersTitle: 'Account', count: (n: number) => `${n} account`, you: 'tu',
+    userCols: ['Account', 'Stato', 'Iscritto', 'Ultimo accesso', 'Org · change set', 'Sessioni'],
+    adminTag: 'Admin', activeTag: 'Attivo', disabledTag: 'Disattivato',
+    resetLink: 'Link di reset', logout: 'Disconnetti', makeAdmin: 'Rendi admin', removeAdmin: 'Togli admin', disable: 'Disattiva', enable: 'Riattiva',
+    confirmDisable: (email: string) => `Disattivare ${email}? Le sue sessioni si chiudono e non potrà entrare finché non riattivi l'account. Org e change set restano.`,
+    confirmAdmin: (email: string) => `Rendere ${email} admin? Potrà invitare persone e gestire tutti gli account.`,
+    invitesTitle: 'Inviti', inviteCols: ['Email', 'Creato', 'Scade', 'Stato'], revoke: 'Revoca', noInvites: 'Ancora nessun invito.',
+    status: { pending: 'In attesa', used: 'Usato', expired: 'Scaduto' },
+    errors: { EMAIL_TAKEN: 'Questa email ha già un account.', SELF: 'Qui non puoi modificare il tuo account.', ACCOUNT_DISABLED: 'Prima riattiva l’account.', NOT_FOUND: 'Non trovato: ricarica la pagina.' }
   },
 
   settings: {
@@ -194,7 +214,8 @@ export const it: Messages = {
       EMAIL_TAKEN: 'Esiste già un account con questa email: accedi.',
       LINK_INVALID: 'Questo link non è più valido. Chiedine uno nuovo.',
       WRONG_PASSWORD: 'La password attuale è errata.',
-      INVALID: 'Controlla i campi: la password deve avere almeno 12 caratteri.'
+      INVALID: 'Controlla i campi: la password deve avere almeno 12 caratteri.',
+      ACCOUNT_DISABLED: 'Questo account è stato disattivato. Scrivici se pensi che sia un errore.'
     }
   },
 

@@ -53,7 +53,7 @@ describe('sign up', () => {
     expect((await call('GET', '/api/session')).body).toEqual({ authenticated: false, user: null, signup: 'open' });
     const first = await call('POST', '/api/account', { name: 'Salvatore', email: ' Owner@Example.com ', password: PASSWORD });
     expect(first.status).toBe(200);
-    expect(first.body).toEqual({ authenticated: true, user: { name: 'Salvatore', email: OWNER } });
+    expect(first.body).toEqual({ authenticated: true, user: { name: 'Salvatore', email: OWNER, isAdmin: true } });
     expect((await call('GET', '/api/session', undefined, first.cookie)).body).toMatchObject({ authenticated: true, user: { email: OWNER } });
 
     expect((await call('GET', '/api/session')).body.signup).toBe('invite');
@@ -162,7 +162,7 @@ describe('sessions', () => {
     const here = await login(current.app);
     const elsewhere = await login(current.app);
     expect((await call('PATCH', '/api/account', { newPassword: NEW_PASSWORD, currentPassword: 'wrong password!' }, here)).status).toBe(403);
-    expect((await call('PATCH', '/api/account', { name: 'Salvo', newPassword: NEW_PASSWORD, currentPassword: PASSWORD }, here)).body).toEqual({ name: 'Salvo', email: OWNER });
+    expect((await call('PATCH', '/api/account', { name: 'Salvo', newPassword: NEW_PASSWORD, currentPassword: PASSWORD }, here)).body).toEqual({ name: 'Salvo', email: OWNER, isAdmin: false });
     expect((await call('GET', '/api/orgs', undefined, here)).status).toBe(200);
     expect((await call('GET', '/api/orgs', undefined, elsewhere)).status).toBe(401);
     expect((await call('PATCH', '/api/account', { name: 'X' })).status).toBe(401);

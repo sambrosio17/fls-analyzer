@@ -34,7 +34,7 @@ export const es: Messages = {
 
   app: {
     guide: 'Guía', news: 'Novedades', newsUnread: 'Hay novedades por leer',
-    orgs: 'Orgs', history: 'Historial', logout: 'Salir', settings: 'Ajustes',
+    orgs: 'Orgs', history: 'Historial', logout: 'Salir', settings: 'Ajustes', admin: 'Administración',
     openOrgs: 'Orgs abiertas', toolsLabel: 'Herramientas', openObjects: 'Objetos abiertos', openChangeSets: 'Change sets abiertos',
     closeX: (name: string) => `Cerrar ${name}`,
     openOrg: 'Abrir una org',
@@ -67,8 +67,28 @@ export const es: Messages = {
       changesets: { title: 'Change sets', body: <>No se escribe nada hasta que confirmas. <b>Ir a la vista previa</b> convierte los cambios pendientes en un change set con lo que se añade, cambia y quita, y los avisos. En producción necesita aprobación y escribir el nombre de la org. La ejecución muestra el progreso y el resultado fila por fila. Si el servidor se reinicia durante una ejecución, OrgFox la retoma al arrancar: relee la org para reconocer las filas ya escritas y aplica solo las demás.</> },
       export: { title: 'Exportar', body: <>El botón <b>Exportar</b> guarda lo que ves: la matriz en Excel, CSV o como metadatos de Salesforce (package.xml y un archivo por perfil y conjunto de permisos), los change sets en Excel, CSV o metadatos con los valores que fijan, y los formatos en Excel o CSV. Un panel abajo a la derecha muestra el progreso de los archivos grandes.</> },
       history: { title: 'Historial y deshacer', body: <>El <b>Historial</b> muestra cada change set con quién lo preparó y aprobó, y cuándo. Cada uno guarda los valores anteriores, así que <b>Deshacer estos cambios</b>, en el change set, crea un change set que los restaura.</> },
-      settings: { title: 'Cuenta, idioma y sesión', body: <>Entras con tu <b>email y contraseña</b>, y cada cuenta ve solo sus propias orgs, change sets e historial. En la beta cerrada se entra con un enlace de invitación. Haz clic en tu nombre arriba para abrir <b>Ajustes</b>, donde cambias tu nombre y tu contraseña: una contraseña nueva cierra la sesión en tus otros dispositivos. Elige English, Italiano, Français o Español en el menú con las banderas. <b>Salir</b> cierra la sesión de OrgFox; tus orgs siguen conectadas. La sesión también se cierra tras 12 horas sin uso.</> }
+      settings: { title: 'Cuenta, idioma y sesión', body: <>Entras con tu <b>email y contraseña</b>, y cada cuenta ve solo sus propias orgs, change sets e historial. En la beta cerrada se entra con un enlace de invitación. Haz clic en tu nombre arriba para abrir <b>Ajustes</b>, donde cambias tu nombre y tu contraseña: una contraseña nueva cierra la sesión en tus otros dispositivos. Elige English, Italiano, Français o Español en el menú con las banderas. <b>Salir</b> cierra la sesión de OrgFox; tus orgs siguen conectadas. La sesión también se cierra tras 12 horas sin uso.</> },
+      admin: { title: 'Administración', body: <>La primera cuenta de una instalación es <b>admin</b> y ve la página <b>Administración</b>. Allí <b>invitas</b> a personas: escribe su email, elige cuánto dura el enlace, cópialo y envíalo tú (OrgFox todavía no envía emails). El enlace sirve una sola vez y solo para ese email; mientras no se use puedes <b>revocarlo</b>. La lista de cuentas muestra la fecha de alta y del último acceso de cada una, cuántas orgs y change sets tiene y si tiene sesiones abiertas. Para cada cuenta puedes crear un <b>enlace para cambiar la contraseña</b>, <b>cerrar su sesión</b> en todas partes, hacerla admin y <b>desactivarla</b>: sus sesiones se cierran y no puede entrar hasta que la reactives. En esta página no puedes cambiar tu propia cuenta.</> }
     }
+  },
+
+  admin: {
+    title: 'Administración',
+    intro: 'Invita a personas a OrgFox y gestiona sus cuentas. Solo los admins ven esta página.',
+    inviteTitle: 'Invitar a alguien', email: 'Email', placeholder: 'nombre@empresa.es', validFor: 'Enlace válido', days: (n: number) => `${n} días`, createInvite: 'Crear invitación',
+    signupInvite: 'Las cuentas nuevas necesitan invitación', signupOpen: 'Cualquiera puede crear una cuenta (SIGNUP=open)',
+    inviteReady: (email: string, days: number) => `Invitación para ${email}, válida ${days} días y una sola vez. Cópiala y envíala tú: OrgFox todavía no envía emails.`,
+    resetReady: (email: string) => `Enlace para cambiar la contraseña de ${email}, válido 24 horas. Cópialo y envíalo tú.`,
+    link: 'Enlace', copy: 'Copiar', copied: 'Copiado',
+    usersTitle: 'Cuentas', count: (n: number) => `${n} cuentas`, you: 'tú',
+    userCols: ['Cuenta', 'Estado', 'Alta', 'Último acceso', 'Orgs · change sets', 'Sesiones'],
+    adminTag: 'Admin', activeTag: 'Activa', disabledTag: 'Desactivada',
+    resetLink: 'Enlace de contraseña', logout: 'Cerrar sesión', makeAdmin: 'Hacer admin', removeAdmin: 'Quitar admin', disable: 'Desactivar', enable: 'Reactivar',
+    confirmDisable: (email: string) => `¿Desactivar ${email}? Sus sesiones se cierran y no podrá entrar hasta que reactives la cuenta. Sus orgs y change sets se conservan.`,
+    confirmAdmin: (email: string) => `¿Hacer admin a ${email}? Podrá invitar a personas y gestionar todas las cuentas.`,
+    invitesTitle: 'Invitaciones', inviteCols: ['Email', 'Creada', 'Caduca', 'Estado'], revoke: 'Revocar', noInvites: 'Todavía no hay invitaciones.',
+    status: { pending: 'Pendiente', used: 'Usada', expired: 'Caducada' },
+    errors: { EMAIL_TAKEN: 'Este email ya tiene una cuenta.', SELF: 'Aquí no puedes cambiar tu propia cuenta.', ACCOUNT_DISABLED: 'Primero reactiva la cuenta.', NOT_FOUND: 'No encontrado: recarga la página.' }
   },
 
   settings: {
@@ -194,7 +214,8 @@ export const es: Messages = {
       EMAIL_TAKEN: 'Ya existe una cuenta con este email: entra con ella.',
       LINK_INVALID: 'Este enlace ya no es válido. Pide uno nuevo.',
       WRONG_PASSWORD: 'La contraseña actual es incorrecta.',
-      INVALID: 'Revisa los campos: la contraseña necesita al menos 12 caracteres.'
+      INVALID: 'Revisa los campos: la contraseña necesita al menos 12 caracteres.',
+      ACCOUNT_DISABLED: 'Esta cuenta se ha desactivado. Escríbenos si crees que es un error.'
     }
   },
 

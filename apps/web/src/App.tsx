@@ -9,6 +9,7 @@ import { LayoutsPage } from './pages/Layouts.tsx';
 import { Guide } from './pages/Guide.tsx';
 import { News } from './pages/News.tsx';
 import { Settings } from './pages/Settings.tsx';
+import { Admin } from './pages/Admin.tsx';
 import { LATEST } from './changelog.ts';
 import { Brand } from './Brand.tsx';
 import { TokenTabButton } from './TokenButton.tsx';
@@ -24,7 +25,7 @@ import {
   APEX_OBJECT, moveOrg, moveTab, selectTab, selectTool, tabTitle, toolOf, updateTab, visibleTab, type WorkTab, type Workspace
 } from './workspace.ts';
 
-type View = 'orgs' | 'history' | 'work' | 'guide' | 'news' | 'settings';
+type View = 'orgs' | 'history' | 'work' | 'guide' | 'news' | 'settings' | 'admin';
 
 const ACCENT_STYLE = accentCss();
 const storage = (() => { try { return window.localStorage; } catch { return null; } })();
@@ -160,6 +161,7 @@ export function App() {
               {t.app.news}{newsSeen !== LATEST && <span className="news-dot" role="img" aria-label={t.app.newsUnread} title={t.app.newsUnread} />}
             </button>
             <button className="tab" aria-current={view === 'settings' ? 'page' : undefined} onClick={() => setView('settings')}>{t.app.settings}</button>
+            {user?.isAdmin && <button className="tab" aria-current={view === 'admin' ? 'page' : undefined} onClick={() => setView('admin')}>{t.app.admin}</button>}
           </nav>
           <span className="spacer" />
           <LangPicker />
@@ -248,6 +250,7 @@ export function App() {
         )}
         {view === 'guide' && <Guide focus={guideFocus} />}
         {view === 'settings' && <Settings user={user} onUser={setUser} />}
+        {view === 'admin' && user?.isAdmin && <Admin me={user} />}
         {view === 'news' && <News onGuide={section => { setGuideFocus(section); setView('guide'); }} />}
         {view === 'history' && <History orgs={orgs} onOpen={(id, orgId, number) => showChangeSet(orgId, id, number)} />}
         {view === 'work' && !activeOrg && (

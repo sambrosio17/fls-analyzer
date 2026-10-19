@@ -138,7 +138,7 @@ const CHAPTERS: { group: keyof Messages['guide']['groups']; items: ({ guide: Gui
   { group: 'matrix', items: [{ guide: 'views', demo: <MapDemo /> }, { matrix: 'read' }, { matrix: 'click' }, { matrix: 'drag' }, { matrix: 'right' }, { matrix: 'bulk' }, { matrix: 'filter' }] },
   { group: 'tools', items: [{ guide: 'apex', demo: <ApexDemo /> }, { guide: 'layouts', demo: <LayoutEditDemo /> }, { guide: 'layoutViews', demo: <PaintDemo /> }] },
   { group: 'apply', items: [{ guide: 'changesets', demo: <FlowDemo /> }, { guide: 'export', demo: <ExportDemo /> }, { guide: 'history' }] },
-  { group: 'more', items: [{ guide: 'settings' }] }
+  { group: 'more', items: [{ guide: 'settings' }, { guide: 'admin' }] }
 ];
 
 export const GUIDE_IDS = CHAPTERS.flatMap(c => c.items.map(i => 'guide' in i ? i.guide : i.matrix));
