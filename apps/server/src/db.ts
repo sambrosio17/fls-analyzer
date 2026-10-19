@@ -128,6 +128,8 @@ export interface ChangeSetRow {
   kind: ChangeSetKind;
   /** Assignment runs: how long each step took, [{ step, ms }]. */
   timings_json: string | null;
+  /** Set when a run cut short by a server restart was picked up again. */
+  resumed_at: string | null;
 }
 
 export type ChangeSetKind = 'fls' | 'assignments';
@@ -201,6 +203,7 @@ export class Db {
     const csCols = (this.sql.prepare('PRAGMA table_info(change_sets)').all() as { name: string }[]).map(c => c.name);
     if (!csCols.includes('kind')) this.sql.exec("ALTER TABLE change_sets ADD COLUMN kind TEXT NOT NULL DEFAULT 'fls'");
     if (!csCols.includes('timings_json')) this.sql.exec('ALTER TABLE change_sets ADD COLUMN timings_json TEXT');
+    if (!csCols.includes('resumed_at')) this.sql.exec('ALTER TABLE change_sets ADD COLUMN resumed_at TEXT');
     const aCols = (this.sql.prepare('PRAGMA table_info(assignment_items)').all() as { name: string }[]).map(c => c.name);
     if (!aCols.includes('form_factor')) this.sql.exec('ALTER TABLE assignment_items ADD COLUMN form_factor TEXT');
   }
@@ -281,6 +284,11 @@ export class Db {
     return this.sql.prepare('SELECT * FROM change_sets WHERE tenant_id = ? AND id = ?').get(tenant, id) as ChangeSetRow | undefined;
   }
 
+  /** Change sets left in "running", e.g. by a server restart in the middle of a run. */
+  listRunning(tenant: string): ChangeSetRow[] {
+    return this.sql.prepare("SELECT * FROM change_sets WHERE tenant_id = ? AND status = 'running' ORDER BY seq").all(tenant) as unknown as ChangeSetRow[];
+  }
+
   listChangeSets(tenant: string, orgId?: string): (ChangeSetRow & { total: number; ok: number; errors: number })[] {
     const where = orgId ? 'cs.tenant_id = ? AND cs.org_id = ?' : 'cs.tenant_id = ?';
     const args = orgId ? [tenant, orgId] : [tenant];
@@ -293,7 +301,7 @@ export class Db {
       WHERE ${where} GROUP BY cs.id ORDER BY cs.seq DESC LIMIT 200`).all(...args) as never;
   }
 
-  updateChangeSet(id: string, fields: Partial<Pick<ChangeSetRow, 'status' | 'submitted_at' | 'approved_by' | 'approved_at' | 'started_at' | 'finished_at' | 'timings_json'>>): void {
+  updateChangeSet(id: string, fields: Partial<Pick<ChangeSetRow, 'status' | 'submitted_at' | 'approved_by' | 'approved_at' | 'started_at' | 'finished_at' | 'timings_json' | 'resumed_at'>>): void {
     const keys = Object.keys(fields) as (keyof typeof fields)[];
     if (!keys.length) return;
     this.sql.prepare(`UPDATE change_sets SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`)

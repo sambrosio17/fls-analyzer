@@ -71,6 +71,8 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
     refresh: () => renewToken(org)
   }));
   const service = new ChangeSetService({ db, tenant, actor: config.appUser, requireDifferentApprover: config.requireDifferentApprover, apiFor });
+  // Runs a restart cut short carry on from where they stopped.
+  service.resumeInterrupted();
 
   app.register(cookie, { secret: config.appSecret });
 
@@ -239,7 +241,7 @@ export function buildApp({ config, db, apiFor: apiOverride, extraApis, refreshTo
     return {
       id: cs.id, number: `CS-${String(cs.seq).padStart(4, '0')}`, org: orgDto(org), author: cs.author, description: cs.description,
       status: cs.status, rollbackOf: cs.rollback_of, createdAt: cs.created_at, submittedAt: cs.submitted_at,
-      approvedBy: cs.approved_by, approvedAt: cs.approved_at, startedAt: cs.started_at, finishedAt: cs.finished_at,
+      approvedBy: cs.approved_by, approvedAt: cs.approved_at, startedAt: cs.started_at, finishedAt: cs.finished_at, resumedAt: cs.resumed_at,
       requiresApproval: !org.is_sandbox, skipped: JSON.parse(cs.skipped_json), kind: cs.kind, timings: cs.timings_json ? JSON.parse(cs.timings_json) : null,
       assignments: db.listAssignments(cs.id).map(r => ({
         id: r.id, kind: r.kind, object: r.object, profile: r.profile, profileLabel: r.profile_label, recordType: r.record_type, app: r.app, formFactor: r.form_factor,

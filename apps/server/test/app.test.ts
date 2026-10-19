@@ -15,10 +15,10 @@ const SALES = '0PS000000000001';
 const FIN = '0PS000000000002';
 const CPQ = '0PS000000000003';
 
-async function setup(isSandbox = true) {
-  const db = new Db(':memory:');
-  const fake = fakeOrg(isSandbox);
-  db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: isSandbox ? 'Acme UAT' : 'Acme', username: 'me@acme.com',
+async function setup(isSandbox = true, reuse?: { db: Db; fake: ReturnType<typeof fakeOrg> }) {
+  const db = reuse?.db ?? new Db(':memory:');
+  const fake = reuse?.fake ?? fakeOrg(isSandbox);
+  if (!reuse) db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: isSandbox ? 'Acme UAT' : 'Acme', username: 'me@acme.com',
     instance_url: 'https://acme.my.salesforce.com', login_url: 'https://login.salesforce.com', is_sandbox: isSandbox ? 1 : 0, refresh_token_enc: 'x', access_token_enc: null, alias: null });
   const app = buildApp({ config, db, apiFor: () => fake });
   const login = await app.inject({ method: 'POST', url: '/api/session', payload: { password: 'secret-pass' } });
@@ -35,7 +35,7 @@ async function setup(isSandbox = true) {
     }
     throw new Error('timeout');
   };
-  return { app, fake, call, waitDone };
+  return { app, db, fake, call, waitDone };
 }
 
 let current: Awaited<ReturnType<typeof setup>> | null = null;
@@ -106,6 +106,29 @@ describe('API', () => {
     await call('POST', `/api/change-sets/${rb.body.id}/execute`, {});
     expect((await waitDone(rb.body.id)).status).toBe('done');
     expect(fake.fieldPerms.map(p => [p.ParentId, p.Field, p.PermissionsRead, p.PermissionsEdit])).toEqual([[SALES, 'Account.Industry', true, false]]);
+  });
+
+  it('picks up a run cut short by a restart without redoing or flagging the rows already written', async () => {
+    current = await setup();
+    const { db, fake, call } = current;
+    const created = await call('POST', '/api/orgs/org1/change-sets', {
+      bulk: [{ fields: ['Account.Industry', 'Account.Tax_Code__c'], parentIds: [SALES, FIN], action: 'edit' }]
+    });
+    const cs = created.body;
+    const row = (label: string, field: string) => cs.items.find((i: { parentLabel: string; field: string }) => i.parentLabel === label && i.field === field);
+    // The server stopped mid-run: one row was written and recorded, one written but not yet recorded, two not written.
+    db.updateChangeSet(cs.id, { status: 'running', started_at: new Date().toISOString() });
+    fake.addPerm(FIN, 'Account.Industry', true, true);
+    db.updateItem(row('Finance Access', 'Account.Industry').id, { status: 'ok' });
+    fake.addPerm(FIN, 'Account.Tax_Code__c', true, true);
+    await current.app.close();
+
+    current = await setup(true, { db, fake });
+    const done = await current.waitDone(cs.id);
+    expect(done.status).toBe('done');
+    expect(done.resumedAt).not.toBeNull();
+    expect(done.items.map((i: { status: string }) => i.status)).toEqual(['ok', 'ok', 'ok', 'ok']);
+    expect(fake.fieldPerms).toHaveLength(4);
   });
 
   it('reads Apex class access as a matrix of enabled classes', async () => {

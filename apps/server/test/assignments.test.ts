@@ -5,16 +5,18 @@ import { DEFAULT_TENANT, Db } from '../src/db.ts';
 import { SalesforceClient, toXml } from '../src/salesforce/client.ts';
 import { demoOrg } from '../src/salesforce/demo.ts';
 import { loadLayoutAnalysis, loadPageAnalysis } from '../src/salesforce/pages.ts';
+import { writeAssignments } from '../src/services/assignments.ts';
+import { assignmentFromRow } from '../src/db.ts';
 
 const config: Config = {
   port: 0, appUrl: 'http://localhost:3000', appPassword: 'secret-pass', appSecret: 'x'.repeat(40), appUser: 'owner',
   sfClientId: 'cid', sfClientSecret: null, sfApiVersion: 'v62.0', dbPath: ':memory:', requireDifferentApprover: false, demoMode: false
 };
 
-async function setup() {
-  const db = new Db(':memory:');
-  const org = demoOrg();
-  db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: 'Acme UAT', username: 'me@acme.com',
+async function setup(reuse?: { db: Db; org: ReturnType<typeof demoOrg> }) {
+  const db = reuse?.db ?? new Db(':memory:');
+  const org = reuse?.org ?? demoOrg();
+  if (!reuse) db.upsertOrg({ id: 'org1', tenant_id: DEFAULT_TENANT, sf_org_id: '00D000000000001', name: 'Acme UAT', username: 'me@acme.com',
     instance_url: 'https://acme.my.salesforce.com', login_url: 'https://test.salesforce.com', is_sandbox: 1, refresh_token_enc: 'x', access_token_enc: null, alias: null });
   const app = buildApp({ config, db, apiFor: () => org });
   const login = await app.inject({ method: 'POST', url: '/api/session', payload: { password: 'secret-pass' } });
@@ -44,6 +46,29 @@ const page = (profile: string, recordType: string | null, after: string | null) 
   ({ kind: 'page', object: 'Account', profile, profileLabel: profile, recordType, app: 'standard__LightningSales', after });
 
 describe('assignment change sets', () => {
+  it('picks up a run cut short by a restart without flagging the assignment already written', async () => {
+    current = await setup();
+    const { call, db, org } = current;
+    const cs = (await call('POST', '/api/orgs/org1/assignment-change-sets', {
+      changes: [layout('Sales User', 'Business', 'Account (Marketing) Layout'), page('Admin', 'Partner', 'Account_Sales_Page')]
+    })).body;
+    // The server stopped after writing the layout, before recording it.
+    db.updateChangeSet(cs.id, { status: 'running', started_at: new Date().toISOString() });
+    const [written] = db.listAssignments(cs.id).filter(r => r.kind === 'layout').map(assignmentFromRow);
+    expect((await writeAssignments(org, [written!]))[0]!.ok).toBe(true);
+    await current.app.close();
+
+    current = await setup({ db, org });
+    let done = (await current.call('GET', `/api/change-sets/${cs.id}`)).body;
+    for (let i = 0; i < 50 && done.status === 'running'; i++) {
+      await new Promise(r => setTimeout(r, 10));
+      done = (await current.call('GET', `/api/change-sets/${cs.id}`)).body;
+    }
+    expect(done.status).toBe('done');
+    expect(done.resumedAt).not.toBeNull();
+    expect(done.assignments.map((a: { status: string }) => a.status)).toEqual(['ok', 'ok']);
+  });
+
   it('previews with the org values, writes layouts and pages, verifies and rolls back', async () => {
     current = await setup();
     const { call, run, org } = current;
